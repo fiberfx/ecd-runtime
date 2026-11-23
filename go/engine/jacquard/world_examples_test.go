@@ -3,7 +3,7 @@ package ecs_test
 import (
 	"time"
 
-	"github.com/mlange-42/ark/ecs"
+	"github.com/fiberfx/ecd-loom/go/engine/jacquard"
 )
 
 func ExampleNewWorld() {

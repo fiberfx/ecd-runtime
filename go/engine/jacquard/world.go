@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/mlange-42/ark/ecs/stats"
+	"github.com/fiberfx/ecd-loom/go/engine/jacquard/stats"
 )
 
 // World is the central type holding entity and component data, as well as resources.

@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"unsafe"
 
-	"github.com/mlange-42/ark/ecs/stats"
+	"github.com/fiberfx/ecd-loom/go/engine/jacquard/stats"
 )
 
 // tableID is the type of table IDs.

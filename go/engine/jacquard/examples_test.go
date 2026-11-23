@@ -3,7 +3,7 @@ package ecs_test
 import (
 	"math/rand/v2"
 
-	"github.com/mlange-42/ark/ecs"
+	"github.com/fiberfx/ecd-loom/go/engine/jacquard"
 )
 
 func NewGrid(width, height int) Grid {

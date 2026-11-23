@@ -1,6 +1,6 @@
 package ecs_test
 
-import "github.com/mlange-42/ark/ecs"
+import "github.com/fiberfx/ecd-loom/go/engine/jacquard"
 
 func ExampleResource() {
 	// Create a world.

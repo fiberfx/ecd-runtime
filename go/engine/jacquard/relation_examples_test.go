@@ -3,7 +3,7 @@ package ecs_test
 import (
 	"fmt"
 
-	"github.com/mlange-42/ark/ecs"
+	"github.com/fiberfx/ecd-loom/go/engine/jacquard"
 )
 
 // ChildOf demonstrates how to define a relation component.
