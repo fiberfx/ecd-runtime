@@ -1,0 +1,9 @@
+Ecd Loom contains code derived from Ark (github.com/mlange-42/ark).
+
+  third_party/ark/     Ark at commit 723f2ac, copied verbatim. SOURCE.txt names the commit and the copied paths.
+  engine/jacquard/     Jacquard, a rewrite of Ark's ecs package. Its source files start from the copy in third_party/ark/ecs.
+
+Derived from Ark (github.com/mlange-42/ark) at commit 723f2ac. Copyright (c) 2025 Martin Lange. MIT License.
+
+Ark is available under the MIT License or the Apache License 2.0. Both licence texts are in third_party/ark/ as
+LICENSE-MIT and LICENSE-APACHE.
