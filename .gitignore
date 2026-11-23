@@ -1,0 +1,14 @@
+# Build and test products
+*.test
+*.out
+*.prof
+/bin/
+/go/bin/
+
+# Editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+
+# Local state
+*.local/
