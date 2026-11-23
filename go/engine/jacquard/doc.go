@@ -1,3 +1,5 @@
+// Derived from Ark (github.com/mlange-42/ark) at commit 723f2ac. Copyright (c) 2025 Martin Lange. MIT License.
+
 // Package ecs provides the core API of Ark, an Entity Component System (ECS) for Go.
 //
 // See the top-level module [github.com/mlange-42/ark] for an overview.
