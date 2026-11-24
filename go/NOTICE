@@ -1,7 +1,8 @@
 Ecd Loom contains code derived from Ark (github.com/mlange-42/ark).
 
   third_party/ark/     Ark at commit 723f2ac, copied verbatim. SOURCE.txt names the commit and the copied paths.
-  engine/jacquard/     Jacquard, a rewrite of Ark's ecs package. Its source files start from the copy in third_party/ark/ecs.
+  engine/jacquard/     Jacquard, the archetype engine. Jacquard's files that port Ark files name their source file in
+                       their header; the cut in third_party/ark/ecs is the source.
 
 Derived from Ark (github.com/mlange-42/ark) at commit 723f2ac. Copyright (c) 2025 Martin Lange. MIT License.
 

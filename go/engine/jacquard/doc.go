@@ -1,68 +1,13 @@
-// Derived from Ark (github.com/mlange-42/ark) at commit 723f2ac. Copyright (c) 2025 Martin Lange. MIT License.
-
-// Package ecs provides the core API of Ark, an Entity Component System (ECS) for Go.
+// Package jacquard is Loom's archetype engine.
 //
-// See the top-level module [github.com/mlange-42/ark] for an overview.
+// Engine is the central type of the package. An entity is known by two names: the eid is its durable key and
+// crosses every boundary, and Entity is the process-local handle that the hot paths use and that never leaves
+// the process.
 //
-// 🕮 Also read Ark's [User Guide] and take a look at the [examples]!
+// Entities of one kind and one component set share an archetype. An archetype stores its rows in fixed-size
+// chunks, and column 0 of every chunk holds the eid of each row (JI1). A component set is a mask, and the
+// width of a mask is 256 bits, or 512 bits under the build tag jacquard512.
 //
-// # Outline
-//
-//   - [World] provides basic functionality that does not require generics,
-//     like [World.NewEntity], [World.Alive], [World.RemoveEntity], etc.
-//   - [Filter1], [Filter2], etc. provide filters for querying entities by their components.
-//   - [Query1], [Query2], etc. are the actual query iterators, and provide functionality like
-//     [Query1.Next], [Query1.Get] and [Query1.Entity].
-//   - [Map1], [Map2], etc. provide access to and manipulation of multiple components.
-//     like [Map1.Get], [Map1.Add], [Map1.Remove], etc.
-//   - [Map] provides access to a single component, like [Map.Get] and [Map.Add], [Map.Remove].
-//   - [Exchange1], [Exchange2] etc. allows to add, remove and exchange components.
-//   - [Resource] provides access the world's [Resources].
-//   - [Observer], [Observer1], etc. allow to react on ECS operations.
-//   - See the separate module [ark-serde] for serialization.
-//
-// # ECS Manipulations
-//
-// This section gives an overview on how to achieve typical ECS operations in Ark.
-//
-// Access data:
-//   - Create a filter: [NewFilter2].
-//   - Create a [Query2]: [Filter2.Query].
-//   - Iterate a Query: [Query2.Next], [Query2.NextTable], [Query2.Get], [Query2.GetColumns].
-//   - Access components of entities: [Map.Get], [Map2.Get].
-//   - Access relationship targets: [Map.GetRelation], [Map2.GetRelation].
-//
-// Manipulate a single [Entity]:
-//   - Create an entity: [World.NewEntity]
-//   - Create an entity with components: [Map2.NewEntity], [Map2.NewEntityFn].
-//   - Add components to an entity: [Map.Add], [Map.AddFn], [Map2.Add], [Map2.AddFn], [Exchange2.Add], [Exchange2.AddFn].
-//   - Remove components from an entity: [Map.Remove], [Map2.Remove], [Exchange2.Remove].
-//   - Exchange components of an entity: [Exchange2.Exchange], [Exchange2.ExchangeFn].
-//   - Change relationship targets: [Map.SetRelation], [Map2.SetRelations].
-//   - Remove an entity from the world: [World.RemoveEntity].
-//
-// Manipulate entities in batches:
-//   - Create entities: [World.NewEntities]
-//   - Create entities with components: [Map2.NewBatch], [Map2.NewBatchFn].
-//   - Add components to entities: [Map2.AddBatch], [Map2.AddBatchFn], [Exchange2.AddBatch], [Exchange2.AddBatchFn].
-//   - Remove components from entities: [Map2.RemoveBatch], [Exchange2.RemoveBatch].
-//   - Exchange components of entities: [Exchange2.ExchangeBatch], [Exchange2.ExchangeBatchFn].
-//   - Change relationship targets: [Map2.SetRelationsBatch].
-//   - Remove entities from the world: [World.RemoveEntities].
-//
-// # Build tags
-//
-// Ark provides two build tags:
-//   - ark_tiny: Reduces the maximum number of components to 64, for faster mask-related operations and smaller archetype memory footprint.
-//   - ark_debug: Improves error messages on incorrect use, at the cost of performance. Use this if you get panics from queries or maps.
-//
-// When building your application, use them like this:
-//
-//	go build -tags ark_tiny .
-//	go build -tags ark_debug .
-//	go build -tags ark_tiny,ark_debug .
-//
-// [ark-serde]: https://github.com/mlange-42/ark-serde/
-// [User Guide]: https://ark.mlange.dev/
-// [examples]: https://github.com/mlange-42/ark/tree/main/examples
-package ecs
+// Files that port a file of Ark name their source file in their header; the cut in go/third_party/ark/ecs is
+// the source.
+package jacquard

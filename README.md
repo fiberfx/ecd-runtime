@@ -10,12 +10,12 @@ The contract is the Ecd specification `ecd_loom.specs.md`. This repository holds
 | Path | Content |
 |---|---|
 | `go/` | The Go module `github.com/fiberfx/ecd-loom/go`. |
-| `go/engine/jacquard/` | Jacquard, the archetype engine. It derives from Ark and is rewritten in place. |
+| `go/engine/jacquard/` | Jacquard, the archetype engine. Its files that port Ark files name their source file in their header; the cut in `go/third_party/ark/` is the source. |
 | `go/third_party/ark/` | Ark, the `ark` reference engine, copied byte for byte. It is a nested Go module and is not a dependency of the Loom module. `SOURCE.txt` names the commit. |
 | `go/NOTICE` | The attribution for the code derived from Ark. |
 | `rows/loom.rows.sh` | The rows script. |
 
-The diff between `go/third_party/ark/ecs/` and `go/engine/jacquard/` records every adaptation of Ark.
+`git diff --no-index` between a ported file in `go/engine/jacquard/` and its source file in `go/third_party/ark/ecs/` records the adaptation.
 
 ## Rows
 
