@@ -14,7 +14,7 @@
 #
 # Rows live in group files, rows/groups/NN-<group>.sh, which the script sources in name order between R0 and the
 # final line. A group file is POSIX sh sourced from /w. It owns its row ids and its group name, calls "sel ID GROUP"
-# before each row, may use the helpers (say, sel, offline, head_of, count, tree_of, go_row, HAVE_GO), and never
+# before each row, may use the helpers (say, sel, offline, head_of, count, go_row, HAVE_GO), and never
 # exits. A later group is added as a file named NN-<group>.sh with NN above the files present.
 #
 # ROWS is a comma-separated list of row ids and group names. The default is every row. R0 always runs.
@@ -54,7 +54,7 @@ SEL=$(printf '%s' "${ROWS:-}" | tr -d ' ')
 say() { # id expect observed verdict
   echo "ROW $1 | expect $2 | observed $3 | $4"
   RAN=$((RAN + 1))
-  case $4 in FAIL|SURVIVED) BAD=1 ;; CNM) CNM=1 ;; esac
+  case $4 in FAIL|SURVIVED) BAD=$((BAD + 1)) ;; CNM) CNM=$((CNM + 1)) ;; esac
 }
 # sel id group: true when ROWS is empty or names the row or its group.
 sel() {
@@ -66,19 +66,6 @@ sel() {
 offline() { grep -q -E 'no matching versions|module lookup disabled|reading file:///|dial tcp|no such host|cannot find module|missing go.sum entry|unrecognized import path|could not read Username|failed to download|GOPROXY list is not the empty string' "$1"; }
 head_of() { head -"${2:-20}" "$1" | cut -c1-220 | sed 's/^/    | /'; }
 count() { grep -c "$1" "$2" 2>/dev/null; }
-
-# tree_of dir: the git tree hash of dir's content, computed in a temporary repository.
-tree_of() {
-  d=$(mktemp -d /tmp/rows/tree.XXXXXX) || return 1
-  cp -a "$1" "$d/ecs" || { rm -rf "$d"; return 1; }
-  (
-    cd "$d" && git init -q . && git -c core.autocrlf=false -c core.excludesFile=/dev/null add -A >/dev/null 2>&1 &&
-      t=$(git write-tree) && git rev-parse "$t:ecs"
-  )
-  rc=$?
-  rm -rf "$d"
-  return $rc
-}
 
 # go_row id group expect dir verb args...: go vet, build or test in dir. A row that finds no package or runs no test is CNM.
 go_row() {
@@ -120,7 +107,7 @@ for f in /w/rows/groups/*.sh; do
   [ -f "$f" ] && . "$f"
 done
 
-if [ $RAN -le 1 ] && [ -n "$SEL" ] && [ "$SEL" != R0 ]; then echo "NOTE ROWS=$SEL selected no row besides R0"; CNM=1; fi
+if [ $RAN -le 1 ] && [ -n "$SEL" ] && [ "$SEL" != R0 ]; then echo "NOTE ROWS=$SEL selected no row besides R0"; CNM=$((CNM + 1)); fi
 echo "END $(date -u +%Y-%m-%dT%H:%M:%SZ) rows $RAN bad $BAD cnm $CNM"
 if [ $BAD -ne 0 ]; then exit 1; elif [ $CNM -ne 0 ]; then exit 3; fi
 exit 0

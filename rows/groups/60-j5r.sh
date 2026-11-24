@@ -1,5 +1,5 @@
 # Group j5r of Ecd Runtime: the residency answers of the Engine of package jacquard, checked against the reference model.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, go_row and HAVE_GO.
 #
 #   J5R-01   Apply and Get of an Engine with a residency declaration answer as the reference model does, on a Cold All
 #            kind, a Warm All kind and a Touched kind: a Set, Unset or Destroy of a Touched entity that is not resident
@@ -17,6 +17,7 @@
 #   J5R-01pc plant: a Cold kind is not skipped (residency.go)
 #   J5R-02p  plant: a Get of a Touched entity that is not resident answers ErrAbsent (engine.go)
 #   J5R-03p  plant: a query on a Cold kind is answered (query.go)
+#   J5R-03pt plant: a query with no kinds runs on the nodes of a Touched kind (query.go)
 #   J5R-04p  plant: a refusal of the check pass does not match ecd.ErrOp (engine.go)
 #
 # j5r_plant id expect test file sedexpr [flags]: copies /w/go to a temporary directory, applies the one-line sed to
@@ -52,3 +53,4 @@ j5r_plant J5R-01pc "TestJ5RNoChange fails on the plant"  TestJ5RNoChange  reside
 j5r_plant J5R-02p  "TestJ5RResidency fails on the plant" TestJ5RResidency engine.go    's/if en\.touchedKind(ki) {/if false {/'
 j5r_plant J5R-03p  "TestJ5RQuery fails on the plant"     TestJ5RQuery     query.go     's/if en\.coldKind(ki) {/if false {/'
 j5r_plant J5R-04p  "TestJ5RErrOp fails on the plant"     TestJ5RErrOp     engine.go    's/^var errOp = fmt\.Errorf("jacquard: op refused: %w", ecd\.ErrOp)$/var errOp = errors.New("jacquard: op refused")/'
+j5r_plant J5R-03pt "TestJ5RQuery fails on the plant"     TestJ5RQuery     query.go     's/return q\.wants(a) \&\& (len(q\.kinds) > 0 || !en\.touchedKind(a\.kind))/return q.wants(a)/'
