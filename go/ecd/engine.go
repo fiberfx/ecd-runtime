@@ -44,7 +44,9 @@ type ComponentDef struct {
 type KindDef struct {
 	Kind      Kind
 	Residency Residency
-	Budget    int64 // bytes; Touched kinds only; 0 means no residency
+	Budget    int64 // bytes, for both residencies: a Hydrate of an All kind over it answers ErrBudget and leaves
+	// the kind as it was, and 0 means no limit; a Touched kind keeps its resident bytes within it, and 0 keeps none
+	// resident
 }
 
 type QueryDef struct {
@@ -75,6 +77,7 @@ const (
 
 // Op is one change. Value is the component's value in the Ecd Runtime codec, or nil for a tag,
 // an unset, a spawn's header op and a destroy. A spawn is one OpSpawn followed by its OpSet ops.
+// Every write, value or structural, reaches an engine only as an op of a committed deed (E1).
 type Op struct {
 	Code   OpCode
 	Entity eid.ID
@@ -146,6 +149,8 @@ type Engine interface {
 	// (At() == 0, no kind loaded) takes At() = at. For an All kind, src holds every row of k and
 	// the kind becomes Warm. For a Touched kind, src holds the rows of the entities to make
 	// resident, as after a miss. All kinds start Cold; Touched kinds start Warm and empty.
+	// Hydrate is all or nothing per call: a row of an undeclared CID or a value of the wrong length refuses the
+	// call with an error that matches ErrOp, the kind stays as it was, and the engine does not become Stale.
 	Hydrate(k Kind, at uint64, src RowSource) error
 
 	// Evict drops resident entities of a Touched kind; it has no store meaning.
@@ -156,6 +161,8 @@ type Engine interface {
 	Get(id eid.ID, c CID, dst []byte) ([]byte, error)
 
 	// Query runs a declared query. arg holds its parameters in the Ecd Runtime codec (empty for none).
+	// An entity matches a QueryDef when it holds every CID of All, none of None and, when Any is not empty, one
+	// of Any; with Exact, its components equal All.
 	Query(q QID, arg []byte, out *Answer) error
 
 	Stats() Stats
@@ -176,7 +183,7 @@ var (
 	ErrMiss   = errors.New("ecd: not resident")                 // a Touched entity; read the store
 	ErrAbsent = errors.New("ecd: absent")                       // resident, and the entity or component is absent
 	ErrKind   = errors.New("ecd: kind not in catalog")          // an op on an entity whose kind the catalog does not declare
-	ErrOp     = errors.New("ecd: op refused")                   // Apply's check pass: an undeclared CID, a value of the wrong length or an op out of order
+	ErrOp     = errors.New("ecd: op refused")                   // Apply's check pass, or a Hydrate row: an undeclared CID, a value of the wrong length or an op out of order
 	ErrBudget = errors.New("ecd: over budget")                  // an All kind exceeds its budget at hydration
 	ErrQuery  = errors.New("ecd: query refused")                // an unknown QID, or a query on a Touched kind
 	ErrOwner  = errors.New("ecd: call off the owner goroutine") // debug builds
