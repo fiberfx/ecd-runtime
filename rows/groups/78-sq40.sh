@@ -18,8 +18,9 @@
 #            or journal mode with ErrSchema (TestCreate)
 #   SQ-10p   plant: Create asks for journal mode DELETE and refuses its answer (store.go; TestCreate)
 #   SQ-11    a committed history survives a close and hydrates a fresh engine equal to the live one on Get and on the
-#            queries, a store of 100,000 entities hydrates from one read transaction, and the log replays to the same
-#            state (TestFlushReopen, TestReplayLog, TestHydrateLarge)
+#            queries, a store of 100,000 entities hydrates from one read transaction, a catalog with no All kind still
+#            brings a new engine to the seq of the store, and the log replays to the same state (TestFlushReopen,
+#            TestReplayLog, TestHydrateLarge, TestHydrateTouchedOnly)
 #   SQ-11p   plant: the destroy of an entity leaves its component values in the file (commit.go; TestFlushReopen)
 #   SQ-11q   plant: the unset of a component leaves its value in the file (commit.go; TestFlushReopen)
 #   SQ-12    a deed that the state of the store refuses is answered refused and a retried deed eid is answered conflict;
@@ -186,7 +187,7 @@ go_row SQ-10 sq40 "TestCreate rc=0" /w/go/sqlite test -run '^TestCreate$' .
 sq40_plant SQ-10p "TestCreate fails on the plant" TestCreate store.go \
   's/^const sqlWAL = `PRAGMA journal_mode = WAL`$/const sqlWAL = `PRAGMA journal_mode = DELETE`/'
 
-go_row SQ-11 sq40 "TestFlushReopen, TestReplayLog, TestHydrateLarge rc=0" /w/go/sqlite test -run '^(TestFlushReopen|TestReplayLog|TestHydrateLarge)$' .
+go_row SQ-11 sq40 "TestFlushReopen, TestReplayLog, TestHydrateLarge, TestHydrateTouchedOnly rc=0" /w/go/sqlite test -run '^(TestFlushReopen|TestReplayLog|TestHydrateLarge|TestHydrateTouchedOnly)$' .
 sq40_plant SQ-11p "TestFlushReopen fails on the plant" TestFlushReopen commit.go \
   's/^const sqlClear = `DELETE FROM state WHERE id = ?1`$/const sqlClear = `DELETE FROM state WHERE id = ?1 AND 0`/'
 sq40_plant SQ-11q "TestFlushReopen fails on the plant" TestFlushReopen commit.go \
