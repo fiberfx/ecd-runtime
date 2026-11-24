@@ -29,7 +29,7 @@ type query struct {
 	none    mask
 	any     mask
 	exact   bool
-	never   bool // All names an undeclared CID: no entity matches
+	never   bool // All names an undeclared CID, or Any lists only undeclared CIDs: no entity matches
 	badKind bool // Kinds names an undeclared kind: the query answers ecd.ErrQuery
 }
 

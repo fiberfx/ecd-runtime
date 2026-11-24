@@ -7,10 +7,14 @@
 #   J4A-01p   plant: None is ignored
 #   J4A-01pa  plant: Any is ignored
 #   J4A-01pe  plant: Exact is ignored
+#   J4A-01pk  plant: Kinds is ignored
 #   J4A-02    an unknown QID, a non-empty arg and an undeclared kind answer ecd.ErrQuery and append nothing; a stale engine
 #             answers ecd.ErrStale first; a QID declared twice is refused by addQuery; an undeclared CID in All, or Any
 #             that lists only undeclared CIDs, matches nothing (TestJ4Refusals)
 #   J4A-02p   plant: a non-empty arg is accepted
+#   J4A-02pn  plant: an undeclared CID in All no longer makes the query match nothing
+#   J4A-02pa  plant: Any that lists only undeclared CIDs no longer makes the query match nothing
+#   J4A-02pk  plant: an undeclared kind no longer makes the query answer ecd.ErrQuery
 #   J4A-03    the answer is appended after the caller's IDs, in eid order across kinds and tables, and Count grows by the
 #             number appended (TestJ4Order)
 #   J4A-03p   plant: the appended part is not sorted
@@ -43,9 +47,13 @@ go_row J4A-01 j4a "TestJ4Terms rc=0" /w/go test -run '^TestJ4Terms$' ./engine/ja
 j4a_plant J4A-01p  "TestJ4Terms fails on the plant"    TestJ4Terms    query.go 's/if m\.containsAny(&q\.none) {/if false {/'
 j4a_plant J4A-01pa "TestJ4Terms fails on the plant"    TestJ4Terms    query.go 's/if !q\.any\.isZero() && !m\.containsAny(&q\.any) {/if false {/'
 j4a_plant J4A-01pe "TestJ4Terms fails on the plant"    TestJ4Terms    query.go 's/return !q\.exact || \*m == q\.all/return true/'
+j4a_plant J4A-01pk "TestJ4Terms fails on the plant"    TestJ4Terms    query.go 's/return len(q\.kinds) == 0 || slices\.Contains(q\.kinds, kind)/return true/'
 
 go_row J4A-02 j4a "TestJ4Refusals rc=0" /w/go test -run '^TestJ4Refusals$' ./engine/jacquard/
 j4a_plant J4A-02p  "TestJ4Refusals fails on the plant" TestJ4Refusals query.go 's/if len(arg) != 0 {/if false {/'
+j4a_plant J4A-02pn "TestJ4Refusals fails on the plant" TestJ4Refusals query.go 's/^\t\t\tq\.never = true$/\t\t\tq.never = false/'
+j4a_plant J4A-02pa "TestJ4Refusals fails on the plant" TestJ4Refusals query.go 's/^\t\tq\.never = true$/\t\tq.never = false/'
+j4a_plant J4A-02pk "TestJ4Refusals fails on the plant" TestJ4Refusals query.go 's/q\.badKind = true/q.badKind = false/'
 
 go_row J4A-03 j4a "TestJ4Order rc=0" /w/go test -run '^TestJ4Order$' ./engine/jacquard/
 j4a_plant J4A-03p  "TestJ4Order fails on the plant"    TestJ4Order    query.go 's/slices\.SortFunc(added, eid\.ID\.Compare)/_ = added/'

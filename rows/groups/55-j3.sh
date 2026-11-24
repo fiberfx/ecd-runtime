@@ -27,6 +27,7 @@
 #   J3-04   a transaction that the check pass refuses leaves entities, nodes, tables and appliedAt as they were and the
 #           engine not stale; two faults answer the first in commit order (TestJ3_04)
 #   J3-04p  plant: the check pass reads no deed
+#   J3-04pf plant: the check pass reads the deeds in list order, so the first fault in list order answers
 #   J3-05   a Set, Unset or Destroy of an absent entity and a Spawn of a present one make the engine stale, wrapping
 #           ecd.ErrStale and the cause; get and apply then answer ecd.ErrStale (TestJ3_05)
 #   J3-05p  plant: fail does not mark the engine stale
@@ -87,6 +88,7 @@ j3_plant J3-03p "TestJ3_03 fails on the plant" TestJ3_03 engine.go 's/if _, dup 
 
 go_row J3-04 j3 "TestJ3_04 rc=0" /w/go test -run '^TestJ3_04$' ./engine/jacquard/
 j3_plant J3-04p "TestJ3_04 fails on the plant" TestJ3_04 engine.go 's/if err := en\.check(seq, deeds); err != nil {/if err := en.check(seq, deeds[:0]); err != nil {/'
+j3_plant J3-04pf "TestJ3_04 fails on the plant" TestJ3_04 engine.go '/^func (en \*Engine) check(/,/inOrder/s/range inOrder(deeds) {/range deeds {/'
 
 go_row J3-05 j3 "TestJ3_05 rc=0" /w/go test -run '^TestJ3_05$' ./engine/jacquard/
 j3_plant J3-05p "TestJ3_05 fails on the plant" TestJ3_05 engine.go 's/^\ten\.stale = true$/\t_ = cause/'
