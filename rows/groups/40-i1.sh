@@ -1,7 +1,6 @@
 # Group i1 of Ecd Runtime: I1-01 to I1-08 and their plants (the rows ending in p).
 # The vectors of ecd-id v0.8.0 (go/ecd/testdata/eid, pinned by SHA256SUMS) run through the encodings of the eid the
-# module requires: MarshalText, UnmarshalText, Value and Scan. The run's inputs folder is
-# /home/jonny/.local/share/ech/mx-box/loom-inputs-080, which holds ecd-id v0.8.0 only.
+# module requires: MarshalText, UnmarshalText, Value and Scan. The run's inputs folder holds ecd-id v0.8.0 only.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
 #
 #   row    check
