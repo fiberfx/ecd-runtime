@@ -3,9 +3,9 @@
 //
 // A kind holds its entities in a map from eid to the entity's components, and a component is its CID and a
 // private copy of its value. The model keeps no byte budget and never answers ecd.ErrBudget: an entity of a
-// Touched kind leaves residency only through Evict, and an All kind is hydrated whole. A tag is a component
-// whose value is nil. An entity with no component is held and counted, and a Row cannot name one, so Hydrate
-// never creates it.
+// Touched kind leaves residency only through Evict, and an All kind is hydrated whole. New refuses a kind whose
+// Budget is below 0 with an error that matches ecd.ErrOp. A tag is a component whose value is nil. An entity with
+// no component is held and counted, and a Row cannot name one, so Hydrate never creates it.
 //
 // Calls that change the model (Apply, Hydrate, Evict and Close) come from one goroutine, at a sync point, with
 // no other call running. Get, Query, State, At and Stats only read, and may run in parallel between sync points.
@@ -40,8 +40,10 @@ var _ ecd.Engine = (*Model)(nil)
 
 // New returns an empty model for the catalog. An All kind starts Cold and a Touched kind starts Warm and empty.
 // The model copies what it keeps from the catalog. It refuses a CID 0, a CID or a kind declared twice, a form
-// other than Component, Tag and Edge, a tag with a nonzero Size, and a component of form Component or Edge with a
-// Size of 0 or less, and returns the error without a model. The model holds an Edge as it holds a Component.
+// other than Component, Tag and Edge, a tag with a nonzero Size, a component of form Component or Edge with a
+// Size of 0 or less, an Exact query whose All repeats a CID, a query whose Kinds repeat a kind, and a kind whose
+// Budget is below 0, and returns the error without a model. The error for a Budget below 0 matches ecd.ErrOp. The
+// model holds an Edge as it holds a Component.
 func New(cat *ecd.Catalog) (ecd.Engine, error) {
 	if cat == nil {
 		return nil, fmt.Errorf("model: nil catalog")
@@ -79,6 +81,9 @@ func New(cat *ecd.Catalog) (ecd.Engine, error) {
 		if _, dup := m.kinds[k.Kind]; dup {
 			return nil, fmt.Errorf("model: kind %v is declared twice", k.Kind)
 		}
+		if k.Budget < 0 {
+			return nil, fmt.Errorf("model: kind %v has Budget %d, below 0: %w", k.Kind, k.Budget, ecd.ErrOp)
+		}
 		switch k.Residency {
 		case ecd.All:
 			m.state[k.Kind] = ecd.Cold
@@ -95,6 +100,12 @@ func New(cat *ecd.Catalog) (ecd.Engine, error) {
 		if _, dup := m.queries[q.QID]; dup {
 			return nil, fmt.Errorf("model: query %d is declared twice", q.QID)
 		}
+		if q.Exact && repeats(q.All) {
+			return nil, fmt.Errorf("model: query %d is Exact and its All repeats a CID", q.QID)
+		}
+		if repeats(q.Kinds) {
+			return nil, fmt.Errorf("model: query %d repeats a kind in Kinds", q.QID)
+		}
 		q.Kinds = slices.Clone(q.Kinds)
 		q.All = slices.Clone(q.All)
 		q.None = slices.Clone(q.None)
@@ -102,6 +113,18 @@ func New(cat *ecd.Catalog) (ecd.Engine, error) {
 		m.queries[q.QID] = q
 	}
 	return m, nil
+}
+
+// repeats reports whether list holds a value twice.
+func repeats[T comparable](list []T) bool {
+	seen := make(map[T]bool, len(list))
+	for _, v := range list {
+		if seen[v] {
+			return true
+		}
+		seen[v] = true
+	}
+	return false
 }
 
 // Name returns "model".
@@ -301,7 +324,9 @@ func (m *Model) applyOp(op ecd.Op) error {
 	return nil
 }
 
-// rows reads every row of src into entities of kind k. It changes nothing in the model.
+// rows reads every row of src into entities of kind k. It changes nothing in the model. A row of another kind
+// answers ecd.ErrKind; a row of an undeclared CID, a tag's row with a value and a row whose value is not the Size
+// of a component without pointers answer an error that matches ecd.ErrOp.
 func (m *Model) rows(k ecd.Kind, src ecd.RowSource) (map[eid.ID]map[ecd.CID][]byte, error) {
 	got := map[eid.ID]map[ecd.CID][]byte{}
 	var r ecd.Row
@@ -316,8 +341,17 @@ func (m *Model) rows(k ecd.Kind, src ecd.RowSource) (map[eid.ID]map[ecd.CID][]by
 		if ecd.KindOf(r.Entity) != k {
 			return nil, fmt.Errorf("model: row of %v among the rows of %v: %w", r.Entity, k, ecd.ErrKind)
 		}
-		if _, ok := m.comps[r.CID]; !ok {
+		def, ok := m.comps[r.CID]
+		if !ok {
 			return nil, fmt.Errorf("model: row with CID %d is not declared: %w", r.CID, ecd.ErrOp)
+		}
+		if def.Form == ecd.Tag && len(r.Value) != 0 {
+			return nil, fmt.Errorf("model: row of %v: tag %d with a value of %d bytes: %w", r.Entity, r.CID, len(r.Value),
+				ecd.ErrOp)
+		}
+		if def.Form != ecd.Tag && !def.Pointers && len(r.Value) != def.Size {
+			return nil, fmt.Errorf("model: row of %v: component %d holds %d bytes, want %d: %w",
+				r.Entity, r.CID, len(r.Value), def.Size, ecd.ErrOp)
 		}
 		vals := got[r.Entity]
 		if vals == nil {
@@ -330,7 +364,8 @@ func (m *Model) rows(k ecd.Kind, src ecd.RowSource) (map[eid.ID]map[ecd.CID][]by
 
 // Hydrate loads the rows of src, read at seq at, into kind k. The seq must equal At(), except that a model with
 // no applied transaction and no hydration takes At() = at; any other seq answers ecd.ErrGap. A row of another
-// kind or with an undeclared CID is refused. An error from src is returned, and a refused or failed hydration
+// kind, a row of an undeclared CID, a tag's row with a value and a row whose value is not the Size of a component
+// without pointers are refused. An error from src is returned, and a refused or failed hydration
 // changes nothing. For an All kind the rows replace the kind's entities and the kind becomes Warm. For a
 // Touched kind the entities of the rows become resident and replace their earlier values. A panic makes the
 // model stale.
