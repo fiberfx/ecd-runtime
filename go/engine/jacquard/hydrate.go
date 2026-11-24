@@ -31,9 +31,18 @@ func (en *Engine) Evict(k ecd.Kind, ids []eid.ID) error {
 // Every row is read and checked before any change: a row of another kind answers ecd.ErrKind; a row with a CID
 // that is not declared, a row of a pointer-holding component, and a row whose value is not exactly the
 // component's size (a tag's value is empty) answer an error that matches ecd.ErrOp and names the kind, the eid,
-// the CID, the length got and the length wanted; an error of src is returned wrapped. A refused or failed
-// hydration changes nothing: the kind keeps its state and its entities, no resident value changes, and the
-// engine does not become stale. Each value is copied out of the row, which src may reuse after Next returns.
+// the CID, the length got and the length wanted; an error of src is returned wrapped.
+//
+// The Budget of an All kind, when above 0, is applied before any change. While the rows are read, stage keeps a
+// lower bound of the kind's Bytes after the hydration and answers ecd.ErrBudget at the first row that takes it
+// over the Budget. Once every row is read, hydratedBytes gives the Bytes that kindStats will report, by the same
+// per-table formula, and the call answers ecd.ErrBudget when they exceed the Budget. The first refusal in the order
+// of the rows is the answer, and the exact check follows the last row. A Budget of 0 is no limit; a Touched kind's
+// Budget is applied by the policy of New.
+//
+// A refused or failed hydration changes nothing: the kind keeps its state, Warm or Cold, and its entities, no
+// resident value changes, the seq of the engine and whether it has been hydrated stay as they were, and the engine
+// does not become stale. Each value is copied out of the row, which src may reuse after Next returns.
 //
 // An All kind is unloaded, then spawned from the rows, and becomes Warm when every entity is in. For a Touched kind
 // each entity of the rows becomes resident; an entity that is already resident is freed first and spawned again,
@@ -55,9 +64,18 @@ func (en *Engine) hydrate(k ecd.Kind, at uint64, src ecd.RowSource) (err error) 
 	if at != en.applied && (en.applied != 0 || en.loaded()) {
 		return fmt.Errorf("%w: hydrate of %v at %d, engine at %d", ecd.ErrGap, k, at, en.applied)
 	}
-	rows, err := en.stage(k, src)
+	var limit int64
+	if en.res != nil && !en.touchedKind(ki) {
+		limit = en.res[ki].budget
+	}
+	rows, err := en.stage(k, limit, src)
 	if err != nil {
 		return err
+	}
+	if limit > 0 {
+		if b := en.hydratedBytes(ki, rows); b > limit {
+			return fmt.Errorf("%w: kind %v would hold %d bytes, budget %d", ecd.ErrBudget, k, b, limit)
+		}
 	}
 	en.stamp = at
 	if !en.touchedKind(ki) {
@@ -91,10 +109,13 @@ func (en *Engine) hydrate(k ecd.Kind, at uint64, src ecd.RowSource) (err error) 
 
 // stage reads every row of src into the entities of kind k, in order of first appearance, and changes nothing in
 // the engine. A repeated component of one entity keeps its last value. It answers the errors that hydrate lists
-// for a row or for src.
-func (en *Engine) stage(k ecd.Kind, src ecd.RowSource) ([]hydEntity, error) {
+// for a row or for src. When limit is above 0 it keeps the lower bound that hydrate describes, indexEntityBytes
+// for each entity and the size of each component an entity names, and answers ecd.ErrBudget at the first row that
+// takes the bound over limit, without reading further rows.
+func (en *Engine) stage(k ecd.Kind, limit int64, src ecd.RowSource) ([]hydEntity, error) {
 	var out []hydEntity
 	at := make(map[eid.ID]int)
+	var low int64 // a lower bound of the kind's Bytes once the rows read so far are spawned
 	var r ecd.Row
 	for {
 		more, err := src.Next(&r)
@@ -123,9 +144,16 @@ func (en *Engine) stage(k ecd.Kind, src ecd.RowSource) ([]hydEntity, error) {
 			n = len(out)
 			at[r.Entity] = n
 			out = append(out, hydEntity{id: r.Entity, vals: make(map[ecd.CID][]byte)})
+			low += indexEntityBytes
 		}
 		vals := out[n].vals
+		if _, again := vals[r.CID]; !again {
+			low += int64(cd.size)
+		}
 		vals[r.CID] = append([]byte(nil), r.Value...)
+		if limit > 0 && low > limit {
+			return nil, fmt.Errorf("%w: kind %v over %d bytes at %s", ecd.ErrBudget, k, limit, r.Entity)
+		}
 	}
 }
 

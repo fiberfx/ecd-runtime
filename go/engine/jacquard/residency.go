@@ -10,7 +10,7 @@ import (
 //
 //	touched    the kind is Touched: its entities are resident one by one, and an entity that is not resident is not in the engine
 //	cold       the kind is not hydrated: it holds no entity, and every op, Get and query on it is answered without a change
-//	budget     the byte budget of the kind as declared; the engine reads no budget
+//	budget     the byte budget of the kind as declared; hydrate applies it to an All kind
 //	evictions  the number of entities dropped from the kind
 type kindRes struct {
 	touched, cold     bool

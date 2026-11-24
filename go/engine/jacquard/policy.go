@@ -1,8 +1,6 @@
 package jacquard
 
 import (
-	"fmt"
-
 	eid "github.com/fiberfx/ecd-id/go"
 	"github.com/fiberfx/ecd-runtime/go/ecd"
 )
@@ -16,8 +14,8 @@ import (
 // the kind's clock, so an entity read since the hand last passed it is passed over once. A Touched kind with
 // Budget 0 keeps no entity resident.
 //
-// An All kind is never evicted. A Hydrate of an All kind whose Budget is above 0 and whose resident bytes exceed
-// the Budget after loading answers ecd.ErrBudget and leaves the kind Cold; an All kind with Budget 0 has no budget.
+// An All kind is never evicted. Its Budget, when above 0, is applied by hydrate before any change: a Hydrate
+// whose rows would exceed it answers ecd.ErrBudget and leaves the kind as it was.
 func New(cat *ecd.Catalog) (ecd.Engine, error) {
 	en, err := build(cat)
 	if err != nil {
@@ -60,35 +58,14 @@ func (p *policy) Apply(seq uint64, deeds []ecd.Deed) error {
 	return nil
 }
 
-// Hydrate is the Hydrate of the Engine, with the budget of the kind applied to the result.
-//
-// For a Touched kind, and for an All kind with Budget 0, the hydration is followed by a trim of every Touched
-// kind. For an All kind with a Budget above 0, the hydration is refused with an error that matches ecd.ErrBudget
-// when the kind's Bytes after loading exceed the Budget. A refused hydration leaves the kind Cold and empty, and
-// restores the seq of the engine and its loaded state, so it does not count for the seq rule of a later
-// hydration.
-//
-// An All kind that is Warm and is hydrated again is unloaded by the hydration before its new size is known, so a
-// refusal leaves it Cold and without its earlier entities, not as it was before the call.
+// Hydrate is the Hydrate of the Engine, followed by a trim of every Touched kind when it succeeds. The Budget of an
+// All kind is applied by the hydration itself, before any change, so a refused call leaves every kind as it was.
 func (p *policy) Hydrate(k ecd.Kind, at uint64, src ecd.RowSource) error {
-	ki, ok := p.idx.kinds[k]
-	if !ok || p.touchedKind(ki) || p.res[ki].budget == 0 {
-		if err := p.hydrate(k, at, src); err != nil {
-			return err
-		}
+	err := p.hydrate(k, at, src)
+	if err == nil {
 		p.trim()
-		return nil
 	}
-	applied, hydrated := p.applied, p.hydrated
-	if err := p.hydrate(k, at, src); err != nil {
-		return err
-	}
-	if s := p.kindStats(ki); s.Bytes > p.res[ki].budget {
-		p.unload(ki)
-		p.applied, p.hydrated = applied, hydrated
-		return fmt.Errorf("%w: kind %v holds %d bytes, budget %d", ecd.ErrBudget, k, s.Bytes, p.res[ki].budget)
-	}
-	return nil
+	return err
 }
 
 // Evict is the Evict of the Engine, and it first clears the clock bit of each resident entity it is given, so the
