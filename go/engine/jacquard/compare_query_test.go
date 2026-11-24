@@ -124,7 +124,6 @@ func TestCompareQuery(t *testing.T) {
 			s.query(n, 42, nil)
 			s.query(n, 0, []byte{1})
 		}
-		t.Logf("seed %d: non-empty answers by query %v", seed, answered)
 		for qid := ecd.QID(0); qid <= 7; qid++ {
 			if answered[qid] < 10 {
 				t.Errorf("seed %d: query %d answered an eid after %d of %d steps, want at least 10",
@@ -140,6 +139,7 @@ func TestCompareQuery(t *testing.T) {
 				t.Errorf("seed %d: no call counted as %s", seed, class)
 			}
 		}
+		t.Logf("seed %d: non-empty answers by query %v", seed, answered)
 	}
 }
 
