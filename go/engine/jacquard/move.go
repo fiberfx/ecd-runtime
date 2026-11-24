@@ -31,6 +31,7 @@ func (en *Engine) table(node uint32) *table {
 		t = newTable(a.cols, defs, &en.stamp)
 		en.tables[node] = t
 		a.active = true
+		en.announce(node)
 	}
 	return t
 }

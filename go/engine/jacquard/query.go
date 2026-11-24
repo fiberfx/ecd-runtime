@@ -1,5 +1,6 @@
 // Derived from Ark (github.com/mlange-42/ark) at commit 723f2ac. Copyright (c) 2025 Martin Lange. MIT License.
-// Port of ecs/filter.go of the cut in go/third_party/ark/: the mask test of a query.
+// Port of ecs/filter.go and ecs/cache.go of the cut in go/third_party/ark/: the mask test of a query and the
+// node list of a declared query.
 
 package jacquard
 
@@ -23,20 +24,23 @@ var _ func(a, b eid.ID) int = eid.ID.Compare
 //	exact   the entity's components, tags included, equal all
 //	never   no entity matches: all names an undeclared CID, or any lists only undeclared CIDs
 //	badKind kinds names an undeclared kind: the query answers ecd.ErrQuery
+//	nodes   the nodes that hold a table and that the query runs on, kept current by announce (JI4)
 type query struct {
 	kinds   []uint16 // empty: every declared kind
 	all     mask
 	none    mask
 	any     mask
 	exact   bool
-	never   bool // All names an undeclared CID, or Any lists only undeclared CIDs: no entity matches
-	badKind bool // Kinds names an undeclared kind: the query answers ecd.ErrQuery
+	never   bool     // All names an undeclared CID, or Any lists only undeclared CIDs: no entity matches
+	badKind bool     // Kinds names an undeclared kind: the query answers ecd.ErrQuery
+	nodes   []uint32 // the nodes that hold a table and that the query runs on (JI4)
 }
 
 // addQuery declares def, compiled against the catalog. A CID in All that is not declared makes the query match
 // nothing; one in None is ignored; Any matches nothing when it lists only undeclared CIDs and ignores them
 // otherwise. A kind that is not declared makes the query answer ecd.ErrQuery at the call. A QID that is
-// declared twice answers errCatalog, wrapped, and keeps the first definition.
+// declared twice answers errCatalog, wrapped, and keeps the first definition. The query's node list starts as a
+// fresh match over the nodes that hold a table.
 func (en *Engine) addQuery(def ecd.QueryDef) error {
 	if _, dup := en.queries[def.QID]; dup {
 		return fmt.Errorf("%w: query %d declared twice", errCatalog, def.QID)
@@ -71,6 +75,7 @@ func (en *Engine) addQuery(def ecd.QueryDef) error {
 		}
 		q.kinds = append(q.kinds, ki)
 	}
+	q.nodes = en.scan(q)
 	if en.queries == nil {
 		en.queries = make(map[ecd.QID]*query)
 	}
@@ -99,10 +104,40 @@ func (q *query) matches(m *mask) bool {
 	return !q.exact || *m == q.all
 }
 
+// wants reports whether the query runs on node a: the query runs on a's kind and a's mask matches.
+func (q *query) wants(a *archetype) bool {
+	if !q.has(a.kind) || !q.matches(&a.mask) {
+		return false
+	}
+	return true
+}
+
+// scan returns, in node order, the nodes that hold a table and that q runs on: a fresh match (JI4).
+func (en *Engine) scan(q *query) []uint32 {
+	var nodes []uint32
+	for node := uint32(1); node <= uint32(en.gr.len()); node++ {
+		if int(node) < len(en.tables) && en.tables[node] != nil && q.wants(en.gr.arch(node)) {
+			nodes = append(nodes, node)
+		}
+	}
+	return nodes
+}
+
+// announce adds node, whose table was just created, to the node list of every declared query that runs on it
+// (JI4). Tables are never removed, so a list only grows.
+func (en *Engine) announce(node uint32) {
+	a := en.gr.arch(node)
+	for _, q := range en.queries {
+		if q.wants(a) {
+			q.nodes = append(q.nodes, node)
+		}
+	}
+}
+
 // query appends the eids that satisfy the declared query qid to out.IDs, in eid order, and adds their number to
 // out.Count. A stale engine answers ecd.ErrStale; an undeclared QID, a non-empty arg or a query that names an
 // undeclared kind answers ecd.ErrQuery. A refusal appends nothing. A query with no kinds runs on every
-// declared kind.
+// declared kind. It reads only the query's node list.
 func (en *Engine) query(qid ecd.QID, arg []byte, out *ecd.Answer) error {
 	if en.stale {
 		return ecd.ErrStale
@@ -118,14 +153,7 @@ func (en *Engine) query(qid ecd.QID, arg []byte, out *ecd.Answer) error {
 		return fmt.Errorf("%w: query %d names a kind that is not declared", ecd.ErrQuery, qid)
 	}
 	start := len(out.IDs)
-	for node := uint32(1); node <= uint32(en.gr.len()); node++ {
-		a := en.gr.arch(node)
-		if !q.has(a.kind) || !q.matches(&a.mask) {
-			continue
-		}
-		if int(node) >= len(en.tables) || en.tables[node] == nil {
-			continue
-		}
+	for _, node := range q.nodes {
 		t := en.tables[node]
 		for row := uint32(0); row < t.len(); row++ {
 			out.IDs = append(out.IDs, t.eidAt(row))
