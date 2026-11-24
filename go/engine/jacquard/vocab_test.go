@@ -33,12 +33,9 @@ func vocabIssues(name, src string) []string {
 	return issues
 }
 
-// goFiles returns every Go file under dir, as paths below dir, and reports a missing dir as nil.
+// goFiles returns every Go file under dir, as paths below dir; a missing dir fails the test.
 func goFiles(t *testing.T, dir string) []string {
 	t.Helper()
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return nil
-	}
 	var files []string
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -62,8 +59,8 @@ func TestVocabulary(t *testing.T) {
 	scanned := 0
 	for _, dir := range []string{".", filepath.Join("..", "..", "ecd")} {
 		files := goFiles(t, dir)
-		if dir == "." && len(files) == 0 {
-			t.Fatal("no Go file found in the package directory")
+		if len(files) == 0 {
+			t.Fatalf("no Go file found under %s", dir)
 		}
 		for _, f := range files {
 			src, err := os.ReadFile(f)
