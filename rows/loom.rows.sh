@@ -9,11 +9,13 @@
 #     --param paths='go rows README.md LICENSE' --param name=rt \
 #     --param image=mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2 \
 #     --param inputs=DIR \
-#     --param cpus=2 --param memory=4g --param timeout=1800
+#     --param cpus=2 --param memory=8g --param timeout=1800
 # CHECKOUT is the directory of a checkout of this repository on the machine that starts the run.
 # inputs is required: a GOPROXY file tree that /w/inputs provides for github.com/fiberfx/ecd-id/go v0.8.0, the one
-# requirement of go/, and for github.com/mlange-42/ark v0.8.4-0.20261110114945-723f2ac3186a, which go/enginecmp also
-# requires. Without it GOPROXY is off, and every row that loads a module is CNM.
+# requirement of go/; for github.com/mlange-42/ark v0.8.4-0.20261110114945-723f2ac3186a, which go/enginecmp also
+# requires; and for every module of go/sqlite/go.mod with the modules its tests import (go mod tidy reads them), such
+# as github.com/google/pprof. Without it GOPROXY is off, and every row that loads a module is CNM. memory=8g leaves
+# room for the first compile of modernc.org/sqlite and modernc.org/libc.
 #
 # Rows live in group files, rows/groups/NN-<group>.sh, which the script sources in name order between R0 and the
 # final line. A group file is POSIX sh sourced from /w. It owns its row ids and its group name, calls "sel ID GROUP"
