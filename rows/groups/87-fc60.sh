@@ -1,17 +1,19 @@
 # Group fc60 of Ecd Runtime: the nested module go/ecr, the facade package ecr, which gives a host one import and one
 # requirement: aliases of the ids, the seam types, the Runtime and the owner store, the constants, sentinels and
-# functions of their packages, and Open and Close of a Host; and the package ecrtest of the module, which gives the
-# tests of a host the reference engine. The rows show that the tests of the module pass, that go mod tidy leaves its
-# go.mod and go.sum unchanged, and that the facade is a leaf: no package outside go/ecr imports ecr or ecrtest, ecr
-# imports only the standard library, package eid and the packages ecd, rt, engine/jacquard and sqlite, and ecrtest
-# alone of the module imports the model. The number 87 is above every group file present once group sp60 moves from
-# 82-sp60.sh to 86-sp60.sh.
+# functions of their packages, among them Migrate, and Open and Close of a Host; and the package ecrtest of the
+# module, which gives the tests of a host the reference engine. The rows show that the tests of the module pass,
+# among them the refusals of Open (an empty Path, an Engine func that returns no engine) and the order of Close, that
+# go mod tidy leaves its go.mod and go.sum unchanged, and that the facade is a leaf: no package outside go/ecr imports
+# ecr or ecrtest, ecr imports only the standard library, package eid and the packages ecd, rt, engine/jacquard and
+# sqlite, and ecrtest alone of the module imports the model. The number 87 is above every group file present once
+# group sp60 moves from 82-sp60.sh to 86-sp60.sh.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #
-#   FC-01    go test ./... in go/ecr: the types, sentinels, constants and functions of ecr are those of their packages
-#            (TestAliases); Open creates, opens and refuses as its steps state (TestOpen); Close closes the engine and
-#            the store (TestClose); NewModel returns the model, to which a deed applies (TestNewModel in ecrtest)
+#   FC-01    go test ./... in go/ecr: the types, sentinels, constants and functions of ecr are those of their packages,
+#            Migrate among them (TestAliases); Open creates, opens and refuses as its steps state, an empty Path and an
+#            Engine func that returns no engine included (TestOpen); Close closes the engine, then the store
+#            (TestClose); NewModel returns the model, to which a deed applies (TestNewModel in ecrtest)
 #   FC-01p   plant: Open hydrates the engine with the whole catalog, so the All kind is Warm after a reopen
 #            (ecr.go; TestOpen, case create)
 #   FC-01q   plant: Close leaves the store open (ecr.go; TestClose, case both)
@@ -23,6 +25,10 @@
 #   FC-01w   plant: Open checks the DeedKind only in rt.New, after the store file is made (ecr.go; TestOpen, case
 #            nilcatalog)
 #   FC-01x   plant: NewModel builds the model of a nil catalog (ecrtest/ecrtest.go; TestNewModel, case name)
+#   FC-01y   plant: Migrate returns nil whatever the file (ecr.go; TestAliases, case functions)
+#   FC-01z   plant: Open does not refuse an empty Path (ecr.go; TestOpen, case nilcatalog)
+#   FC-01za  plant: Open does not refuse an Engine func that returns no engine (ecr.go; TestOpen, case nilengine)
+#   FC-01zb  plant: Close closes the store before the engine (ecr.go; TestClose, case order)
 #   FC-02    go mod tidy in a copy of go/ leaves go/ecr/go.mod and go.sum byte-equal
 #   FC-03    no Go file under go/ outside go/ecr imports github.com/fiberfx/ecd-runtime/go/ecr or its package
 #            ecrtest; the imports of the packages of go/ecr and of their tests, as go list prints them, are the
@@ -178,6 +184,14 @@ fc60_plant FC-01w "TestOpen/nilcatalog fails on the plant" . TestOpen nilcatalog
   's/^\(\t*\)if !o\.DeedKind\.IsKind() {$/\1if false {/'
 fc60_plant FC-01x "TestNewModel/name fails on the plant" ./ecrtest/ TestNewModel name ecrtest/ecrtest.go \
   's/{ return model\.New(cat) }$/{ return model.New(nil) }/'
+fc60_plant FC-01y "TestAliases/functions fails on the plant" . TestAliases functions ecr.go \
+  's/^func Migrate(path string) error { return sqlite\.Migrate(path) }$/func Migrate(path string) error { return nil }/'
+fc60_plant FC-01z "TestOpen/nilcatalog fails on the plant" . TestOpen nilcatalog ecr.go \
+  's/^\(\t*\)if o\.Path == "" {$/\1if false {/'
+fc60_plant FC-01za "TestOpen/nilengine fails on the plant" . TestOpen nilengine ecr.go \
+  's/^\(\t*\)if e == nil {$/\1if false {/'
+fc60_plant FC-01zb "TestClose/order fails on the plant" . TestClose order ecr.go \
+  's/^\(\t*\)ee = h\.Engine\.Close()$/\1if h.Store != nil { se = h.Store.Close() }; ee = h.Engine.Close()/'
 
 # FC-02
 fc60_ex="go mod tidy leaves go.mod and go.sum of go/ecr byte-equal"

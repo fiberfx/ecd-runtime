@@ -82,19 +82,23 @@ func storeOpen(s *ecr.Store) bool {
 	return s.Log(0, func(uint64, ecr.Deed) error { return nil }) == nil
 }
 
-// named is an engine that answers Name with its name and counts its Close calls, which close the engine it holds and
-// answer closeErr. Its other calls are those of the engine it holds.
+// named is an engine that answers Name with its name and counts its Close calls, which call onClose when it is not nil,
+// close the engine it holds and answer closeErr. Its other calls are those of the engine it holds.
 type named struct {
 	ecr.Engine
 	name     string
 	closes   int
 	closeErr error
+	onClose  func()
 }
 
 func (n *named) Name() string { return n.name }
 
 func (n *named) Close() error {
 	n.closes++
+	if n.onClose != nil {
+		n.onClose()
+	}
 	n.Engine.Close()
 	return n.closeErr
 }
@@ -113,7 +117,8 @@ func namedEngine(name string, closeErr error, got **named) func(*ecr.Catalog) (e
 
 // TestAliases holds that every type of ecr is the type of its package, every sentinel the error of its package,
 // every constant the constant of its package, with its type and value, and every function the answer of the function
-// it names.
+// it names, Migrate included: it leaves an owner store as it is, refuses a file that is not an owner store with
+// ErrSchema, and refuses a missing path without making a file.
 func TestAliases(t *testing.T) {
 	t.Run("types", func(t *testing.T) {
 		for _, c := range []struct {
@@ -311,14 +316,39 @@ func TestAliases(t *testing.T) {
 		if _, err := ecr.SpanIDFromBytes(make([]byte, 7)); !errors.Is(err, ecr.ErrSpanID) {
 			t.Errorf("ecr.SpanIDFromBytes of 7 bytes: %v; want ErrSpanID", err)
 		}
+		// Migrate is sqlite.Migrate: it accepts an owner store and refuses what sqlite.Migrate refuses, with its error.
+		o := options(t)
+		h, err := ecr.Open(o)
+		if err != nil {
+			t.Fatalf("ecr.Open with Create: %v", err)
+		}
+		if err := h.Close(); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+		if err := ecr.Migrate(o.Path); err != nil {
+			t.Errorf("ecr.Migrate of an owner store: %v; want nil", err)
+		}
+		other := filepath.Join(t.TempDir(), "other.db")
+		if err := os.WriteFile(other, nil, 0o600); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		if err := ecr.Migrate(other); !errors.Is(err, ecr.ErrSchema) {
+			t.Errorf("ecr.Migrate of an empty file: %v; want an error that matches ErrSchema", err)
+		}
+		missing := filepath.Join(t.TempDir(), "missing.db")
+		if err := ecr.Migrate(missing); err == nil {
+			t.Error("ecr.Migrate of a missing path: no error; want an error")
+		}
+		absent(t, missing)
 	})
 }
 
 // TestOpen holds the steps of Open: a Host made with Create commits a deed with its trace id and span id, which a Host
 // opened later reads back through the store with its engine at the seq of the store and the All kind Cold; Open of an
 // absent path without Create fails, makes no file and closes the engine it built; Open with Create of an existing
-// store fails with ErrExist and closes the engine; an Engine func of the Options builds the engine; and Options
-// without a Catalog, a Minter or a DeedKind that is a kind are refused with ErrConfig before a file is made.
+// store fails with ErrExist and closes the engine; an Engine func of the Options builds the engine, and one that
+// returns no engine and no error is refused with ErrConfig before a file is made; and Options without a Path, a
+// Catalog, a Minter or a DeedKind that is a kind are refused with ErrConfig before a file is made.
 func TestOpen(t *testing.T) {
 	t.Run("create", func(t *testing.T) {
 		o := options(t)
@@ -467,11 +497,36 @@ func TestOpen(t *testing.T) {
 		h.Close()
 	})
 
+	t.Run("nilengine", func(t *testing.T) {
+		o := options(t)
+		o.Engine = func(*ecr.Catalog) (ecr.Engine, error) { return nil, nil }
+		h, err := ecr.Open(o)
+		if err == nil {
+			h.Close()
+		}
+		if !errors.Is(err, ecr.ErrConfig) {
+			t.Errorf("Open with an Engine func that returns no engine and no error: %v; want an error that matches "+
+				"ErrConfig", err)
+		}
+		absent(t, o.Path)
+		// The violating half: an Engine func that returns an engine opens at the same path.
+		o.Engine = jacquard.New
+		h, err = ecr.Open(o)
+		if err != nil {
+			t.Fatalf("Open with an Engine func that returns an engine: %v", err)
+		}
+		if err := h.Close(); err != nil {
+			t.Errorf("Close: %v", err)
+		}
+	})
+
 	t.Run("nilcatalog", func(t *testing.T) {
 		for _, c := range []struct {
 			name string
 			edit func(*ecr.Options)
 		}{
+			{"no Path", func(o *ecr.Options) { o.Path = "" }},
+			{"no Path without Create", func(o *ecr.Options) { o.Path, o.Create = "", false }},
 			{"no Catalog", func(o *ecr.Options) { o.Catalog = nil }},
 			{"no Minter", func(o *ecr.Options) { o.Minter = nil }},
 			{"DeedKind 0", func(o *ecr.Options) { o.DeedKind = 0 }},
@@ -495,8 +550,9 @@ func TestOpen(t *testing.T) {
 	})
 }
 
-// TestClose holds that Close closes the engine and the store, that a second Close returns nil, and that the store is
-// closed when the engine's Close fails, whose error Close returns.
+// TestClose holds that Close closes the engine and the store, that a second Close returns nil, that the store is
+// closed when the engine's Close fails, whose error Close returns, and that the engine is closed first, while the
+// store is open.
 func TestClose(t *testing.T) {
 	t.Run("both", func(t *testing.T) {
 		h, err := ecr.Open(options(t))
@@ -535,6 +591,33 @@ func TestClose(t *testing.T) {
 		}
 		if got.closes != 1 || storeOpen(h.Store) {
 			t.Errorf("after Close: %d engine closes, store open %v; want 1 and closed", got.closes, storeOpen(h.Store))
+		}
+	})
+
+	t.Run("order", func(t *testing.T) {
+		o := options(t)
+		var got *named
+		o.Engine = namedEngine("named", nil, &got)
+		h, err := ecr.Open(o)
+		if err != nil {
+			t.Fatalf("Open: %v", err)
+		}
+		// The engine records whether the store answers when its Close begins.
+		calls, open := 0, false
+		got.onClose = func() {
+			calls++
+			open = storeOpen(h.Store)
+		}
+		if err := h.Close(); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+		if calls != 1 || !open {
+			t.Errorf("the engine's Close began %d times, with the store open %v; want once, with the store open", calls,
+				open)
+		}
+		// The violating half: the probe tells the states apart, since the store answers no Log after Close.
+		if storeOpen(h.Store) {
+			t.Error("after Close the store answers Log; want it closed")
 		}
 	})
 }

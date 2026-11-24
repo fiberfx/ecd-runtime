@@ -8,7 +8,8 @@
 // errors.Is matches an error of either name. Each function calls the function of the same name.
 //
 // Open builds a Host: the engine, Jacquard unless Options names another, the owner store brought to the engine's seq,
-// and the Runtime that commits into the store. Close closes the engine and the store.
+// and the Runtime that commits into the store. Close closes the engine and the store. Migrate brings a store of user
+// version 1 to the user version 2 that Open accepts.
 //
 // The package imports the standard library, package eid and the packages ecd, rt, engine/jacquard and sqlite of
 // Ecd Runtime. No package of Ecd Runtime imports ecr. The reference engine of tests is in package ecrtest of this
@@ -174,9 +175,13 @@ func Of(id ID) Ref { return rt.Of(id) }
 // with it.
 func New(cfg Config) (*Runtime, error) { return rt.New(cfg) }
 
-// Options is what Open needs. Catalog and Minter are required, and DeedKind must be a kind.
+// Migrate is sqlite.Migrate: it brings the store at path to the user version that Open accepts. A host calls it before
+// Open on a store of user version 1, which Open refuses with ErrSchema; no Store may be open on path while it runs.
+func Migrate(path string) error { return sqlite.Migrate(path) }
+
+// Options is what Open needs. Path, Catalog and Minter are required, and DeedKind must be a kind.
 type Options struct {
-	Path     string                         // the store file
+	Path     string                         // the store file; required
 	Create   bool                           // make the store file first; a path at which anything exists is refused
 	Catalog  *Catalog                       // the catalog of the engine and of the Runtime
 	Minter   Minter                         // the host's one Minter for its lease
@@ -195,13 +200,14 @@ type Host struct {
 // Open builds the engine, opens the owner store at o.Path, brings the engine to the seq of the store and returns the
 // Host whose Runtime commits into the store. It takes these steps in this order:
 //
-//  1. Refuse a nil Catalog, a nil Minter and a DeedKind that is not a kind, with an error that matches ErrConfig.
+//  1. Refuse an empty Path, a nil Catalog, a nil Minter and a DeedKind that is not a kind, with an error that matches
+//     ErrConfig.
 //  2. Build the engine from the catalog with o.Engine, or with Jacquard when o.Engine is nil. An engine func that
 //     returns no engine and no error is refused with ErrConfig.
 //  3. With o.Create, make the store file (sqlite.Create), which refuses a path at which anything exists with an
 //     error that matches ErrExist.
 //  4. Open the store (sqlite.Open), which never makes a file and refuses a file that is not an owner store of user
-//     version 2 with an error that matches ErrSchema.
+//     version 2 with an error that matches ErrSchema; Migrate brings a store of user version 1 to 2 before Open.
 //  5. Bring the engine to the seq of the store with Store.Hydrate, given the catalog without its All kinds: until an
 //     engine is admitted to serve All kinds, a host reads their entities with Store.Rows, and the engine takes the
 //     seq through Start with its All kinds Cold.
@@ -211,6 +217,9 @@ type Host struct {
 // and is returned wrapped with "ecr: open: "; it matches what its cause matches. A store file that step 3 made stays
 // at o.Path when a later step fails.
 func Open(o Options) (*Host, error) {
+	if o.Path == "" {
+		return nil, fmt.Errorf("ecr: open: options have no Path: %w", ErrConfig)
+	}
 	if o.Catalog == nil {
 		return nil, fmt.Errorf("ecr: open: options have no Catalog: %w", ErrConfig)
 	}

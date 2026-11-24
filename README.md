@@ -255,16 +255,21 @@ error of either name, and each function calls the function of the same name. No 
 `ecr`.
 
 - `Open(Options)` returns a `Host`. `Options` holds `Path`, `Create`, `Catalog`, `Minter`, `DeedKind` and `Engine`,
-  a func that builds the engine from the catalog; a nil `Engine` builds Jacquard. `Open` refuses a nil `Catalog`, a
-  nil `Minter` and a `DeedKind` that is not a kind with an error that matches `ErrConfig`, before it builds an engine
-  or makes a file. It then builds the engine, makes the store file when `Create` is set (a path at which anything
-  exists matches `ErrExist`), opens the store, brings the engine to the seq of the store with `Hydrate` given the
-  catalog without its All kinds, as "Starting a host" states, and builds the `Runtime` with the store as its
-  `Committer`. An error closes what was opened, the engine first, and is wrapped with `ecr: open: `.
+  a func that builds the engine from the catalog; a nil `Engine` builds Jacquard. `Path` is required, with or without
+  `Create`. `Open` refuses an empty `Path`, a nil `Catalog`, a nil `Minter` and a `DeedKind` that is not a kind with an
+  error that matches `ErrConfig`, before it builds an engine or makes a file. It then builds the engine, makes the
+  store file when `Create` is set (a path at which anything exists matches `ErrExist`), opens the store, brings the
+  engine to the seq of the store with `Hydrate` given the catalog without its All kinds, as "Starting a host" states,
+  and builds the `Runtime` with the store as its `Committer`. An error closes what was opened, the engine first, and
+  is wrapped with `ecr: open: `.
 - `Host` embeds the `Runtime`, so `Register` and `Flush` are its methods, and holds the `Store` and the `Engine`.
 - `Host.Close` closes the engine, then the store, and returns `errors.Join` of their errors. The store is closed
   whatever the engine answers.
 - `New(Config)` is `rt.New`, for a host that builds its `Runtime` over an engine and a `Committer` of its own.
+- `Migrate(path)` is `sqlite.Migrate`: it brings a store of user version 1 to user version 2, which `Open` accepts, and
+  leaves a store of user version 2 as it is. A host calls it before `Open` on a store of an earlier release, which
+  `Open` refuses with `ErrSchema`; no `Store` may be open on `path` while it runs. A file that is not an owner store of
+  user version 1 or 2 is refused with `ErrSchema`, and a missing path with an error and no file.
 - The package `ecrtest`, in `go/ecr/ecrtest/`, gives the tests of a host the reference engine: `NewModel(cat)`
   returns the model of `go/engine/jacquard/model`, which a host never runs, and `ecrtest` is the one package of the
   module that imports it.
@@ -308,7 +313,9 @@ of package `eid` and its lease and minting types are not in `ecr`, which gives t
 
 Rows FC-01 to FC-03, in `rows/groups/87-fc60.sh`, measure the module: its tests, `go mod tidy` and the rule that it is
 a leaf whose packages import only the standard library, `eid` and the packages `ecd`, `rt`, `engine/jacquard` and
-`sqlite`, with the model for `ecrtest` alone.
+`sqlite`, with the model for `ecrtest` alone. Its plants, FC-01p to FC-01zb and FC-03p to FC-03r, each change one line
+of a copy; FC-01y to FC-01zb are the plants of `Migrate`, of the refusal of an empty `Path`, of the refusal of an
+`Engine` func that returns no engine, and of the order in which `Close` closes the engine and the store.
 
 ## Rows
 
