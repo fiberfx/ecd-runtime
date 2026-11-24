@@ -6,11 +6,12 @@
 # edit one line of engine.go each and run that test.
 #
 #   SC-01    TestSeamDecidedText passes on engine.go
-#   SC-01p   plant: the Budget comment ends "and 0 means no residency" instead of "and 0 keeps none" (engine.go)
+#   SC-01p   plant: the Budget comment ends "and 0 means no residency", not "and 0 keeps none resident" (engine.go)
 #   SC-01q   plant: the Op comment drops the reference "(E1)" (engine.go)
 #   SC-01r   plant: the Hydrate comment does not state that a call is all or nothing (engine.go)
 #   SC-01s   plant: the ErrOp comment does not name a Hydrate row (engine.go)
 #   SC-01t   plant: the Query comment drops the rule for a non-empty Any (engine.go)
+#   SC-01u   plant: the Budget comment drops the empty-kind case (engine.go)
 #
 # seamc_plant id expect sedexpr: copies /w/go to a temporary directory, applies the one-line sed to ecd/engine.go and
 # runs only TestSeamDecidedText there. KILLED: the test failed. SURVIVED: it passed.
@@ -40,9 +41,10 @@ seamc_plant() {
 }
 
 go_row SC-01 seamc "TestSeamDecidedText rc=0" /w/go test -run '^TestSeamDecidedText$' ./ecd/
-seamc_plant SC-01p "TestSeamDecidedText fails on the plant" 's/, and 0 keeps none$/, and 0 means no residency/'
+seamc_plant SC-01p "TestSeamDecidedText fails on the plant" 's/, and 0 keeps none resident$/, and 0 means no residency/'
 seamc_plant SC-01q "TestSeamDecidedText fails on the plant" 's/ (E1)\.$/./'
 seamc_plant SC-01r "TestSeamDecidedText fails on the plant" 's/Hydrate is all or nothing per call:/Hydrate loads rows:/'
 seamc_plant SC-01s "TestSeamDecidedText fails on the plant" \
   's/, or a Hydrate row: an undeclared CID/: an undeclared CID/'
 seamc_plant SC-01t "TestSeamDecidedText fails on the plant" 's/and, when Any is not empty, one$/and one/'
+seamc_plant SC-01u "TestSeamDecidedText fails on the plant" 's/within it, or holds no$/within it, and holds no/'

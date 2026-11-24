@@ -48,14 +48,38 @@ func (p *policy) Get(id eid.ID, c ecd.CID, dst []byte) ([]byte, error) {
 	return p.get(id, c, dst)
 }
 
-// Apply is the Apply of the Engine, followed by a trim of every Touched kind. A refused or failed call changes no
-// residency.
+// Apply is the Apply of the Engine, followed by a trim of every Touched kind. When the call succeeds it first clears
+// the clock bit of each resident Touched entity that the transaction destroys, so the entity that later takes a
+// freed index does not inherit a mark. A refused or failed call changes no residency and no mark.
 func (p *policy) Apply(seq uint64, deeds []ecd.Deed) error {
+	var freed []freedIndex
+	for _, d := range deeds {
+		for i := range d.Ops {
+			op := &d.Ops[i]
+			if op.Code != ecd.OpDestroy {
+				continue
+			}
+			if e, ok := p.idx.entity(op.Entity); ok {
+				if ki := p.idx.pool.records[e.index].kind(); p.touchedKind(ki) {
+					freed = append(freed, freedIndex{kind: ki, index: e.index})
+				}
+			}
+		}
+	}
 	if err := p.apply(seq, deeds); err != nil {
 		return err
 	}
+	for _, f := range freed {
+		p.clocks[f.kind].unmark(f.index)
+	}
 	p.trim()
 	return nil
+}
+
+// freedIndex is the kind index and the entity index of a resident Touched entity that a transaction destroys.
+type freedIndex struct {
+	kind  uint16
+	index uint32
 }
 
 // Hydrate is the Hydrate of the Engine, followed by a trim of every Touched kind when it succeeds. The Budget of an

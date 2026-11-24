@@ -385,8 +385,6 @@ func TestJ11(t *testing.T) {
 				}
 			}
 		}
-		t.Logf("seed %d: %d steps within budget with residents, %d evictions, %d hits, %d misses",
-			seed, s.within, s.evictions, s.hits, s.misses)
 		if s.within == 0 {
 			t.Errorf("seed %d: no step ended within the budget with a resident entity", seed)
 		}
@@ -396,6 +394,8 @@ func TestJ11(t *testing.T) {
 		if s.hits == 0 || s.misses == 0 {
 			t.Errorf("seed %d: %d hits and %d misses, want both above zero", seed, s.hits, s.misses)
 		}
+		t.Logf("seed %d: %d steps within budget with residents, %d evictions, %d hits, %d misses",
+			seed, s.within, s.evictions, s.hits, s.misses)
 	}
 }
 
@@ -451,10 +451,10 @@ func TestL15(t *testing.T) {
 	if st := j5pStat(p, log); st.Bytes > budget {
 		t.Errorf("after the reads: %d bytes, budget %d", st.Bytes, budget)
 	}
-	t.Logf("%d hits, %d misses, budget %d of %d bytes", hits, misses, budget, full)
 	if hits == 0 || misses == 0 {
 		t.Errorf("%d hits and %d misses, want both above zero", hits, misses)
 	}
+	t.Logf("%d hits, %d misses, budget %d of %d bytes", hits, misses, budget, full)
 }
 
 // TestL15Budget (L15v): an All kind whose budget is below the bytes of its rows refuses the hydration with an error
@@ -604,6 +604,90 @@ func TestJ5PClock(t *testing.T) {
 	expect("the sixth spawn", 1, 4, 6)
 	if ev := j5pStat(p, log).Evictions; ev != 3 {
 		t.Errorf("evictions after the sixth spawn: %d, want 3", ev)
+	}
+}
+
+// TestJ5PApplyDestroy (J5P-08): the budget holds three entities of the Touched kind, and the hand stands at the start
+// of the clock. A Get of the first entity marks its index, and a transaction that destroys it frees the index. The
+// fourth entity is spawned into that index, which the test checks, and the fifth spawn is over the budget. The hand
+// reaches the index first: when the destroy clears the mark, the fourth entity is the victim; when the index keeps the
+// mark, the fourth entity is passed over and the second entity is the victim. A transaction with a wrong seq that
+// destroys a marked entity is refused and leaves the mark, so the entity is passed over by the next sweep: the third
+// entity is the victim, where an unmarked second entity would be.
+func TestJ5PApplyDestroy(t *testing.T) {
+	log := j1Kinds()[2]
+	id := func(n uint64) eid.ID { return j1ID(t, log, n) }
+	spawn := func(ns ...uint64) ecd.Deed {
+		var ops []ecd.Op
+		for _, n := range ns {
+			ops = append(ops, j5pSpawnOps(id(n), n)...)
+		}
+		return j3Deed(0, ops...)
+	}
+	three := j5pBytes(t, j5pCatalog(0), log, spawn(1, 2, 3))
+	p := j5pNew(t, j5pCatalog(three))
+	ki := p.idx.kinds[log]
+	resident := func(n uint64) bool { _, ok := p.idx.entity(id(n)); return ok }
+	expect := func(step string, in ...uint64) {
+		t.Helper()
+		for n := uint64(1); n <= 6; n++ {
+			if got, want := resident(n), slices.Contains(in, n); got != want {
+				t.Errorf("%s: entity %d resident is %v, want %v", step, n, got, want)
+			}
+		}
+	}
+
+	j5pApply(t, p, nil, spawn(1, 2, 3))
+	first, ok := p.idx.entity(id(1))
+	if !ok {
+		t.Fatalf("the first entity is not resident")
+	}
+	if _, err := p.Get(id(1), j3U64, nil); err != nil {
+		t.Fatalf("Get(1): %v", err)
+	}
+	if !p.clocks[ki].marked(first.index) {
+		t.Fatalf("the first entity at index %d is not marked after a read", first.index)
+	}
+	j5pApply(t, p, nil, j3Deed(0, j3Destroy(id(1))))
+	if p.clocks[ki].marked(first.index) {
+		t.Errorf("index %d is marked after the destroy of its entity", first.index)
+	}
+	j5pApply(t, p, nil, spawn(4))
+	if e, ok := p.idx.entity(id(4)); !ok || e.index != first.index {
+		t.Fatalf("the fourth entity is at %+v, want the index %d that the destroy freed", e, first.index)
+	}
+	expect("the fourth spawn", 2, 3, 4)
+
+	// Correct: the index of the fourth entity is clear, so the hand takes it. Defect: the fourth entity inherits
+	// the mark of the first, the hand passes it over, and the second entity is evicted.
+	j5pApply(t, p, nil, spawn(5))
+	expect("the fifth spawn", 2, 3, 5)
+	if ev := j5pStat(p, log).Evictions; ev != 1 {
+		t.Errorf("evictions after the fifth spawn: %d, want 1", ev)
+	}
+
+	second, ok := p.idx.entity(id(2))
+	if !ok {
+		t.Fatalf("the second entity is not resident")
+	}
+	if _, err := p.Get(id(2), j3U64, nil); err != nil {
+		t.Fatalf("Get(2): %v", err)
+	}
+	err := p.Apply(p.At()+2, []ecd.Deed{j3Deed(0, j3Destroy(id(2)))})
+	if !errors.Is(err, ecd.ErrGap) {
+		t.Fatalf("Apply with a wrong seq answers %v, want ErrGap", err)
+	}
+	if !p.clocks[ki].marked(second.index) {
+		t.Errorf("the refused Apply cleared the mark of index %d", second.index)
+	}
+	expect("the refused Apply", 2, 3, 5)
+
+	// Correct: the hand stands at the second entity, which is marked, so it is passed over and the third entity is
+	// evicted. Defect: the refused Apply cleared the mark, and the second entity is evicted.
+	j5pApply(t, p, nil, spawn(6))
+	expect("the sixth spawn", 2, 5, 6)
+	if ev := j5pStat(p, log).Evictions; ev != 2 {
+		t.Errorf("evictions after the sixth spawn: %d, want 2", ev)
 	}
 }
 

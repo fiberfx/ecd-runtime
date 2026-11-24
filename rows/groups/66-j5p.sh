@@ -31,6 +31,8 @@
 #               (TestJ5PBudgetEarly)
 #   J5P-07      rows that fit the budget are not refused although the bytes of their first part, as if the source ended
 #               there, are over it; a budget one byte lower is refused (TestJ5PBudgetBound)
+#   J5P-08      an entity that is destroyed after a read leaves no mark for the entity that takes its index, and a
+#               refused Apply that destroys a marked entity leaves the mark (TestJ5PApplyDestroy)
 #   J11p        plant: the trim covers every kind, so an All kind is evicted (policy.go; TestJ11)
 #   J11q        plant: an eviction by the hand is not counted (policy.go; TestJ11)
 #   L15s        plant: the tables of a kind keep their chunks after an eviction (policy.go; TestL15)
@@ -51,6 +53,8 @@
 #   J5P-06p     plant: the lower bound refuses no row, so the source is read to its end (hydrate.go; TestJ5PBudgetEarly)
 #   J5P-07p     plant: the lower bound counts eight times the index cost of an entity, so it exceeds the Bytes of the
 #               kind and refuses rows that fit (hydrate.go; TestJ5PBudgetBound)
+#   J5P-08p     plant: an Apply that destroys a read entity leaves the mark of its index (policy.go;
+#               TestJ5PApplyDestroy)
 #
 # j5p_plant id expect test file sedexpr: copies /w/go to a temporary directory, applies the one-line sed to
 # engine/jacquard/<file> and runs only the named test there. KILLED: the test failed, and the observed text names its
@@ -92,6 +96,7 @@ go_row J5P-04 j5p "TestJ5PBudgetOp rc=0" /w/go test -run '^TestJ5PBudgetOp$' ./e
 go_row J5P-05 j5p "TestJ5PBudgetPredict rc=0" /w/go test -run '^TestJ5PBudgetPredict$' ./engine/jacquard/
 go_row J5P-06 j5p "TestJ5PBudgetEarly rc=0" /w/go test -run '^TestJ5PBudgetEarly$' ./engine/jacquard/
 go_row J5P-07 j5p "TestJ5PBudgetBound rc=0" /w/go test -run '^TestJ5PBudgetBound$' ./engine/jacquard/
+go_row J5P-08 j5p "TestJ5PApplyDestroy rc=0" /w/go test -run '^TestJ5PApplyDestroy$' ./engine/jacquard/
 j5p_plant J11p "TestJ11 fails on the plant" TestJ11 policy.go 's/if p\.res\[ki\]\.touched {/if true {/'
 j5p_plant J11q "TestJ11 fails on the plant" TestJ11 policy.go 's/\t\t\tp\.res\[ki\]\.evictions++/\t\t\t_ = i/'
 j5p_plant L15s "TestL15 fails on the plant" TestL15 policy.go 's/^\t\t\tt\.shrink()$/\t\t\t_ = t/'
@@ -118,3 +123,5 @@ j5p_plant J5P-06p "TestJ5PBudgetEarly fails on the plant" TestJ5PBudgetEarly hyd
   's/if limit > 0 \&\& low > limit {/if limit > 0 \&\& low < 0 {/'
 j5p_plant J5P-07p "TestJ5PBudgetBound fails on the plant" TestJ5PBudgetBound hydrate.go \
   's/low += indexEntityBytes$/low += 8 * indexEntityBytes/'
+j5p_plant J5P-08p "TestJ5PApplyDestroy fails on the plant" TestJ5PApplyDestroy policy.go \
+  's/^\t\tp\.clocks\[f\.kind\]\.unmark(f\.index)$/\t\t_ = f/'
