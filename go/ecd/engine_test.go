@@ -237,7 +237,7 @@ func TestNoSecondMinter(t *testing.T) {
 }
 
 // I2B-04: no source file under go/ecd and go/engine carries the retired product name, in any case.
-func TestNoLoomName(t *testing.T) {
+func TestNoRetiredName(t *testing.T) {
 	retired := "lo" + "om"
 	for _, p := range sourceFiles(t) {
 		src, err := os.ReadFile(p)

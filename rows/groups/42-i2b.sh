@@ -1,7 +1,7 @@
 # Group i2b of Ecd Runtime: I2B-01 to I2B-04 and their plants (the rows ending in p).
 # Package ecd (go/ecd): the seam's hardening. Apply is all or nothing, in a check pass and a commit pass; QueryDef holds
 # an Any term; ErrOp is the tenth sentinel; the host's one Minter is the only minter; the catalog names are ecd_*.
-# Sourced by rows/loom.rows.sh from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
 #
 #   row     check
 #   I2B-01  QueryDef has a field Any of type []ecd.CID, between None and Exact (TestSeamQueryAny)
@@ -10,7 +10,7 @@
 #   I2B-03  the seam lists ten error texts, ErrOp matches none of the nine others, and the comment of Apply in engine.go
 #           holds "all or nothing", "check pass" and "makes the engine Stale" (TestSeamErrorTexts, TestSeamErrOpDistinct,
 #           TestSeamSentinelsDistinct, TestSeamApplyText); every one of the four tests must pass
-#   I2B-04  no non-test Go file under go/ecd and go/engine contains the retired product name, in any case (TestNoLoomName)
+#   I2B-04  no non-test Go file under go/ecd and go/engine contains the retired product name, in any case (TestNoRetiredName)
 #
 # Each plant is one sed expression on engine.go of a temporary copy of /w/go that re-runs only the test of its row.
 # KILLED: a test failed. SURVIVED: every test passed. CNM: the sed did not change the expected number of lines, the
@@ -68,5 +68,5 @@ i2b_plant I2B-02p "a file that builds a Minter is appended and TestNoSecondMinte
 i2b_good I2B-03 "ten error texts, ErrOp distinct from the nine others, and the Apply comment states the two passes and the stale rule" 'TestSeamErrorTexts|TestSeamErrOpDistinct|TestSeamSentinelsDistinct|TestSeamApplyText'
 i2b_plant I2B-03p "the Apply comment drops all or nothing and TestSeamApplyText fails" 'TestSeamApplyText' 's/Apply applies one committed transaction, all or nothing, in two passes\./Apply applies one committed transaction./' 1 1
 
-i2b_good I2B-04 "no non-test Go file under go/ecd and go/engine contains the retired product name" 'TestNoLoomName'
-i2b_plant I2B-04p "a catalog name returns to the retired prefix and TestNoLoomName fails" 'TestNoLoomName' 's/ecd_component\.cid/loom_component.cid/' 1 1
+i2b_good I2B-04 "no non-test Go file under go/ecd and go/engine contains the retired product name" 'TestNoRetiredName'
+i2b_plant I2B-04p "a catalog name returns to the retired prefix and TestNoRetiredName fails" 'TestNoRetiredName' 's/ecd_component\.cid/loom_component.cid/' 1 1

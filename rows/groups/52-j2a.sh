@@ -1,5 +1,5 @@
 # Group j2a of Ecd Runtime: masks, chunk geometry and vocabulary of package jacquard.
-# Sourced by rows/loom.rows.sh from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
 #
 #   J13      chunkShift gives the largest power-of-two row count, 64 to 4096, that fits 16 KiB
 #   J13p     plant: chunkShift returns 6 for every row width; TestChunkShift must fail

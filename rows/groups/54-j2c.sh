@@ -1,9 +1,9 @@
 # Group j2c of Ecd Runtime: tables, chunks, typed columns and change stamps of package jacquard.
-# Sourced by rows/loom.rows.sh from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
 #
 #   J09      pointer columns survive the collector: a string and a slice in a component stay intact across pushes, copies
-#            and swap-removes with two collections between operations, and the finalizer of an object that only a resident
-#            value references never runs (TestJ09); a control object shows that a run is observable
+#            and swap-removes with two collections between operations, and an object that only a resident
+#            value references is never freed while resident (TestJ09); a control probe shows that a release is observable
 #   J09p     plant: columns are allocated as []byte arrays; TestJ09 must fail
 #   J2C-01   eid and ix columns and both value columns equal a reference after random push and swapRemove; swapRemove
 #            returns the moved row's ix; a pushed row and every slot beyond the length read zero (TestTableRows)
@@ -19,8 +19,8 @@
 #   J2C-05p  plant: a column write records stamp-1
 #   J2C-06   col(c) is the position of c in ids, and (0, false) for every other component (TestColRank)
 #   J2C-06p  plant: the rank counts the bit of c itself
-#   J2C-07   the vacated tail slot reads zero in eid, ix and every column, and the finalizer of what the removed value
-#            referenced runs (TestTailZero)
+#   J2C-07   the vacated tail slot reads zero in eid, ix and every column, and the probe of what the removed value
+#            referenced is freed (TestTailZero)
 #   J2C-07p  plant: swapRemove does not clear the tail slot
 #   J2C-08   hasPointers finds pointers through fields and array elements (TestHasPointers)
 #   J2C-08p  plant: unsafe.Pointer is not a pointer kind

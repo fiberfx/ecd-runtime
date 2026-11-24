@@ -7,10 +7,9 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"sync/atomic"
 	"testing"
-	"time"
 	"unsafe"
+	"weak"
 
 	eid "github.com/fiberfx/ecd-id/go"
 )
@@ -376,56 +375,51 @@ type ttHolder struct {
 	b []byte
 }
 
-// ttProbe is a heap object that carries a finalizer.
+// ttProbe is a heap object larger than the tiny-allocation limit, so the collector frees it on its own.
 type ttProbe struct{ pad [64]byte }
 
-// ttHold stores a holder value in column 0 of a row. The holder's slice is the only reference to a probe
-// whose finalizer sets ran.
-func ttHold(tb *table, row uint32, ran *atomic.Bool, s string) {
+// ttHold stores a holder value in column 0 of a row. The holder's slice is the only reference to a probe;
+// the returned weak pointer reads nil once the collector has freed the probe.
+func ttHold(tb *table, row uint32, s string) weak.Pointer[ttProbe] {
 	p := new(ttProbe)
-	runtime.SetFinalizer(p, func(*ttProbe) { ran.Store(true) })
 	h := ttHolder{s: s, b: p.pad[:]}
 	tb.set(row, 0, unsafe.Pointer(&h))
+	return weak.Make(p)
 }
 
-// ttSettle runs the collector twice and lets the finalizer goroutine run.
-func ttSettle() {
+// ttCollect runs two complete collections. runtime.GC returns after the sweep, so a weak pointer to an object
+// that was unreachable reads nil when it returns.
+func ttCollect() {
 	runtime.GC()
 	runtime.GC()
-	time.Sleep(time.Millisecond)
 }
 
-// ttRuns reports whether the finalizer that sets ran runs within 20 rounds of a collection and a 1 ms sleep.
-func ttRuns(ran *atomic.Bool) bool {
-	for range 20 {
-		runtime.GC()
-		time.Sleep(time.Millisecond)
-		if ran.Load() {
-			return true
-		}
-	}
-	return false
+// ttGone reports whether the probe of w has been freed, after two complete collections.
+func ttGone(w weak.Pointer[ttProbe]) bool {
+	ttCollect()
+	return w.Value() == nil
 }
 
-// ttDrop creates a probe that nothing references.
-func ttDrop(ran *atomic.Bool) {
-	p := new(ttProbe)
-	runtime.SetFinalizer(p, func(*ttProbe) { ran.Store(true) })
+// ttDrop creates a probe that nothing references and returns a weak pointer to it.
+//
+//go:noinline
+func ttDrop() weak.Pointer[ttProbe] {
+	return weak.Make(new(ttProbe))
 }
 
 // TestTailZero removes the tail row and the only row of a chunk (J2C-07). The vacated slot reads zero in eid,
-// ix and every column, and the finalizer of an object reachable only from the removed pointer value runs.
+// ix and every column, and the probe of an object reachable only from the removed pointer value is freed.
 func TestTailZero(t *testing.T) {
 	var at uint64 = 1
 	build := func() *table {
 		return newTable([]compID{1, 2}, []colDef{defOf[ttHolder](), defOf[uint64]()}, &at)
 	}
-	pushHolder := func(tb *table, n int, ran *atomic.Bool) uint32 {
+	pushHolder := func(tb *table, n int) (uint32, weak.Pointer[ttProbe]) {
 		row := tb.push(ttID(n), uint32(n))
-		ttHold(tb, row, ran, fmt.Sprintf("holder-%d", n))
+		w := ttHold(tb, row, fmt.Sprintf("holder-%d", n))
 		v := uint64(n) * 11
 		tb.set(row, 1, unsafe.Pointer(&v))
-		return row
+		return row, w
 	}
 	zeroAt := func(tb *table, row uint32, what string) {
 		t.Helper()
@@ -435,25 +429,25 @@ func TestTailZero(t *testing.T) {
 	}
 
 	tb := build()
-	ran := [3]*atomic.Bool{new(atomic.Bool), new(atomic.Bool), new(atomic.Bool)}
+	var probe [3]weak.Pointer[ttProbe]
 	for n := range 3 {
-		pushHolder(tb, n+1, ran[n])
+		_, probe[n] = pushHolder(tb, n+1)
 	}
 	tb.swapRemove(2)
 	zeroAt(tb, 2, "tail row removed")
-	if !ttRuns(ran[2]) {
-		t.Fatal("the finalizer of the removed tail value did not run")
+	if !ttGone(probe[2]) {
+		t.Fatal("the probe of the removed tail value was not freed")
 	}
-	if ran[0].Load() || ran[1].Load() {
-		t.Fatal("a finalizer of a resident value ran")
+	if probe[0].Value() == nil || probe[1].Value() == nil {
+		t.Fatal("a probe of a resident value was freed")
 	}
 	tb.swapRemove(0)
 	zeroAt(tb, 1, "row 0 removed, tail moved")
-	if !ttRuns(ran[0]) {
-		t.Fatal("the finalizer of the value that the move overwrote did not run")
+	if !ttGone(probe[0]) {
+		t.Fatal("the probe of the value that the move overwrote was not freed")
 	}
-	if ran[1].Load() {
-		t.Fatal("the finalizer of the moved value ran")
+	if probe[1].Value() == nil {
+		t.Fatal("the probe of the moved value was freed")
 	}
 	if h := (*ttHolder)(tb.ptr(0, 0)); h.s != "holder-2" || len(h.b) != 64 {
 		t.Fatalf("the moved value reads %q with %d bytes", h.s, len(h.b))
@@ -464,26 +458,23 @@ func TestTailZero(t *testing.T) {
 	for n := range per {
 		tb.push(ttID(n+1), uint32(n)+1)
 	}
-	lone := new(atomic.Bool)
-	row := pushHolder(tb, per+1, lone)
+	row, lone := pushHolder(tb, per+1)
 	if len(tb.chunks) != 2 || int(row) != per {
 		t.Fatalf("row %d in %d chunks, want the only row of the second chunk", row, len(tb.chunks))
 	}
 	tb.swapRemove(row)
 	zeroAt(tb, row, "only row of a chunk removed")
-	if !ttRuns(lone) {
-		t.Fatal("the finalizer of the only row's value did not run")
+	if !ttGone(lone) {
+		t.Fatal("the probe of the only row's value was not freed")
 	}
 }
 
 // TestJ09 keeps pointer columns alive across the collector (J09): a component with a string and a slice
-// survives pushes, copies and swap-removes with a collection between operations, and a finalizer on an object
-// that only a resident value references never runs while the value is resident.
+// survives pushes, copies and swap-removes with a collection between operations, and an object that only a
+// resident value references is never freed while the value is resident.
 func TestJ09(t *testing.T) {
-	control := new(atomic.Bool)
-	ttDrop(control)
-	if !ttRuns(control) {
-		t.Fatal("the finalizer of an unreferenced object did not run, so a run cannot be observed")
+	if !ttGone(ttDrop()) {
+		t.Fatal("an unreferenced probe was not freed, so a release cannot be observed")
 	}
 
 	var at uint64 = 1
@@ -494,19 +485,19 @@ func TestJ09(t *testing.T) {
 	tb := newTable([]compID{1}, []colDef{h}, &at)
 	cp := newTable([]compID{1}, []colDef{h}, &at)
 	const probes = 40
-	flags := make([]*atomic.Bool, probes)
+	probe := make([]weak.Pointer[ttProbe], probes)
 	text := func(k int) string { return fmt.Sprintf("probe-%d-%s", k, strings.Repeat("x", k%7)) }
 	var rows, copies []int // the probe held by each row of tb and of cp
 	check := func(step string) {
 		t.Helper()
-		ttSettle()
+		ttCollect()
 		for _, held := range []struct {
 			tb *table
 			ks []int
 		}{{tb, rows}, {cp, copies}} {
 			for r, k := range held.ks {
-				if flags[k].Load() {
-					t.Fatalf("%s: the finalizer of probe %d ran while its value is resident", step, k)
+				if probe[k].Value() == nil {
+					t.Fatalf("%s: the probe of %d was freed while its value is resident", step, k)
 				}
 				v := (*ttHolder)(held.tb.ptr(uint32(r), 0))
 				if v.s != text(k) || len(v.b) != 64 {
@@ -517,9 +508,8 @@ func TestJ09(t *testing.T) {
 	}
 
 	for k := range probes {
-		flags[k] = new(atomic.Bool)
 		row := tb.push(ttID(k+1), uint32(k)+1)
-		ttHold(tb, row, flags[k], text(k))
+		probe[k] = ttHold(tb, row, text(k))
 		rows = append(rows, k)
 		check(fmt.Sprintf("push %d", k))
 	}
@@ -547,9 +537,9 @@ func TestJ09(t *testing.T) {
 		rows[0] = rows[len(rows)-1]
 		rows = rows[:len(rows)-1]
 	}
-	for k, f := range flags {
-		if !ttRuns(f) {
-			t.Fatalf("the finalizer of probe %d did not run after every row was removed", k)
+	for k, w := range probe {
+		if !ttGone(w) {
+			t.Fatalf("the probe of %d was not freed after every row was removed", k)
 		}
 	}
 }

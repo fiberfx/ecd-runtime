@@ -268,7 +268,7 @@ type j1Marshals struct{ index, gen uint32 }
 
 func (j1Marshals) MarshalJSON() ([]byte, error) { return nil, nil }
 
-// TestJ1_09 (J1-09, I-j1-4): neither Entity nor *Entity implements an encoding interface; the check detects a
+// TestJ1_09 (J1-09): neither Entity nor *Entity implements an encoding interface; the check detects a
 // type that does.
 func TestJ1_09(t *testing.T) {
 	if found := j1Encodings(reflect.TypeFor[Entity]()); len(found) != 0 {
