@@ -39,8 +39,9 @@ type Model struct {
 var _ ecd.Engine = (*Model)(nil)
 
 // New returns an empty model for the catalog. An All kind starts Cold and a Touched kind starts Warm and empty.
-// The model copies what it keeps from the catalog. It refuses a CID 0, a CID or a kind declared twice, a tag
-// with a nonzero Size and a component of form Component with Size 0, and returns the error without a model.
+// The model copies what it keeps from the catalog. It refuses a CID 0, a CID or a kind declared twice, a form
+// other than Component and Tag, a tag with a nonzero Size, and a component of form Component with a Size of 0
+// or less, and returns the error without a model.
 func New(cat *ecd.Catalog) (ecd.Engine, error) {
 	if cat == nil {
 		return nil, fmt.Errorf("model: nil catalog")
@@ -60,11 +61,14 @@ func New(cat *ecd.Catalog) (ecd.Engine, error) {
 		if _, dup := m.comps[c.CID]; dup {
 			return nil, fmt.Errorf("model: CID %d is declared twice", c.CID)
 		}
+		if c.Form != ecd.Component && c.Form != ecd.Tag {
+			return nil, fmt.Errorf("model: component %q has form %d", c.Name, c.Form)
+		}
 		if c.Form == ecd.Tag && c.Size != 0 {
 			return nil, fmt.Errorf("model: tag %q has Size %d, want 0", c.Name, c.Size)
 		}
-		if c.Form == ecd.Component && c.Size == 0 {
-			return nil, fmt.Errorf("model: component %q has Size 0", c.Name)
+		if c.Form == ecd.Component && c.Size <= 0 {
+			return nil, fmt.Errorf("model: component %q has Size %d, want more than 0", c.Name, c.Size)
 		}
 		m.comps[c.CID] = c
 	}
@@ -126,17 +130,17 @@ func (m *Model) fail(cause error) error {
 	return fmt.Errorf("%w: %w", ecd.ErrStale, cause)
 }
 
-// Apply applies one committed transaction, all or nothing, in two passes. The check pass refuses the
-// transaction before any change: a seq other than At()+1 answers ecd.ErrGap, and the first fault in commit
-// order answers ecd.ErrKind for an op on an undeclared kind, or ecd.ErrOp for an undeclared CID, a value of the
-// wrong length or an op out of order, such as a second Spawn of one eid. A refusal leaves the model and At() unchanged. The commit pass applies
-// the deeds in Ord order, then list order. Any error or panic in the commit pass, one before the first change
-// included, makes the model stale, and Apply returns an error wrapping ecd.ErrStale and its cause.
+// Apply applies one committed transaction, all or nothing, in two passes. The check pass refuses the transaction
+// before any change: a seq other than At()+1 answers ecd.ErrGap, and the first fault in commit order answers
+// ecd.ErrKind for an op on an undeclared kind, or ecd.ErrOp for an undeclared CID, a value of the wrong length or
+// an op out of order, such as a second Spawn of one eid. A refusal leaves the model and At() unchanged. The commit
+// pass applies the deeds in Ord order, then list order. Any error or panic in the commit pass, one before the
+// first change included, makes the model stale, and Apply returns an error wrapping ecd.ErrStale and its cause.
 //
-// An op on a Cold kind changes nothing. A Set, Unset or Destroy on a Touched entity that is not resident
-// changes nothing, and a Spawn makes a Touched entity resident. A Set, Unset or Destroy on an entity that an
-// All kind does not hold fails the commit pass with a cause that wraps ecd.ErrAbsent. An Unset of an entity's
-// last component leaves the entity alive; only a Destroy removes it.
+// An op on a Cold kind changes nothing. A Set, Unset or Destroy on a Touched entity that is not resident changes
+// nothing, and a Spawn makes a Touched entity resident. A Set, Unset or Destroy on an entity that an All kind
+// does not hold fails the commit pass with a cause that wraps ecd.ErrAbsent. An Unset of an entity's last
+// component leaves the entity alive; only a Destroy removes it.
 func (m *Model) Apply(seq uint64, deeds []ecd.Deed) error {
 	if err := m.gate(); err != nil {
 		return err

@@ -417,6 +417,8 @@ func TestCatalog(t *testing.T) {
 	}{
 		{"tag with a size", []ecd.ComponentDef{one, {CID: 3, Name: "mark", Form: ecd.Tag, Size: 4}}, nil},
 		{"component with size 0", []ecd.ComponentDef{{CID: 1, Name: "one", Form: ecd.Component}}, nil},
+		{"component with a negative size", []ecd.ComponentDef{{CID: 1, Name: "one", Form: ecd.Component, Size: -8}}, nil},
+		{"unknown form", []ecd.ComponentDef{{CID: 1, Name: "one", Form: 0, Size: 8}}, nil},
 		{"CID 0", []ecd.ComponentDef{{CID: 0, Name: "zero", Form: ecd.Component, Size: 8}}, nil},
 		{"CID twice", []ecd.ComponentDef{one, one}, nil},
 		{"kind twice", []ecd.ComponentDef{one}, []ecd.KindDef{{Kind: kindAaa, Residency: ecd.All}, {Kind: kindAaa, Residency: ecd.All}}},
