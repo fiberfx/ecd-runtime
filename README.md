@@ -113,7 +113,7 @@ func tick(cfg rt.Config, mover ecd.Kind, pos ecd.CID, known eid.ID) (rt.Result, 
 The module `github.com/fiberfx/ecd-runtime/go/sqlite`, in `go/sqlite/`, package `sqlite`, is an owner store in one
 SQLite file. A host passes it to the Runtime as `rt.Config.Committer`, and after a restart it brings a fresh engine to
 the seq of the committed history. The module has its own tags, `go/sqlite/vX.Y.Z`; `go/sqlite/v0.4.0` is the first. It
-requires `github.com/fiberfx/ecd-runtime/go` v0.3.0, `github.com/fiberfx/ecd-id/go` v0.8.0 and the pure-Go driver
+requires `github.com/fiberfx/ecd-runtime/go` v0.5.0, `github.com/fiberfx/ecd-id/go` v0.8.0 and the pure-Go driver
 `modernc.org/sqlite` v1.37.0. Inside this repository a `replace` directive points the requirement on the main module at
 the parent directory. The main module `go/` does not require the driver.
 
@@ -131,6 +131,12 @@ the parent directory. The main module `go/` does not require the driver.
 - `Store.Commit(deeds, out)` is the `rt.Committer`. It commits the deeds of one flush in one SQLite transaction and
   writes one `rt.Outcome` per deed into `out`.
 - `Store.Hydrate(e, cat)` loads every kind of residency `All` of the catalog into a fresh engine and returns the seq.
+  When it loads no kind and the seq is above 0, it calls the engine's `Start` with the seq.
+- `Store.Rows(k, ids, f)` calls `f` once, inside one read transaction, with the seq of the store and a `RowSource` of
+  the stored values of the entities `ids` of kind `k`, in eid order and then CID order. The ids may be in any order and
+  may repeat; an eid of another kind is an error before `f` is called. An entity that is not alive, or alive with no
+  component value, yields no row. The source is valid only until `f` returns, and an error of `f` is returned
+  unchanged.
 - `Store.Log(after, f)` calls `f` with each committed deed of a seq above `after`, in seq order and then ord order. An
   error of `f` stops the walk and is returned unchanged. A body that does not decode matches `ErrSchema`.
 - `Store.Close` closes both connections, and a second `Close` returns nil.
@@ -172,6 +178,11 @@ func start(path string, cfg rt.Config) (*rt.Runtime, *sqlite.Store, error) {
 
 After `Hydrate` the engine is at the seq of the store, and the next flush commits at that seq plus one.
 
+A host whose catalog holds All kinds passes `Hydrate` a catalog without them until an engine is admitted to serve All
+kinds, and reads their entities with `Rows`. The engine then takes the seq of the store through `Start`, with its All
+kinds `Cold`. A miss on a Touched entity is served the same way: `f` passes its seq and source to the engine's
+`Hydrate`, which answers `ErrGap` when the store has committed a transaction that the engine has not applied.
+
 ### The order of a commit
 
 `Commit` runs on the owner goroutine and takes these steps in this order.
@@ -206,8 +217,8 @@ deed whose transaction failed. Only a deed answered `Committed` reaches the engi
 
 - The store holds no outbox, no intents, no `_feed` or `_store` tables, no lineage and no replication, and it projects
   nothing to a lake. `wal_autocheckpoint` keeps the default of SQLite.
-- The state of a kind of residency `Touched` is written, and nothing reads it back: there is no miss path and no
-  residency. `Hydrate` skips such a kind.
+- The state of a kind of residency `Touched` is written, and `Hydrate` skips such a kind. Only `Rows` reads it back,
+  for the entities a host names; the store keeps no residency.
 - An entity with no component value is alive in the store, and `Hydrate` cannot load it, since a `Row` of the hydration
   cannot name it. It is absent after a hydration.
 - One `state` table holds opaque values for every kind. The store has no typed tables, routes no query and keeps no
@@ -220,8 +231,8 @@ deed whose transaction failed. Only a deed answered `Committed` reaches the engi
 - The deed kind is provisional: the tests of the module use kind `ded` of system `tst`, a code registered nowhere.
 - On macOS the writer also sets `fullfsync` and `checkpoint_fullfsync`. The rows run on Linux and do not measure them.
 
-Rows SQ-01 to SQ-14, in `rows/groups/78-sq40.sh`, measure the module. They load the driver and its modules from the
-offline module inputs.
+Rows SQ-01 to SQ-14, in `rows/groups/78-sq40.sh`, and SQ-20 to SQ-22, in `rows/groups/79-sq50.sh`, measure the
+module. They load the driver and its modules from the offline module inputs.
 
 ## Rows
 
