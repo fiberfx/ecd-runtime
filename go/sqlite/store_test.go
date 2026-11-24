@@ -1004,3 +1004,42 @@ func TestRefusedAtomic(t *testing.T) {
 	}
 	commitWant(t, s, "spawn Q", deedsOf(t, m, ops(spawnOp(q), setOp(q, cidOne, vq))), []rt.Outcome{rt.Committed}, 4)
 }
+
+// TestHydrateTouchedOnly holds that Hydrate brings a new engine to the store's seq when the catalog declares no All
+// kind. After two committed transactions, a fresh engine over a catalog of one Touched kind is at seq 2 and Hydrate
+// returns 2; a third commit then returns seq 3, and its Apply at 3 succeeds and makes the spawned entity resident,
+// on the reference model and on Jacquard.
+func TestHydrateTouchedOnly(t *testing.T) {
+	cat := &ecd.Catalog{
+		Components: storeCatalog().Components,
+		Kinds:      []ecd.KindDef{{Kind: kindTouch, Residency: ecd.Touched, Budget: 1 << 20}},
+	}
+	committed := []rt.Outcome{rt.Committed}
+	path, s := newStore(t)
+	m := &countMinter{}
+	a, b, c := m.must(t, kindTouch.Kind), m.must(t, kindTouch.Kind), m.must(t, kindTouch.Kind)
+	commitWant(t, s, "spawn A", deedsOf(t, m, ops(spawnOp(a), setOp(a, cidOne, val(0, 0, 1)))), committed, 1)
+	commitWant(t, s, "spawn B", deedsOf(t, m, ops(spawnOp(b), setOp(b, cidOne, val(0, 0, 2)))), committed, 2)
+	closeStore(t, s)
+
+	s = openStore(t, path)
+	ens := make([]ecd.Engine, len(engineCases))
+	for i, ec := range engineCases {
+		ens[i] = openEngine(t, ec, cat)
+		seq, err := s.Hydrate(ens[i], cat)
+		if err != nil || seq != 2 || ens[i].At() != 2 {
+			t.Fatalf("%s: Hydrate: seq %d, At() %d, %v; want 2, 2, nil", ec.name, seq, ens[i].At(), err)
+		}
+	}
+	vc := val(0, 0, 3)
+	deeds := deedsOf(t, m, ops(spawnOp(c), setOp(c, cidOne, vc)))
+	commitWant(t, s, "spawn C", deeds, committed, 3)
+	for i, ec := range engineCases {
+		if err := ens[i].Apply(3, deeds); err != nil {
+			t.Fatalf("%s: Apply(3): %v", ec.name, err)
+		}
+		if v, err := ens[i].Get(c, cidOne, nil); ens[i].At() != 3 || err != nil || !bytes.Equal(v, vc) {
+			t.Fatalf("%s: after Apply(3): At() %d, Get(C, 1) %x, %v; want 3, %x", ec.name, ens[i].At(), v, err, vc)
+		}
+	}
+}
