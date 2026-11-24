@@ -5,8 +5,9 @@
 #            kind, a Warm All kind and a Touched kind: the seq rule, the replacement of an All kind and of a resident
 #            Touched entity, rows out of order with a repeated component, the refusals of an undeclared kind, an All kind
 #            and a stale engine, the evictions counted, a new engine that takes the seq of its first hydration, unload,
-#            and seeded random calls; after each call the seq, the state, the entities and the evictions of every kind,
-#            every component and every declared query read alike (TestJ5HHydrate)
+#            a new engine whose first hydration is of a Touched kind, after which a hydration at another seq is
+#            refused with ecd.ErrGap, and seeded random calls; after each call the seq, the state, the entities and
+#            the evictions of every kind, every component and every declared query read alike (TestJ5HHydrate)
 #   J5H-02   a refused or failed hydration changes nothing: a wrong seq, a row of another kind, an undeclared CID, a value
 #            of the wrong length, a tag with a value, an error of the row source after some rows, and an undeclared kind,
 #            each on a Cold All kind, a Warm All kind and a Touched kind; the answer matches its error, the kind keeps its
@@ -20,6 +21,8 @@
 #   J5H-02pa plant: a hydration at a seq other than the Engine's is not refused (hydrate.go)
 #   J5H-03p  plant: a resident entity is not freed before it is spawned again (hydrate.go)
 #   J5H-04p  plant: a hydrated value is kept as the row source hands it out, not copied (hydrate.go)
+#   J5H-05p  plant: a source error ends the rows read and the hydration goes on with the rows so far (hydrate.go)
+#   J5H-06p  plant: a successful hydration does not record that the engine has been hydrated (hydrate.go)
 #
 # j5h_plant id expect test file sedexpr: copies /w/go to a temporary directory, applies the one-line sed to
 # engine/jacquard/<file> and runs only the named test there. KILLED: the test failed. SURVIVED: it passed.
@@ -54,3 +57,5 @@ j5h_plant J5H-02pk "TestJ5HRefused fails on the plant"   TestJ5HRefused   hydrat
 j5h_plant J5H-02pa "TestJ5HRefused fails on the plant"   TestJ5HRefused   hydrate.go 's/if at != en\.applied && (en\.applied != 0 || en\.loaded()) {/if false {/'
 j5h_plant J5H-03p  "TestJ5HRehydrate fails on the plant" TestJ5HRehydrate hydrate.go 's/if _, ok := en\.idx\.entity(s\.id); ok {/if false {/'
 j5h_plant J5H-04p  "TestJ5HHydrate fails on the plant"   TestJ5HHydrate   hydrate.go 's/vals\[r\.CID\] = append(\[\]byte(nil), r\.Value\.\.\.)/vals[r.CID] = r.Value/'
+j5h_plant J5H-05p  "TestJ5HRefused fails on the plant"   TestJ5HRefused   hydrate.go 's/return nil, fmt\.Errorf("jacquard: reading rows of %v: %w", k, err)/return out, nil/'
+j5h_plant J5H-06p  "TestJ5HHydrate fails on the plant"   TestJ5HHydrate   hydrate.go 's/en\.hydrated = true/_ = ki/'

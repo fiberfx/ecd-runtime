@@ -64,6 +64,7 @@ type Engine struct {
 	queries  map[ecd.QID]*query // the declared queries by QID; nil until addQuery
 	res      []kindRes          // the residency of each kind by kind index; nil: every kind is All and Warm
 	allKinds []uint16           // the indexes of the All kinds, in kind order
+	hydrated bool               // a hydration has succeeded; the seq rule of hydrate reads it
 }
 
 // newEngine returns an empty engine over the declared kinds and components. It answers errCatalog, wrapped,
