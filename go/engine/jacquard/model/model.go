@@ -30,7 +30,7 @@ type Model struct {
 	ents    map[ecd.Kind]map[eid.ID]map[ecd.CID][]byte
 	evicted map[ecd.Kind]int64
 	at      uint64
-	loaded  bool // a Hydrate has succeeded
+	loaded  bool // a Hydrate or a Start has succeeded
 	stale   bool
 	closed  bool
 	hook    func(op ecd.Op) // called before each op of the commit pass; tests make it panic
@@ -130,7 +130,8 @@ func repeats[T comparable](list []T) bool {
 // Name returns "model".
 func (m *Model) Name() string { return "model" }
 
-// At returns the seq of the last transaction applied in full, or the seq of the first hydration of a new model.
+// At returns the seq of the last transaction applied in full, or the seq of the first hydration or Start of a new
+// model.
 func (m *Model) At() uint64 { return m.at }
 
 // State returns the state of a kind: Stale for every kind once the model is stale or closed, and Cold for a
@@ -363,7 +364,7 @@ func (m *Model) rows(k ecd.Kind, src ecd.RowSource) (map[eid.ID]map[ecd.CID][]by
 }
 
 // Hydrate loads the rows of src, read at seq at, into kind k. The seq must equal At(), except that a model with
-// no applied transaction and no hydration takes At() = at; any other seq answers ecd.ErrGap. A row of another
+// no applied transaction, no hydration and no Start takes At() = at; any other seq answers ecd.ErrGap. A row of another
 // kind, a row of an undeclared CID, a tag's row with a value and a row whose value is not the Size of a component
 // without pointers are refused. An error from src is returned, and a refused or failed hydration
 // changes nothing. For an All kind the rows replace the kind's entities and the kind becomes Warm. For a
@@ -399,6 +400,23 @@ func (m *Model) Hydrate(k ecd.Kind, at uint64, src ecd.RowSource) (err error) {
 	}
 	m.at = at
 	m.loaded = true
+	return nil
+}
+
+// Start brings a new model, with no applied transaction, no hydration and no Start, to the seq at without loading a
+// kind: At() becomes at, no kind changes state, and a later Hydrate must name at. On any other model a call with at
+// equal to At() changes nothing, and any other at answers ecd.ErrGap. A stale or closed model answers ecd.ErrStale.
+func (m *Model) Start(at uint64) error {
+	if err := m.gate(); err != nil {
+		return err
+	}
+	if m.at != 0 || m.loaded { // start: not new
+		if at == m.at {
+			return nil
+		}
+		return fmt.Errorf("model: start at %d, model at %d: %w", at, m.at, ecd.ErrGap)
+	}
+	m.at, m.loaded = at, true
 	return nil
 }
 

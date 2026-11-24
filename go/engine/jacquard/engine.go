@@ -49,7 +49,7 @@ type compDef struct {
 //	queries the declared queries by QID; nil until addQuery
 //	res     the residency of each kind by kind index; nil: every kind is All and Warm
 //	allKinds the indexes of the All kinds, in kind order
-//	hydrated a hydration has succeeded; the seq rule of hydrate reads it
+//	hydrated a hydration or a Start has succeeded; the seq rule of hydrate reads it
 //
 // Mutation happens on one goroutine; get writes nothing.
 type Engine struct {
@@ -65,7 +65,7 @@ type Engine struct {
 	queries  map[ecd.QID]*query // the declared queries by QID; nil until addQuery
 	res      []kindRes          // the residency of each kind by kind index; nil: every kind is All and Warm
 	allKinds []uint16           // the indexes of the All kinds, in kind order
-	hydrated bool               // a hydration has succeeded; the seq rule of hydrate reads it
+	hydrated bool               // a hydration or a Start has succeeded; the seq rule of hydrate reads it
 }
 
 // newEngine returns an empty engine over the declared kinds and components. It answers errCatalog, wrapped,

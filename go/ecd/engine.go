@@ -155,6 +155,11 @@ type Engine interface {
 	// call with an error that matches ErrOp, the kind stays as it was, and the engine does not become Stale.
 	Hydrate(k Kind, at uint64, src RowSource) error
 
+	// Start brings a new engine (At() == 0, no kind loaded) to the seq at without loading a kind: At() becomes at,
+	// All kinds stay Cold and Touched kinds stay Warm and empty. On any other engine a call with at == At() changes
+	// nothing, and any other at answers ErrGap with the engine unchanged. A Stale engine answers ErrStale.
+	Start(at uint64) error
+
 	// Evict drops resident entities of a Touched kind; it has no store meaning.
 	Evict(k Kind, ids []eid.ID) error
 

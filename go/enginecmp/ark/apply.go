@@ -250,10 +250,10 @@ func (e *Engine) rows(k ecd.Kind, src ecd.RowSource) (map[eid.ID]map[ecd.CID][]b
 }
 
 // Hydrate loads the rows of src, read at seq at, into All kind k. The seq must equal At(), except that an engine
-// with no applied transaction and no hydration takes At() = at; any other seq answers ecd.ErrGap. A row of another
-// kind, a row of an undeclared CID, a tag's row with a value and a row whose value is not the Size of a component
-// without pointers are refused. An error from src is returned, and a refused or failed hydration changes nothing.
-// The rows replace the kind's entities in a new Ark world, and the kind becomes Warm. A panic makes the engine
+// with no applied transaction, no hydration and no Start takes At() = at; any other seq answers ecd.ErrGap. A row of
+// another kind, a row of an undeclared CID, a tag's row with a value and a row whose value is not the Size of a
+// component without pointers are refused. An error from src is returned, and a refused or failed hydration changes
+// nothing. The rows replace the kind's entities in a new Ark world, and the kind becomes Warm. A panic makes the engine
 // stale. A kind that the catalog does not declare answers ecd.ErrKind.
 func (e *Engine) Hydrate(k ecd.Kind, at uint64, src ecd.RowSource) (err error) {
 	if err := e.gate(); err != nil {

@@ -11,7 +11,7 @@ import (
 	refmodel "github.com/fiberfx/ecd-runtime/go/engine/jacquard/model"
 )
 
-// j5sSeam is the part of ecd.Engine that seam.go implements: every method but Hydrate and Evict.
+// j5sSeam is the part of ecd.Engine that seam.go implements: every method but Hydrate, Evict and Start.
 type j5sSeam interface {
 	Name() string
 	At() uint64
