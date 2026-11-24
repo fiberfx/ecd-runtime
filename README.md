@@ -217,8 +217,9 @@ deed whose transaction failed. Only a deed answered `Committed` reaches the engi
 
 - The store holds no outbox, no intents, no `_feed` or `_store` tables, no lineage and no replication, and it projects
   nothing to a lake. `wal_autocheckpoint` keeps the default of SQLite.
-- The state of a kind of residency `Touched` is written, and `Hydrate` skips such a kind. Only `Rows` reads it back,
-  for the entities a host names; the store keeps no residency.
+- The state of a kind of residency `Touched` is written, and `Hydrate` loads none of it: it skips every Touched kind,
+  and when it loads no kind and the seq is above 0 it calls the engine's `Start`, which loads no kind. Only `Rows`
+  reads that state back, for the entities a host names; the store keeps no residency.
 - An entity with no component value is alive in the store, and `Hydrate` cannot load it, since a `Row` of the hydration
   cannot name it. It is absent after a hydration.
 - One `state` table holds opaque values for every kind. The store has no typed tables, routes no query and keeps no
@@ -231,8 +232,9 @@ deed whose transaction failed. Only a deed answered `Committed` reaches the engi
 - The deed kind is provisional: the tests of the module use kind `ded` of system `tst`, a code registered nowhere.
 - On macOS the writer also sets `fullfsync` and `checkpoint_fullfsync`. The rows run on Linux and do not measure them.
 
-Rows SQ-01 to SQ-14, in `rows/groups/78-sq40.sh`, and SQ-20 to SQ-22, in `rows/groups/79-sq50.sh`, measure the
-module. They load the driver and its modules from the offline module inputs.
+Rows SQ-01 to SQ-14, in `rows/groups/78-sq40.sh`, SQ-20 to SQ-22, in `rows/groups/79-sq50.sh`, SQ-30 with the
+plants SQ-22q and SQ-22r, in `rows/groups/80-fx51.sh`, L12-model, in `rows/groups/50-j0m.sh`, and MQ-01, in
+`rows/groups/85-mq60.sh`, measure the module. They load the driver and its modules from the offline module inputs.
 
 ## Rows
 
