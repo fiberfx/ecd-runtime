@@ -10,7 +10,7 @@
 #     --param inputs=DIR \
 #     --param cpus=2 --param memory=4g --param timeout=1800
 # inputs is required: a GOPROXY file tree that /w/inputs provides for the module's one requirement,
-# github.com/fiberfx/ecd-id/go v0.7.0. Without it GOPROXY is off, and every row that loads the module is CNM.
+# github.com/fiberfx/ecd-id/go v0.8.0. Without it GOPROXY is off, and every row that loads the module is CNM.
 #
 # Rows live in group files, rows/groups/NN-<group>.sh, which the script sources in name order between R0 and the
 # final line. A group file is POSIX sh sourced from /w. It owns its row ids and its group name, calls "sel ID GROUP"

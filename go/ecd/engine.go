@@ -6,8 +6,8 @@ import (
 	eid "github.com/fiberfx/ecd-id/go"
 )
 
-type CID uint16 // a component's id: loom_component.cid, from 1
-type QID uint16 // a declared engine query's index in loom_query, from 0
+type CID uint16 // a component's id: ecd_component.cid, from 1
+type QID uint16 // a declared engine query's index in ecd_query, from 0
 
 type Residency uint8
 
@@ -37,7 +37,8 @@ type ComponentDef struct {
 	Name     string
 	Form     Form
 	Size     int  // bytes of the Go value; 0 for a tag
-	Pointers bool // the value holds a string, a slice or a pointer
+	Pointers bool // the value holds a pointer word: pointer, unsafe.Pointer, string, slice, map, chan, func
+	// or interface, found through struct fields and array elements
 }
 
 type KindDef struct {
@@ -52,10 +53,11 @@ type QueryDef struct {
 	Kinds []Kind // empty: every All kind
 	All   []CID  // required components
 	None  []CID  // excluded components
+	Any   []CID  // at least one present; empty: no term
 	Exact bool   // the entity's components equal All
 }
 
-// Catalog is what loom gen generated; the engine copies what it keeps.
+// Catalog is what the gen job generated; the engine copies what it keeps.
 type Catalog struct {
 	Components []ComponentDef
 	Kinds      []KindDef
@@ -116,7 +118,8 @@ type KindStats struct {
 	Bytes        int64 // resident bytes, columns and index
 	PointerBytes int64 // bytes of components with Pointers
 	Evictions    int64
-	Archetypes   int64 // 0 for engines without archetypes
+	Archetypes   int64 // active archetypes: those holding at least one row; 0 for engines without archetypes
+	Nodes        int64 // archetype graph nodes, active or not; 0 for engines without archetypes
 }
 
 type Engine interface {
@@ -124,10 +127,19 @@ type Engine interface {
 	At() uint64   // the seq of the last transaction applied in full
 	State(k Kind) State
 
-	// Apply applies one committed transaction. seq must equal At()+1, else ErrGap and no change.
-	// Ops apply in Ord order, then list order. On success At() == seq.
+	// Apply applies one committed transaction, all or nothing, in two passes.
+	// Check pass, before any change: seq == At()+1 (else ErrGap); every op's entity of a declared
+	// kind (else ErrKind); every CID declared, every value of a component without Pointers exactly
+	// Size bytes, a tag's value nil, a Spawn's OpSet ops after its OpSpawn, no op on an eid after
+	// its OpDestroy, and no Destroy and Spawn of one eid in the transaction (else ErrOp). A refusal
+	// here returns its error with the engine and At() unchanged; the check pass creates nothing.
+	// Commit pass: ops apply in Ord order, then list order. On success At() == seq. Any error or
+	// panic after the first change makes the engine Stale; Apply then returns an error that
+	// matches ErrStale and its cause.
 	// Ops on a Cold kind, and Set, Unset and Destroy on a non-resident Touched entity, change nothing;
-	// a Spawn of a Touched kind makes the entity resident.
+	// a Spawn of a Touched kind makes the entity resident. A Spawn with no OpSet, or with tags only,
+	// makes an entity with no component value. An Unset of an entity's last component leaves the
+	// entity alive; only OpDestroy removes it.
 	Apply(seq uint64, deeds []Deed) error
 
 	// Hydrate loads rows read from the store at seq at, which must equal At(); a new engine
@@ -150,6 +162,13 @@ type Engine interface {
 	Close() error
 }
 
+// Minter mints the eids of new entities and deeds. The host process holds one Minter per lease and hands it
+// to the Runtime; the Runtime never builds a second Minter from the same lease. *eid.Minter satisfies it;
+// tests pass a fake.
+type Minter interface {
+	Mint(kind eid.Code) (eid.ID, error)
+}
+
 var (
 	ErrGap    = errors.New("ecd: apply out of order")
 	ErrStale  = errors.New("ecd: engine stale")                 // route to the store and rebuild
@@ -157,6 +176,7 @@ var (
 	ErrMiss   = errors.New("ecd: not resident")                 // a Touched entity; read the store
 	ErrAbsent = errors.New("ecd: absent")                       // resident, and the entity or component is absent
 	ErrKind   = errors.New("ecd: kind not in catalog")          // an op on an entity whose kind the catalog does not declare
+	ErrOp     = errors.New("ecd: op refused")                   // Apply's check pass: an undeclared CID, a value of the wrong length or an op out of order
 	ErrBudget = errors.New("ecd: over budget")                  // an All kind exceeds its budget at hydration
 	ErrQuery  = errors.New("ecd: query refused")                // an unknown QID, or a query on a Touched kind
 	ErrOwner  = errors.New("ecd: call off the owner goroutine") // debug builds
