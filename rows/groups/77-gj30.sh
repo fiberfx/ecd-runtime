@@ -1,7 +1,7 @@
 # Group gj30 of Ecd Runtime: the smoke row of the comparison benchmarks of package gj in go/enginecmp. TestGJSmoke runs
 # the body of each benchmark of the gates GJ1 to GJ4, G4 and G6 once with 1,000 entities on both engines, Jacquard and
-# Ark, and fails on any error. The measurement of the gates is rows/gj.bench.sh, a separate script that this group does
-# not run.
+# Ark, and fails on any error. The measurement of the gates is rows/gj.bench.rows.sh, a separate script that this
+# group does not run.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #
