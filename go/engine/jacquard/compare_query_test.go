@@ -65,12 +65,15 @@ func (s *jcSim) query(step int, qid ecd.QID, arg []byte) int {
 		s.t.Fatalf("seed %d step %d: query %d (arg %v): engine %v, %d, %v; model %v, %d, %v",
 			s.seed, step, qid, arg, oe.IDs, oe.Count, errE, om.IDs, om.Count, errM)
 	}
+	s.counts["query "+jcQueryClass(errE)]++
 	return len(oe.IDs) - 1
 }
 
 // TestCompareQuery (JC-02): four seeds of 2,000 random transactions, as TestCompare runs them. After each one
 // every declared query, an undeclared QID and a declared query with an argument run on the Engine and on the
 // reference model: the answer class, the eids appended after a caller's prefix, in order, and Count are equal.
+// Two queries also run on a stale engine before it is rebuilt, and each of queries 0 to 7 must answer an eid in at
+// least 10 steps of a seed.
 func TestCompareQuery(t *testing.T) {
 	for seed := uint64(1); seed <= 4; seed++ {
 		s := jcNewSim(t, seed)
@@ -87,9 +90,12 @@ func TestCompareQuery(t *testing.T) {
 		}
 		t.Logf("seed %d: non-empty answers by query %v", seed, answered)
 		for qid := ecd.QID(0); qid <= 7; qid++ {
-			if answered[qid] == 0 {
-				t.Errorf("seed %d: query %d never answered an eid", seed, qid)
+			if answered[qid] < 10 {
+				t.Errorf("seed %d: query %d answered an eid after %d of %d steps, want at least 10", seed, qid, answered[qid], jcSteps)
 			}
+		}
+		if s.counts["query ErrStale"] == 0 {
+			t.Errorf("seed %d: no query on a stale engine was compared", seed)
 		}
 	}
 }

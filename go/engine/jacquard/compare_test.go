@@ -208,13 +208,13 @@ func (s *jcSim) scatter(p *jcPlan, acts [][][]ecd.Op, order []int, ops []ecd.Op)
 	}
 }
 
-// build returns the next transaction: one to four deeds of random Ord, equal Ord included, and for each deed one
-// to four entity actions on average. An action spawns an entity (a fresh eid) with
-// up to three Set or Unset ops, sets and unsets components of a live entity, or destroys one (one in five). No
-// entity has two actions, but one action may be split over several deeds of different Ord, so that the commit
-// order of the deeds decides its result. With a chance of one in five the transaction carries a fault that the
-// check pass refuses, and one time in four of those two or three, which leaves the first in commit order to
-// decide; with a chance of one in fifty it carries one fault that only the commit pass finds.
+// build returns the next transaction: one to four deeds of random Ord, equal Ord included, and for each deed one to
+// four entity actions on average. An action spawns an entity (a fresh eid) with up to three Set or Unset ops, sets
+// and unsets components of a live entity, or destroys one (one in five). No entity has two actions, but one action
+// may be split over several deeds of different Ord, so that the commit order of the deeds decides its result. With a
+// chance of one in five the transaction carries a fault that the check pass refuses, and one time in four of those
+// two or three, which leaves the first in commit order to decide; with a chance of one in fifty it carries one fault
+// that only the commit pass finds.
 func (s *jcSim) build() *jcPlan {
 	p := &jcPlan{seq: s.en.appliedAt() + 1}
 	nd := 1 + s.rng.IntN(4)
@@ -424,6 +424,9 @@ func (s *jcSim) step(n int) {
 	if len(slices.Compact(slices.Sorted(slices.Values(p.wants)))) > 1 {
 		s.counts["multi"]++
 	}
+	if slices.Contains(p.wants, "ErrKind") && slices.Contains(p.wants, "ErrOp") && !slices.Contains(p.wants, "ErrGap") {
+		s.counts["mixed"]++
+	}
 	if ce == "nil" && p.inverted {
 		s.counts["split"]++
 	}
@@ -445,16 +448,19 @@ func (s *jcSim) step(n int) {
 	if e1, e2 := jcClass(s.en.apply(s.en.appliedAt()+1, nil)), jcClass(s.m.Apply(s.m.At()+1, nil)); e1 != "ErrStale" || e2 != "ErrStale" {
 		s.t.Fatalf("seed %d step %d: apply after a stale apply answers %q and %q, want ErrStale", s.seed, n, e1, e2)
 	}
+	s.query(n, 0, nil)
+	s.query(n, 42, []byte{1})
 	s.en, s.m = jcPair(s.t)
 	s.live, s.dead = nil, nil
 }
 
-// TestCompare (JC-01): four seeds of 2,000 random transactions run through the Engine and the reference model.
-// After each one the answer class, At() and every Get, byte for byte on success and on error, are equal. The
-// transactions include spawns that stay bare, tag Sets with a nil and with an empty value, Ord that differs from
-// the list order, one entity touched from several deeds of different Ord, the
-// faults that the check pass refuses (one or several in one transaction), and the faults that make both engines
-// stale and start a new episode.
+// TestCompare (JC-01): four seeds of 2,000 random transactions run through the Engine and the reference model. After
+// each one the answer class, At() and every Get, byte for byte on success and on error, are equal. The transactions
+// include spawns that stay bare, tag Sets with a nil and with an empty value, Ord that differs from the list order,
+// one entity touched from several deeds of different Ord, the faults that the check pass refuses (one or several in
+// one transaction, among them an undeclared kind and an op fault in one transaction, where the first in commit order
+// answers), and the faults that make both engines stale and start a new episode. Before a stale engine is rebuilt, a
+// query on it is compared too.
 func TestCompare(t *testing.T) {
 	for seed := uint64(1); seed <= 4; seed++ {
 		s := jcNewSim(t, seed)
@@ -462,7 +468,7 @@ func TestCompare(t *testing.T) {
 			s.step(n)
 		}
 		t.Logf("seed %d: answers %v", seed, s.counts)
-		for _, class := range []string{"nil", "ErrGap", "ErrKind", "ErrOp", "ErrStale", "multi", "split"} {
+		for _, class := range []string{"nil", "ErrGap", "ErrKind", "ErrOp", "ErrStale", "multi", "mixed", "split"} {
 			if s.counts[class] == 0 {
 				t.Errorf("seed %d: no transaction counted as %s", seed, class)
 			}

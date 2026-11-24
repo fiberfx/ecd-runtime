@@ -27,11 +27,12 @@
 #   J0M-05       a buffer overwritten after Apply or Hydrate leaves Get unchanged, and a write into an answer changes
 #                nothing (TestInboundCopy)
 #   J0M-05-p     plant: a Set stores the caller's slice; TestInboundCopy must fail
-#   J0M-06       New refuses a tag with a nonzero Size, a component of form Component with a Size of 0 or less, an
-#                unknown form, a CID 0, a CID declared twice and a kind declared twice, and builds no engine
+#   J0M-06       New refuses a tag with a nonzero Size, a component of form Component or Edge with a Size of 0 or
+#                less, an unknown form, a CID 0, a CID declared twice and a kind declared twice, and builds no engine
 #                (TestCatalog)
 #   J0M-06-p     plant: the tag-size check is skipped; TestCatalog must fail
 #   J0M-06-pz    plant: the Size check of a component is skipped; TestCatalog must fail
+#   J0M-06-pe    plant: the Size check of an Edge is skipped; TestCatalog must fail
 #   L12-model    CNM: the model against a SQL twin needs a SQLite driver (modernc.org/sqlite v1.37.0), and the module
 #                inputs hold ecd-id only
 #
@@ -88,6 +89,7 @@ j0m_plant J0M-05-p "TestInboundCopy fails on the plant" TestInboundCopy 's/vals\
 go_row J0M-06 j0m "TestCatalog rc=0" /w/go test -run '^TestCatalog$' ./engine/jacquard/model/
 j0m_plant J0M-06-p "TestCatalog fails on the plant" TestCatalog 's/if c\.Form == ecd\.Tag && c\.Size != 0 {/if false {/'
 j0m_plant J0M-06-pz "TestCatalog fails on the plant" TestCatalog 's/if c\.Form == ecd\.Component && c\.Size <= 0 {/if false {/'
+j0m_plant J0M-06-pe "TestCatalog fails on the plant" TestCatalog 's/if c\.Form == ecd\.Edge && c\.Size <= 0 {/if false {/'
 
 if sel L12-model j0m; then
   say L12-model "every declared query equals its SQL twin on 100,000 entities" "no SQLite driver: modernc.org/sqlite v1.37.0 is not in the module inputs, which hold ecd-id only" CNM
