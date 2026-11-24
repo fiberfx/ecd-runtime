@@ -1,5 +1,6 @@
 # Group jcmp of Ecd Runtime: the comparison of the Engine of package jacquard with the reference model.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   JC-01    the Engine and the reference model answer alike, in answer class and in every byte that Get returns, on
 #            four seeds of 2,000 random transactions: valid ones with Ord that differs from the list order, one entity
@@ -31,7 +32,8 @@ jc_plant() {
     jc_log=/tmp/rows/$jc_id.log
     (cd "$jc_pd/go" && go test -count=1 -v $jc_flags -run "^$jc_test\$" ./engine/jacquard/ >"$jc_log" 2>&1); jc_rc=$?
     if offline "$jc_log"; then say "$jc_id" "$jc_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $jc_test" "$jc_log"; then say "$jc_id" "$jc_ex" "rc=$jc_rc, $jc_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $jc_test" "$jc_log"; then
+      say "$jc_id" "$jc_ex" "rc=$jc_rc, $jc_test FAIL: $(why_of "$jc_log")" KILLED
     elif [ $jc_rc -eq 0 ] && grep -q "^--- PASS: $jc_test" "$jc_log"; then say "$jc_id" "$jc_ex" "rc=0, $jc_test PASS" SURVIVED
     else say "$jc_id" "$jc_ex" "rc=$jc_rc, the test did not run" CNM; head_of "$jc_log" 8; fi
   fi

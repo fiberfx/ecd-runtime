@@ -1,5 +1,6 @@
 # Group jcmpq of Ecd Runtime: the comparison of the queries of the Engine of package jacquard with the reference model.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   JC-02    the Engine and the reference model answer every declared query, an undeclared QID and a query with an
 #            argument alike, in answer class, in the eids appended after a caller's prefix and in Count, after each of
@@ -25,7 +26,8 @@ jcq_plant() {
     jcq_log=/tmp/rows/$jcq_id.log
     (cd "$jcq_pd/go" && go test -count=1 -v $jcq_flags -run "^$jcq_test\$" ./engine/jacquard/ >"$jcq_log" 2>&1); jcq_rc=$?
     if offline "$jcq_log"; then say "$jcq_id" "$jcq_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $jcq_test" "$jcq_log"; then say "$jcq_id" "$jcq_ex" "rc=$jcq_rc, $jcq_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $jcq_test" "$jcq_log"; then
+      say "$jcq_id" "$jcq_ex" "rc=$jcq_rc, $jcq_test FAIL: $(why_of "$jcq_log")" KILLED
     elif [ $jcq_rc -eq 0 ] && grep -q "^--- PASS: $jcq_test" "$jcq_log"; then say "$jcq_id" "$jcq_ex" "rc=0, $jcq_test PASS" SURVIVED
     else say "$jcq_id" "$jcq_ex" "rc=$jcq_rc, the test did not run" CNM; head_of "$jcq_log" 8; fi
   fi

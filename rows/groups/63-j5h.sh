@@ -1,5 +1,6 @@
 # Group j5h of Ecd Runtime: the hydration and the eviction of the Engine of package jacquard, checked against the reference model.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   J5H-01   Hydrate and Evict of an Engine with a residency declaration answer as the reference model does, on a Cold All
 #            kind, a Warm All kind and a Touched kind: the seq rule, the replacement of an All kind and of a resident
@@ -41,7 +42,8 @@ j5h_plant() {
     j5h_log=/tmp/rows/$j5h_id.log
     (cd "$j5h_pd/go" && go test -count=1 -v -run "^$j5h_test\$" ./engine/jacquard/ >"$j5h_log" 2>&1); j5h_rc=$?
     if offline "$j5h_log"; then say "$j5h_id" "$j5h_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $j5h_test" "$j5h_log"; then say "$j5h_id" "$j5h_ex" "rc=$j5h_rc, $j5h_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $j5h_test" "$j5h_log"; then
+      say "$j5h_id" "$j5h_ex" "rc=$j5h_rc, $j5h_test FAIL: $(why_of "$j5h_log")" KILLED
     elif [ $j5h_rc -eq 0 ] && grep -q "^--- PASS: $j5h_test" "$j5h_log"; then say "$j5h_id" "$j5h_ex" "rc=0, $j5h_test PASS" SURVIVED
     else say "$j5h_id" "$j5h_ex" "rc=$j5h_rc, the test did not run" CNM; head_of "$j5h_log" 8; fi
   fi

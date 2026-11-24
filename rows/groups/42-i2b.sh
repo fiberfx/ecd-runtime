@@ -1,7 +1,8 @@
 # Group i2b of Ecd Runtime: I2B-01 to I2B-04 and their plants (the rows ending in p).
 # Package ecd (go/ecd): the seam's hardening. Apply is all or nothing, in a check pass and a commit pass; QueryDef holds
 # an Any term; ErrOp is the tenth sentinel; the host's one Minter is the only minter; the catalog names are ecd_*.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   row     check
 #   I2B-01  QueryDef has a field Any of type []ecd.CID, between None and Exact (TestSeamQueryAny)
@@ -52,7 +53,8 @@ i2b_plant() {
     i2b_log=/tmp/rows/$i2b_id.log
     (cd "$i2b_pd/go" && go test -count=1 -v -run "^($i2b_names)\$" ./ecd/ >"$i2b_log" 2>&1); i2b_rc=$?
     if offline "$i2b_log"; then say "$i2b_id" "$i2b_what" "module not found" CNM
-    elif grep -q '^--- FAIL' "$i2b_log"; then say "$i2b_id" "$i2b_what" "rc=$i2b_rc, a test FAIL on the plant" KILLED
+    elif grep -q '^--- FAIL' "$i2b_log"; then
+      say "$i2b_id" "$i2b_what" "rc=$i2b_rc, a test FAIL on the plant: $(why_of "$i2b_log")" KILLED
     elif [ $i2b_rc -eq 0 ] && grep -q '^--- PASS' "$i2b_log"; then say "$i2b_id" "$i2b_what" "rc=0, every test PASS on the plant" SURVIVED
     else say "$i2b_id" "$i2b_what" "rc=$i2b_rc, the tests did not run" CNM; head_of "$i2b_log" 8; fi
   fi

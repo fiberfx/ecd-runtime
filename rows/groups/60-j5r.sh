@@ -1,5 +1,6 @@
 # Group j5r of Ecd Runtime: the residency answers of the Engine of package jacquard, checked against the reference model.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   J5R-01   Apply and Get of an Engine with a residency declaration answer as the reference model does, on a Cold All
 #            kind, a Warm All kind and a Touched kind: a Set, Unset or Destroy of a Touched entity that is not resident
@@ -37,7 +38,8 @@ j5r_plant() {
     j5r_log=/tmp/rows/$j5r_id.log
     (cd "$j5r_pd/go" && go test -count=1 -v $j5r_flags -run "^$j5r_test\$" ./engine/jacquard/ >"$j5r_log" 2>&1); j5r_rc=$?
     if offline "$j5r_log"; then say "$j5r_id" "$j5r_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $j5r_test" "$j5r_log"; then say "$j5r_id" "$j5r_ex" "rc=$j5r_rc, $j5r_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $j5r_test" "$j5r_log"; then
+      say "$j5r_id" "$j5r_ex" "rc=$j5r_rc, $j5r_test FAIL: $(why_of "$j5r_log")" KILLED
     elif [ $j5r_rc -eq 0 ] && grep -q "^--- PASS: $j5r_test" "$j5r_log"; then say "$j5r_id" "$j5r_ex" "rc=0, $j5r_test PASS" SURVIVED
     else say "$j5r_id" "$j5r_ex" "rc=$j5r_rc, the test did not run" CNM; head_of "$j5r_log" 8; fi
   fi

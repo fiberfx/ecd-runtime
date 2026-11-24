@@ -1,5 +1,6 @@
 # Group j5s of Ecd Runtime: the seam methods and the catalog constructor of the Engine of package jacquard.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   J5S-01   an Engine built from a catalog reports the name "jacquard" and answers At, State, Apply, Get, Query and Stats
 #            as the reference model does, on a Cold All kind, a Warm All kind and a Touched kind; a stale Engine and a
@@ -28,7 +29,8 @@ j5s_plant() {
     j5s_log=/tmp/rows/$j5s_id.log
     (cd "$j5s_pd/go" && go test -count=1 -v $j5s_flags -run "^$j5s_test\$" ./engine/jacquard/ >"$j5s_log" 2>&1); j5s_rc=$?
     if offline "$j5s_log"; then say "$j5s_id" "$j5s_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $j5s_test" "$j5s_log"; then say "$j5s_id" "$j5s_ex" "rc=$j5s_rc, $j5s_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $j5s_test" "$j5s_log"; then
+      say "$j5s_id" "$j5s_ex" "rc=$j5s_rc, $j5s_test FAIL: $(why_of "$j5s_log")" KILLED
     elif [ $j5s_rc -eq 0 ] && grep -q "^--- PASS: $j5s_test" "$j5s_log"; then say "$j5s_id" "$j5s_ex" "rc=0, $j5s_test PASS" SURVIVED
     else say "$j5s_id" "$j5s_ex" "rc=$j5s_rc, the test did not run" CNM; head_of "$j5s_log" 8; fi
   fi

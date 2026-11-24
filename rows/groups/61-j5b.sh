@@ -1,5 +1,6 @@
 # Group j5b of Ecd Runtime: the per-kind statistics of the Engine of package jacquard.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   J5B-01   after four seeds of 1,500 random transactions over three kinds, the Entities, Archetypes and Nodes of every
 #            kind equal a recount from the records and the graph, Bytes and PointerBytes equal the formula over the
@@ -27,7 +28,8 @@ j5b_plant() {
     j5b_log=/tmp/rows/$j5b_id.log
     (cd "$j5b_pd/go" && go test -count=1 -v $j5b_flags -run "^$j5b_test\$" ./engine/jacquard/ >"$j5b_log" 2>&1); j5b_rc=$?
     if offline "$j5b_log"; then say "$j5b_id" "$j5b_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $j5b_test" "$j5b_log"; then say "$j5b_id" "$j5b_ex" "rc=$j5b_rc, $j5b_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $j5b_test" "$j5b_log"; then
+      say "$j5b_id" "$j5b_ex" "rc=$j5b_rc, $j5b_test FAIL: $(why_of "$j5b_log")" KILLED
     elif [ $j5b_rc -eq 0 ] && grep -q "^--- PASS: $j5b_test" "$j5b_log"; then say "$j5b_id" "$j5b_ex" "rc=0, $j5b_test PASS" SURVIVED
     else say "$j5b_id" "$j5b_ex" "rc=$j5b_rc, the test did not run" CNM; head_of "$j5b_log" 8; fi
   fi

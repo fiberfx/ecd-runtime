@@ -1,5 +1,6 @@
 # Group j2b of Ecd Runtime: archetypes and the graph of package jacquard.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   J04      after random withAdd/withRemove walks over 3 kinds, every edge equals find(kind, mask with the bit toggled)
 #            and has its back edge (TestGraphEdges, JI3)
@@ -37,7 +38,8 @@ j2b_plant() {
     j2b_log=/tmp/rows/$j2b_id.log
     (cd "$j2b_pd/go" && go test -count=1 -v -run "^$j2b_test\$" ./engine/jacquard/ >"$j2b_log" 2>&1); j2b_rc=$?
     if offline "$j2b_log"; then say "$j2b_id" "$j2b_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $j2b_test" "$j2b_log"; then say "$j2b_id" "$j2b_ex" "rc=$j2b_rc, $j2b_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $j2b_test" "$j2b_log"; then
+      say "$j2b_id" "$j2b_ex" "rc=$j2b_rc, $j2b_test FAIL: $(why_of "$j2b_log")" KILLED
     elif [ $j2b_rc -eq 0 ] && grep -q "^--- PASS: $j2b_test" "$j2b_log"; then say "$j2b_id" "$j2b_ex" "rc=0, $j2b_test PASS" SURVIVED
     else say "$j2b_id" "$j2b_ex" "rc=$j2b_rc, the test did not run" CNM; head_of "$j2b_log" 8; fi
   fi

@@ -1,5 +1,6 @@
 # Group j5k of Ecd Runtime: the referenced bitset of package jacquard that orders the eviction of entities.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   J5K-01   sweep returns the unmarked resident indexes in hand order, clears the marks it passes, skips an index that is
 #            not resident, and continues from the index after its last victim (TestJ5KSweep)
@@ -25,7 +26,8 @@ j5k_plant() {
     j5k_log=/tmp/rows/$j5k_id.log
     (cd "$j5k_pd/go" && go test -count=1 -v -run "^$j5k_test\$" ./engine/jacquard/ >"$j5k_log" 2>&1); j5k_rc=$?
     if offline "$j5k_log"; then say "$j5k_id" "$j5k_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $j5k_test" "$j5k_log"; then say "$j5k_id" "$j5k_ex" "rc=$j5k_rc, $j5k_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $j5k_test" "$j5k_log"; then
+      say "$j5k_id" "$j5k_ex" "rc=$j5k_rc, $j5k_test FAIL: $(why_of "$j5k_log")" KILLED
     elif [ $j5k_rc -eq 0 ] && grep -q "^--- PASS: $j5k_test" "$j5k_log"; then say "$j5k_id" "$j5k_ex" "rc=0, $j5k_test PASS" SURVIVED
     else say "$j5k_id" "$j5k_ex" "rc=$j5k_rc, the test did not run" CNM; head_of "$j5k_log" 8; fi
   fi

@@ -1,7 +1,8 @@
 # Group i2 of Ecd Runtime: L06, I2-01 to I2-06 and their plants (the rows ending in p).
 # Package ecd (go/ecd): the id types over eid, the trace and span ids, and the engine seam. Rules E1 to E9 bind the
 # engines that implement the seam; this group checks the seam's types, constants and sentinels.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   row    check
 #   L06    the TraceID and SpanID declarations refuse every conversion with eid.ID and with an array (a probe package
@@ -40,7 +41,8 @@ i2_plant() {
     i2_log=/tmp/rows/$i2_id.log
     (cd "$i2_pd/go" && go test -count=1 -v -run "$i2_pat" ./ecd/ >"$i2_log" 2>&1); i2_rc=$?
     if offline "$i2_log"; then say "$i2_id" "$i2_what" "module not found" CNM
-    elif grep -q '^--- FAIL' "$i2_log"; then say "$i2_id" "$i2_what" "rc=$i2_rc, a test FAIL on the plant" KILLED
+    elif grep -q '^--- FAIL' "$i2_log"; then
+      say "$i2_id" "$i2_what" "rc=$i2_rc, a test FAIL on the plant: $(why_of "$i2_log")" KILLED
     elif [ $i2_rc -eq 0 ] && grep -q '^--- PASS' "$i2_log"; then say "$i2_id" "$i2_what" "rc=0, every test PASS on the plant" SURVIVED
     else say "$i2_id" "$i2_what" "rc=$i2_rc, the tests did not run" CNM; head_of "$i2_log" 8; fi
   fi

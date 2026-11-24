@@ -38,14 +38,15 @@ func TestJ03(t *testing.T) {
 	}
 }
 
-// j03Fresh returns, in node order, the nodes that hold a table and whose kind and mask q admits.
+// j03Fresh returns, in node order, the nodes that hold a table and that Engine.runs admits for q, by a walk of the
+// archetype graph that does not read the node lists of q.
 func j03Fresh(en *Engine, q *query) []uint32 {
 	var nodes []uint32
 	for node := uint32(1); node <= uint32(en.gr.len()); node++ {
 		if int(node) >= len(en.tables) || en.tables[node] == nil {
 			continue
 		}
-		if a := en.gr.arch(node); q.has(a.kind) && q.matches(&a.mask) {
+		if a := en.gr.arch(node); en.runs(q, a) {
 			nodes = append(nodes, node)
 		}
 	}

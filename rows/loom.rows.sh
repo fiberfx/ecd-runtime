@@ -5,7 +5,8 @@
 # Run command (flow:row-container, image mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2, whose /usr/local/go is
 # go1.27.4; the module's go line is go 1.27.4):
 #   kan flow run flow:row-container --param script=rows/loom.rows.sh \
-#     --param checkout=/Users/jonny/dev/ecd/ecd-runtime --param revision=SHA --param paths='go rows' --param name=rt \
+#     --param checkout=/Users/jonny/dev/ecd/ecd-runtime --param revision=SHA \
+#     --param paths='go rows README.md LICENSE' --param name=rt \
 #     --param image=mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2 \
 #     --param inputs=DIR \
 #     --param cpus=2 --param memory=4g --param timeout=1800
@@ -14,7 +15,7 @@
 #
 # Rows live in group files, rows/groups/NN-<group>.sh, which the script sources in name order between R0 and the
 # final line. A group file is POSIX sh sourced from /w. It owns its row ids and its group name, calls "sel ID GROUP"
-# before each row, may use the helpers (say, sel, offline, head_of, count, go_row, HAVE_GO), and never
+# before each row, may use the helpers (say, sel, offline, head_of, count, why_of, go_row, HAVE_GO), and never
 # exits. A later group is added as a file named NN-<group>.sh with NN above the files present.
 #
 # ROWS is a comma-separated list of row ids and group names. The default is every row. R0 always runs.
@@ -31,6 +32,7 @@
 #   notice    NT3   every file that go/NOTICE.txt lists carries its attribution line; plant NT3p
 #   notice    NT4   go/go.mod has go 1.27.4, no toolchain line and the one requirement; plants NT4p and NT4q
 #   notice    NT5   go mod tidy in a copy of go/ leaves go.mod and go.sum byte-equal; plant NT5p
+#   notice    NT6   LICENSE and go/LICENSE are the MIT License, byte-equal, with the copyright line; NT6p, q, r
 #   other groups    each group file lists its own rows in its header
 #
 # A plant is KILLED when its row turns red and SURVIVED when it stays green. A plant that cannot be applied, or in
@@ -66,6 +68,7 @@ sel() {
 offline() { grep -q -E 'no matching versions|module lookup disabled|reading file:///|dial tcp|no such host|cannot find module|missing go.sum entry|unrecognized import path|could not read Username|failed to download|GOPROXY list is not the empty string' "$1"; }
 head_of() { head -"${2:-20}" "$1" | cut -c1-220 | sed 's/^/    | /'; }
 count() { grep -c "$1" "$2" 2>/dev/null; }
+why_of() { grep -m1 -E '_test\.go:[0-9]+:|^panic:' "$1" | cut -c1-100; } # the first failing line of a test log
 
 # go_row id group expect dir verb args...: go vet, build or test in dir. A row that finds no package or runs no test is CNM.
 go_row() {

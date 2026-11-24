@@ -177,20 +177,19 @@ func (p *jcPlan) want() string {
 // and a store (a model that holds every kind whole) receives each transaction that the Engine accepts and supplies
 // the rows of each hydration. A plain sim builds the Engine with no residency declaration, so that every kind is Warm.
 //
-// The calls keep to the domain on which the Engine and the model agree. Four known differences stay out of every
+// The calls keep to the domain on which the Engine and the model agree. Three known differences stay out of every
 // history. A Set of a component that holds pointers is refused by the Engine and accepted by the model, so the
 // catalog declares none. A hydrated row whose value is not the size of its component, and a row of a component that
 // holds pointers, are refused by the Engine and stored by the model, so the rows of a random history come from the
 // store, which holds only values that both accept. After Close the model drops its entities and the Engine keeps its
-// counts, so a history compares only State and the order of the kinds of Stats after Close. A new Engine that is
-// hydrated first with a Touched kind only, and again at a later seq, is accepted by the Engine and refused by the
-// model with ErrGap, so each hydration of a history is of an All kind or happens at the seq of the Engine.
+// counts, so a history compares only State and the order of the kinds of Stats after Close.
 //
 //	touched   the kinds that are Touched
 //	warm      the All kinds that are hydrated
 //	resident  the Touched entities that the Engine holds
 //	live      the entities that the store holds and that a transaction may touch, in creation order
 //	dead      the entities that a transaction destroyed
+//	loaded    a hydration has answered nil since the last reset
 type jcSim struct {
 	t        *testing.T
 	seed     uint64
@@ -207,6 +206,7 @@ type jcSim struct {
 	live     []eid.ID
 	dead     []eid.ID
 	next     uint64
+	loaded   bool
 	counts   map[string]int
 }
 
@@ -227,6 +227,7 @@ func jcStart(t *testing.T, seed uint64, seam bool) *jcSim {
 // reset replaces the Engine, the model and the store with new ones at seq 0 and empties the ledger.
 func (s *jcSim) reset() {
 	s.live, s.dead = nil, nil
+	s.loaded = false
 	s.resident = map[eid.ID]bool{}
 	s.touched = map[ecd.Kind]bool{}
 	s.warm = map[ecd.Kind]bool{}
@@ -634,7 +635,7 @@ func (s *jcSim) rowsOf(ids []eid.ID) []ecd.Row {
 func (s *jcSim) bare(id eid.ID) bool { return len(s.rowsOf([]eid.ID{id})) == 0 }
 
 // hydrateRows calls Hydrate of the kind k at seq at with the rows on the Engine and on the model, and requires the
-// same class and the same At. It returns the class.
+// same class and the same At, and sets loaded when the class is nil. It returns the class.
 func (s *jcSim) hydrateRows(step int, k ecd.Kind, at uint64, rows []ecd.Row) string {
 	s.t.Helper()
 	errE := s.en.Hydrate(k, at, &jcRowList{rows: rows})
@@ -643,9 +644,12 @@ func (s *jcSim) hydrateRows(step int, k ecd.Kind, at uint64, rows []ecd.Row) str
 		s.t.Fatalf("seed %d step %d: Hydrate(%v, %d, %d rows): engine %v; model %v",
 			s.seed, step, k, at, len(rows), errE, errM)
 	}
-	if s.en.appliedAt() != s.m.At() {
+	if s.en.At() != s.m.At() {
 		s.t.Fatalf("seed %d step %d: Hydrate(%v, %d): engine at %d, model at %d",
-			s.seed, step, k, at, s.en.appliedAt(), s.m.At())
+			s.seed, step, k, at, s.en.At(), s.m.At())
+	}
+	if jcClass(errE) == "nil" {
+		s.loaded = true
 	}
 	return jcClass(errE)
 }
@@ -677,7 +681,7 @@ func (s *jcSim) hydrateAll(step int) {
 	}
 	s.warm[k] = true
 	s.live = slices.DeleteFunc(s.live, func(id eid.ID) bool { return ecd.KindOf(id) == k && s.bare(id) })
-	s.counts["hydrate"]++
+	s.counts["hydrate all"]++
 }
 
 // hydrateTouched hydrates one to three entities of the Touched kind from the store at the seq of the Engine: ones
@@ -712,7 +716,7 @@ func (s *jcSim) hydrateTouched(step int) {
 	for _, id := range ids {
 		s.resident[id] = true
 	}
-	s.counts["hydrate"]++
+	s.counts["hydrate touched"]++
 }
 
 // evict calls Evict of the Touched kind on the Engine and on the model with up to three resident entities, one time
@@ -760,7 +764,7 @@ func (s *jcSim) refuseHydrate(step int) {
 	k, at, want := s.kinds[s.rng.IntN(len(s.kinds))], s.en.appliedAt(), "ErrKind"
 	var rows []ecd.Row
 	switch x := s.rng.IntN(3); {
-	case x == 0 && at > 0:
+	case x == 0 && (at > 0 || s.loaded):
 		at, want = at+1, "ErrGap"
 	case x == 1:
 		rows = []ecd.Row{{Entity: j1ID(s.t, s.other, 1), CID: j3U64, Value: j3Num(1)}}
@@ -833,8 +837,8 @@ func (s *jcSim) step(n int) {
 	if ce == "nil" && p.inverted {
 		s.counts["split"]++
 	}
-	if s.en.appliedAt() != s.m.At() {
-		s.t.Fatalf("seed %d step %d: engine at %d, model at %d", s.seed, n, s.en.appliedAt(), s.m.At())
+	if s.en.At() != s.m.At() {
+		s.t.Fatalf("seed %d step %d: engine at %d, model at %d", s.seed, n, s.en.At(), s.m.At())
 	}
 	if ce == "nil" {
 		s.accept(p)
@@ -904,7 +908,8 @@ func TestCompare(t *testing.T) {
 		}
 		t.Logf("seed %d: answers %v", seed, s.counts)
 		for _, class := range []string{"nil", "ErrGap", "ErrKind", "ErrOp", "ErrStale", "multi", "mixed", "split",
-			"get ErrCold", "get ErrMiss", "skip cold", "skip touched", "hydrate", "evict"} {
+			"get ErrCold", "get ErrMiss", "skip cold", "skip touched", "hydrate all", "hydrate touched", "hydrate refused",
+			"evict"} {
 			if s.counts[class] == 0 {
 				t.Errorf("seed %d: no call counted as %s", seed, class)
 			}
@@ -923,8 +928,8 @@ func (s *jcSim) do(want string, deeds ...ecd.Deed) error {
 	if ce, cm := jcClass(errE), jcClass(errM); ce != want || cm != want {
 		s.t.Fatalf("Apply(%d): engine %q (%v), model %q (%v), want %q", seq, ce, errE, cm, errM, want)
 	}
-	if s.en.appliedAt() != s.m.At() {
-		s.t.Fatalf("Apply(%d): engine at %d, model at %d", seq, s.en.appliedAt(), s.m.At())
+	if s.en.At() != s.m.At() {
+		s.t.Fatalf("Apply(%d): engine at %d, model at %d", seq, s.en.At(), s.m.At())
 	}
 	if errE == nil {
 		s.applyStore(0, seq, forStore)

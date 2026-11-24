@@ -1,6 +1,6 @@
 # Group jcmp5 of Ecd Runtime: the comparison of the Engine of package jacquard with the reference model through the
 # seam, with Cold and Touched kinds.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #
 # TestCompare (JC-01, group jcmp) and TestCompareQuery (JC-02, group jcmpq) drive the Engine that build returns and the
@@ -20,6 +20,9 @@
 #   JC-01pc  plant: an op on a Cold kind is not skipped (residency.go; TestCompare)
 #   JC-01pm  plant: a Get of a Touched entity that is not resident answers ErrAbsent, not ErrMiss (engine.go;
 #            TestCompare)
+#   JC-01pu  plant: a Set, Unset or Destroy of a Touched entity that is not resident is not skipped (residency.go;
+#            TestCompare)
+#   JC-01pk  plant: a Get on a Cold kind answers no ErrCold (engine.go; TestCompare)
 #   JC-02pc  plant: a query on a Cold kind answers no ErrCold (query.go; TestCompareQuery)
 #   JC-02pt  plant: a query with no kinds runs on the nodes of the Touched kind (query.go; TestCompareQuery)
 #   JC-05p   plant: the refusal of the check pass does not match ecd.ErrOp (engine.go; TestCompareSeam)
@@ -41,7 +44,8 @@ jc5_plant() {
     jc5_log=/tmp/rows/$jc5_id.log
     (cd "$jc5_pd/go" && go test -count=1 -v $jc5_flags -run "^$jc5_test\$" ./engine/jacquard/ >"$jc5_log" 2>&1); jc5_rc=$?
     if offline "$jc5_log"; then say "$jc5_id" "$jc5_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $jc5_test" "$jc5_log"; then say "$jc5_id" "$jc5_ex" "rc=$jc5_rc, $jc5_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $jc5_test" "$jc5_log"; then
+      say "$jc5_id" "$jc5_ex" "rc=$jc5_rc, $jc5_test FAIL: $(why_of "$jc5_log")" KILLED
     elif [ $jc5_rc -eq 0 ] && grep -q "^--- PASS: $jc5_test" "$jc5_log"; then say "$jc5_id" "$jc5_ex" "rc=0, $jc5_test PASS" SURVIVED
     else say "$jc5_id" "$jc5_ex" "rc=$jc5_rc, the test did not run" CNM; head_of "$jc5_log" 8; fi
   fi
@@ -55,3 +59,6 @@ jc5_plant JC-01pm "TestCompare fails on the plant" TestCompare engine.go 's/if e
 jc5_plant JC-02pc "TestCompareQuery fails on the plant" TestCompareQuery query.go 's/if en\.coldKind(ki) {/if false {/'
 jc5_plant JC-02pt "TestCompareQuery fails on the plant" TestCompareQuery query.go 's/return q\.wants(a) && (len(q\.kinds) > 0 || !en\.touchedKind(a\.kind))/return q.wants(a)/'
 jc5_plant JC-05p "TestCompareSeam fails on the plant" TestCompareSeam engine.go 's/^var errOp = fmt\.Errorf("jacquard: op refused: %w", ecd\.ErrOp)$/var errOp = errors.New("jacquard: op refused")/'
+jc5_plant JC-01pu "TestCompare fails on the plant" TestCompare residency.go \
+  's/return r\.cold || (r\.touched \&\& !present \&\& !spawn)/return r.cold/'
+jc5_plant JC-01pk "TestCompare fails on the plant" TestCompare engine.go 's/if en\.coldKind(ki) {/if false {/'

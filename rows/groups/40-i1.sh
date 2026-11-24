@@ -1,7 +1,8 @@
 # Group i1 of Ecd Runtime: I1-01 to I1-08 and their plants (the rows ending in p).
 # The vectors of ecd-id v0.8.0 (go/ecd/testdata/eid, pinned by SHA256SUMS) run through the encodings of the eid the
 # module requires: MarshalText, UnmarshalText, Value and Scan. The run's inputs folder holds ecd-id v0.8.0 only.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   row    check
 #   I1-01  every valid.tsv id: UnmarshalText gives the bytes of its hex, MarshalText its text, Value its 16 bytes, Scan of them the id; the fields agree
@@ -47,7 +48,8 @@ i1_run() {
   i1_log=/tmp/rows/$1.log
   (cd "$2" && go test -count=1 -v -run "$3" ./ecd/ >"$i1_log" 2>&1); i1_rc=$?
   if offline "$i1_log"; then say "$1" "$4" "module not found" CNM
-  elif grep -q '^--- FAIL' "$i1_log"; then say "$1" "$4" "rc=$i1_rc, a test FAIL on the plant" KILLED
+  elif grep -q '^--- FAIL' "$i1_log"; then
+    say "$1" "$4" "rc=$i1_rc, a test FAIL on the plant: $(why_of "$i1_log")" KILLED
   elif [ $i1_rc -eq 0 ] && grep -q '^--- PASS' "$i1_log"; then say "$1" "$4" "rc=0, every test PASS on the plant" SURVIVED
   else say "$1" "$4" "rc=$i1_rc, the tests did not run" CNM; head_of "$i1_log" 8; fi
 }

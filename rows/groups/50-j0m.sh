@@ -1,5 +1,6 @@
 # Group j0m of Ecd Runtime: the reference model and its op-sequence vectors, package model of engine/jacquard.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   L07-model    Apply 1..1,000 and then 1,001..2,000 equal a reference built beside the model, and At() is 2,000;
 #                Apply of At()+2 and of At() answer ErrGap and change nothing (TestApplyCatchUp)
@@ -54,7 +55,8 @@ j0m_plant() {
     j0m_log=/tmp/rows/$j0m_id.log
     (cd "$j0m_pd/go" && go test -count=1 -v -run "^($j0m_test)\$" ./engine/jacquard/model/ >"$j0m_log" 2>&1); j0m_rc=$?
     if offline "$j0m_log"; then say "$j0m_id" "$j0m_ex" "module not found" CNM
-    elif grep -q -E "^--- FAIL: ($j0m_test)" "$j0m_log"; then say "$j0m_id" "$j0m_ex" "rc=$j0m_rc, a named test FAIL" KILLED
+    elif grep -q -E "^--- FAIL: ($j0m_test)" "$j0m_log"; then
+      say "$j0m_id" "$j0m_ex" "rc=$j0m_rc, a named test FAIL: $(why_of "$j0m_log")" KILLED
     elif [ $j0m_rc -eq 0 ] && grep -q -E "^--- PASS: ($j0m_test)" "$j0m_log"; then say "$j0m_id" "$j0m_ex" "rc=0, the named tests PASS" SURVIVED
     else say "$j0m_id" "$j0m_ex" "rc=$j0m_rc, the tests did not run" CNM; head_of "$j0m_log" 8; fi
   fi
