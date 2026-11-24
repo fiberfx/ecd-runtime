@@ -143,6 +143,25 @@ func jcClass(err error) string {
 	return "other"
 }
 
+// jcSentinels names every sentinel of package ecd that err matches, each after a "+", in a fixed order; it is empty
+// for nil and for an error that matches none.
+func jcSentinels(err error) string {
+	names := ""
+	for _, s := range []struct {
+		name string
+		err  error
+	}{
+		{"ErrGap", ecd.ErrGap}, {"ErrStale", ecd.ErrStale}, {"ErrCold", ecd.ErrCold}, {"ErrMiss", ecd.ErrMiss},
+		{"ErrAbsent", ecd.ErrAbsent}, {"ErrKind", ecd.ErrKind}, {"ErrOp", ecd.ErrOp}, {"ErrBudget", ecd.ErrBudget},
+		{"ErrQuery", ecd.ErrQuery}, {"ErrOwner", ecd.ErrOwner},
+	} {
+		if err != nil && errors.Is(err, s.err) {
+			names += "+" + s.name
+		}
+	}
+	return names
+}
+
 // jcPlan is one transaction and what it does to the sim's ledger of eids when both engines accept it.
 //
 //	skipped  the ops that change nothing, counted by "cold" (an op on a Cold kind) and "touched" (a Set, Unset or
@@ -177,12 +196,10 @@ func (p *jcPlan) want() string {
 // and a store (a model that holds every kind whole) receives each transaction that the Engine accepts and supplies
 // the rows of each hydration. A plain sim builds the Engine with no residency declaration, so that every kind is Warm.
 //
-// The calls keep to the domain on which the Engine and the model agree. Three known differences stay out of every
-// history. A Set of a component that holds pointers is refused by the Engine and accepted by the model, so the
-// catalog declares none. A hydrated row whose value is not the size of its component, and a row of a component that
-// holds pointers, are refused by the Engine and stored by the model, so the rows of a random history come from the
-// store, which holds only values that both accept. After Close the model drops its entities and the Engine keeps its
-// counts, so a history compares only State and the order of the kinds of Stats after Close.
+// The calls keep to the domain on which the Engine and the model agree. Two known differences stay out of every
+// history. A Set of a component that holds pointers, and a hydrated row of such a component, are refused by the
+// Engine and accepted by the model, so the catalog declares none. After Close the model drops its entities and the
+// Engine keeps its counts, so a history compares only State and the order of the kinds of Stats after Close.
 //
 //	touched   the kinds that are Touched
 //	warm      the All kinds that are hydrated
@@ -756,18 +773,20 @@ func (s *jcSim) evict(step int) {
 	}
 }
 
-// refuseHydrate calls a Hydrate that both engines refuse: a seq other than the Engine's, a row of another kind, or
-// a kind that is not declared. It requires the class that the contract names, and the later comparisons show that
-// nothing changed.
+// refuseHydrate calls a Hydrate that both engines refuse: a seq other than the Engine's, a row of another kind, a row
+// whose value has the wrong length, or a kind that is not declared. It requires the class that the contract names,
+// and the later comparisons show that nothing changed.
 func (s *jcSim) refuseHydrate(step int) {
 	s.t.Helper()
 	k, at, want := s.kinds[s.rng.IntN(len(s.kinds))], s.en.appliedAt(), "ErrKind"
 	var rows []ecd.Row
-	switch x := s.rng.IntN(3); {
+	switch x := s.rng.IntN(4); {
 	case x == 0 && (at > 0 || s.loaded):
 		at, want = at+1, "ErrGap"
 	case x == 1:
 		rows = []ecd.Row{{Entity: j1ID(s.t, s.other, 1), CID: j3U64, Value: j3Num(1)}}
+	case x == 2:
+		rows, want = s.badLength(k), "ErrOp"
 	default:
 		k = s.other
 	}
@@ -775,6 +794,18 @@ func (s *jcSim) refuseHydrate(step int) {
 		s.t.Fatalf("seed %d step %d: refused Hydrate(%v, %d) answers %q, want %q", s.seed, step, k, at, got, want)
 	}
 	s.counts["hydrate refused"]++
+	s.counts["hydrate refused "+want]++
+}
+
+// badLength returns the rows that the store holds for the live entities of the kind k, followed by one row of a
+// fresh eid of k whose value has the wrong length: one byte short or long for a component, one byte for a tag.
+func (s *jcSim) badLength(k ecd.Kind) []ecd.Row {
+	c := ecd.CID(1 + s.rng.IntN(5))
+	n := j3Size[c] + 1
+	if j3Size[c] > 0 && s.rng.IntN(2) == 0 {
+		n = j3Size[c] - 1
+	}
+	return append(s.rowsOf(s.liveOf(k)), ecd.Row{Entity: s.freshOf(k), CID: c, Value: make([]byte, n)})
 }
 
 // maintain runs, with a chance of at most seven in ten, one call that is not a transaction: a hydration of an All
@@ -826,6 +857,13 @@ func (s *jcSim) step(n int) {
 	if ce != cm || (want != "" && ce != want) || (want == "" && !slices.Contains(p.wants, ce)) {
 		s.t.Fatalf("seed %d step %d: Apply(%d): engine %q (%v), model %q (%v), want %q of %v",
 			s.seed, n, p.seq, ce, errE, cm, errM, want, p.wants)
+	}
+	if se, sm := jcSentinels(errE), jcSentinels(errM); se != sm {
+		s.t.Fatalf("seed %d step %d: Apply(%d): the engine's error matches %q, the model's %q (%v; %v)",
+			s.seed, n, p.seq, se, sm, errE, errM)
+	}
+	if ce == "ErrStale" {
+		s.counts["stale"+jcSentinels(errE)]++
 	}
 	s.counts[ce]++
 	if len(slices.Compact(slices.Sorted(slices.Values(p.wants)))) > 1 {
@@ -893,13 +931,15 @@ func (s *jcSim) applyStore(step int, seq uint64, deeds []ecd.Deed) {
 // TestCompare (JC-01): four seeds of 2,000 random transactions run through the Engine that build returns for a
 // catalog with two All kinds, which start Cold, and a Touched kind, and through the reference model. Between the
 // transactions the calls hydrate an All kind and Touched entities from the store, evict Touched entities, and
-// refuse a hydration. After each transaction the answer class, At(), every Get, byte for byte on success and on
+// refuse a hydration, among them hydrations refused for a row of the wrong length. After each transaction the answer
+// class, the sentinels of package ecd that each Apply error matches, At(), every Get, byte for byte on success and on
 // error, State and the Entities and Evictions of Stats are equal. The transactions include spawns that stay bare, tag
 // Sets with a nil and with an empty value, Ord that differs from the list order, one entity touched from several
 // deeds of different Ord, ops on a Cold kind and on Touched entities that are not resident, which change nothing,
 // the faults that the check pass refuses (one or several in one transaction, among them an undeclared kind and an
 // op fault in one transaction, where the first in commit order answers), and the faults that make both engines
-// stale and start a new episode. Before a stale engine is rebuilt, a query on it is compared too.
+// stale and start a new episode, a Spawn of a held entity and a Set of an entity that was never spawned. Before a
+// stale engine is rebuilt, a query on it is compared too.
 func TestCompare(t *testing.T) {
 	for seed := uint64(1); seed <= 4; seed++ {
 		s := jcNewSeamSim(t, seed)
@@ -909,7 +949,8 @@ func TestCompare(t *testing.T) {
 		t.Logf("seed %d: answers %v", seed, s.counts)
 		for _, class := range []string{"nil", "ErrGap", "ErrKind", "ErrOp", "ErrStale", "multi", "mixed", "split",
 			"get ErrCold", "get ErrMiss", "skip cold", "skip touched", "hydrate all", "hydrate touched", "hydrate refused",
-			"evict"} {
+			"hydrate refused ErrGap", "hydrate refused ErrKind", "hydrate refused ErrOp", "stale+ErrStale",
+			"stale+ErrStale+ErrAbsent", "evict"} {
 			if s.counts[class] == 0 {
 				t.Errorf("seed %d: no call counted as %s", seed, class)
 			}
@@ -1030,6 +1071,10 @@ func TestCompareSeam(t *testing.T) {
 		}
 		if got := s.hydrateRows(0, jobK, 0, []ecd.Row{{Entity: job1, CID: 99}}); got != "ErrOp" {
 			t.Fatalf("a hydrated row of an undeclared CID answers %q, want ErrOp", got)
+		}
+		bad := []ecd.Row{{Entity: job1, CID: j3U64, Value: make([]byte, 7)}}
+		if got := s.hydrateRows(0, jobK, 0, bad); got != "ErrOp" {
+			t.Fatalf("a hydrated row of the wrong length answers %q, want ErrOp", got)
 		}
 		s.read("ErrCold", job1, j3U64)
 		s.compareStats(0)
