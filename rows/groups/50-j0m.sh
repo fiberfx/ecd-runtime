@@ -17,8 +17,8 @@
 #   J0M-02-p     plant: the Any term is skipped; TestQueries must fail
 #   J0M-02-pn    plant: the None term is skipped; TestQueries must fail
 #   J0M-03       a transaction refused by the check pass leaves the model and At() unchanged, whichever deed holds the
-#                fault; with several faults the first in commit order is returned, and a gap before any op
-#                (TestCheckAtomic, TestCheckFirstFault)
+#                fault; with several faults the first in commit order is returned, a gap before any op, and a second
+#                Spawn of one eid is refused where the engine refuses it (TestCheckAtomic, TestCheckFirstFault)
 #   J0M-03-p     plant: the check pass reads no deed; TestCheckAtomic must fail
 #   J0M-04       a Destroy and a Spawn of one eid in one transaction answer ErrOp, in either order, in one deed or in
 #                two, and change nothing (TestDestroySpawn)
@@ -27,6 +27,9 @@
 #   J0M-05       a buffer overwritten after Apply or Hydrate leaves Get unchanged, and a write into an answer changes
 #                nothing (TestInboundCopy)
 #   J0M-05-p     plant: a Set stores the caller's slice; TestInboundCopy must fail
+#   J0M-06       New refuses a tag with a nonzero Size, a component of form Component with Size 0, a CID 0, a CID declared
+#                twice and a kind declared twice, and builds no engine (TestCatalog)
+#   J0M-06-p     plant: the tag-size check is skipped; TestCatalog must fail
 #   L12-model    CNM: the model against a SQL twin needs a SQLite driver (modernc.org/sqlite v1.37.0), and the module
 #                inputs hold ecd-id only
 #
@@ -79,6 +82,9 @@ j0m_plant J0M-04-p "TestDestroySpawn fails on the plant" TestDestroySpawn 's/ret
 
 go_row J0M-05 j0m "TestInboundCopy rc=0" /w/go test -run '^TestInboundCopy$' ./engine/jacquard/model/
 j0m_plant J0M-05-p "TestInboundCopy fails on the plant" TestInboundCopy 's/vals\[op.CID\] = append(\[\]byte(nil), op.Value...)/vals[op.CID] = op.Value/'
+
+go_row J0M-06 j0m "TestCatalog rc=0" /w/go test -run '^TestCatalog$' ./engine/jacquard/model/
+j0m_plant J0M-06-p "TestCatalog fails on the plant" TestCatalog 's/if c\.Form == ecd\.Tag && c\.Size != 0 {/if false {/'
 
 if sel L12-model j0m; then
   say L12-model "every declared query equals its SQL twin on 100,000 entities" "no SQLite driver: modernc.org/sqlite v1.37.0 is not in the module inputs, which hold ecd-id only" CNM

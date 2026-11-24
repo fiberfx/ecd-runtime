@@ -7,7 +7,8 @@
 // whose value is nil. An entity with no component is held and counted, and a Row cannot name one, so Hydrate
 // never creates it.
 //
-// A Model is not safe for concurrent use: every call comes from one goroutine.
+// Calls that change the model (Apply, Hydrate, Evict and Close) come from one goroutine, at a sync point, with
+// no other call running. Get, Query, State, At and Stats only read, and may run in parallel between sync points.
 package model
 
 import (
@@ -38,7 +39,8 @@ type Model struct {
 var _ ecd.Engine = (*Model)(nil)
 
 // New returns an empty model for the catalog. An All kind starts Cold and a Touched kind starts Warm and empty.
-// The model copies what it keeps from the catalog.
+// The model copies what it keeps from the catalog. It refuses a CID 0, a CID or a kind declared twice, a tag
+// with a nonzero Size and a component of form Component with Size 0, and returns the error without a model.
 func New(cat *ecd.Catalog) (ecd.Engine, error) {
 	if cat == nil {
 		return nil, fmt.Errorf("model: nil catalog")
@@ -57,6 +59,12 @@ func New(cat *ecd.Catalog) (ecd.Engine, error) {
 		}
 		if _, dup := m.comps[c.CID]; dup {
 			return nil, fmt.Errorf("model: CID %d is declared twice", c.CID)
+		}
+		if c.Form == ecd.Tag && c.Size != 0 {
+			return nil, fmt.Errorf("model: tag %q has Size %d, want 0", c.Name, c.Size)
+		}
+		if c.Form == ecd.Component && c.Size == 0 {
+			return nil, fmt.Errorf("model: component %q has Size 0", c.Name)
 		}
 		m.comps[c.CID] = c
 	}
@@ -121,14 +129,14 @@ func (m *Model) fail(cause error) error {
 // Apply applies one committed transaction, all or nothing, in two passes. The check pass refuses the
 // transaction before any change: a seq other than At()+1 answers ecd.ErrGap, and the first fault in commit
 // order answers ecd.ErrKind for an op on an undeclared kind, or ecd.ErrOp for an undeclared CID, a value of the
-// wrong length or an op out of order. A refusal leaves the model and At() unchanged. The commit pass applies
+// wrong length or an op out of order, such as a second Spawn of one eid. A refusal leaves the model and At() unchanged. The commit pass applies
 // the deeds in Ord order, then list order. Any error or panic in the commit pass, one before the first change
 // included, makes the model stale, and Apply returns an error wrapping ecd.ErrStale and its cause.
 //
 // An op on a Cold kind changes nothing. A Set, Unset or Destroy on a Touched entity that is not resident
 // changes nothing, and a Spawn makes a Touched entity resident. A Set, Unset or Destroy on an entity that an
-// All kind does not hold fails the commit pass. An Unset of an entity's last component leaves the entity
-// alive; only a Destroy removes it.
+// All kind does not hold fails the commit pass with a cause that wraps ecd.ErrAbsent. An Unset of an entity's
+// last component leaves the entity alive; only a Destroy removes it.
 func (m *Model) Apply(seq uint64, deeds []ecd.Deed) error {
 	if err := m.gate(); err != nil {
 		return err
@@ -160,49 +168,46 @@ func (m *Model) check(seq uint64, deeds []ecd.Deed) error {
 	return m.checkOps(deeds)
 }
 
-// checkOps refuses, at the first op that shows it, an undeclared kind (ecd.ErrKind), or one of these faults
-// (ecd.ErrOp): an eid both spawned and destroyed in the transaction, an op after the destroy of its entity, an
-// op before the Spawn of its entity, an unknown op code, an undeclared CID, or a value of the wrong length. A tag
-// takes a value of length 0, and a component without pointers takes exactly Size bytes.
+// opSeen is what the check pass has seen of one eid in a transaction.
+type opSeen struct {
+	ops       int
+	spawned   bool
+	destroyed bool
+}
+
+// checkOps reads the ops in commit order and refuses the transaction at the first op that shows a fault. At each
+// op the faults are tested in this order: an undeclared kind (ecd.ErrKind); an unknown op code, an undeclared
+// CID or a value of the wrong length (ecd.ErrOp); then, for the op's eid, a Destroy and a Spawn of one eid in
+// the transaction, a Spawn that is not the first op of its eid, and an op after the Destroy of its eid
+// (ecd.ErrOp). A tag takes a value of length 0, and a component without pointers takes exactly Size bytes.
 func (m *Model) checkOps(deeds []ecd.Deed) error {
-	spawns := map[eid.ID]bool{}
-	destroys := map[eid.ID]bool{}
-	for _, d := range deeds {
-		for _, op := range d.Ops {
-			switch op.Code {
-			case ecd.OpSpawn:
-				spawns[op.Entity] = true
-			case ecd.OpDestroy:
-				destroys[op.Entity] = true
-			}
-		}
-	}
-	spawned := map[eid.ID]bool{}
-	destroyed := map[eid.ID]bool{}
+	seen := map[eid.ID]*opSeen{}
 	for _, d := range deeds {
 		for _, op := range d.Ops {
 			e := op.Entity
 			if _, ok := m.kinds[ecd.KindOf(e)]; !ok {
 				return fmt.Errorf("model: op on %v: %w", e, ecd.ErrKind)
 			}
-			if spawns[e] && destroys[e] {
-				return fmt.Errorf("model: spawn and destroy of %v in one transaction: %w", e, ecd.ErrOp)
-			}
-			if destroyed[e] {
-				return fmt.Errorf("model: op on %v after its destroy: %w", e, ecd.ErrOp)
-			}
-			if op.Code != ecd.OpSpawn && spawns[e] && !spawned[e] {
-				return fmt.Errorf("model: op on %v before its spawn: %w", e, ecd.ErrOp)
-			}
 			if err := m.checkOp(op); err != nil {
 				return err
 			}
-			switch op.Code {
-			case ecd.OpSpawn:
-				spawned[e] = true
-			case ecd.OpDestroy:
-				destroyed[e] = true
+			st := seen[e]
+			if st == nil {
+				st = new(opSeen)
+				seen[e] = st
 			}
+			if (op.Code == ecd.OpSpawn && st.destroyed) || (op.Code == ecd.OpDestroy && st.spawned) {
+				return fmt.Errorf("model: spawn and destroy of %v in one transaction: %w", e, ecd.ErrOp)
+			}
+			if op.Code == ecd.OpSpawn && st.ops > 0 {
+				return fmt.Errorf("model: spawn of %v is not its first op: %w", e, ecd.ErrOp)
+			}
+			if st.destroyed {
+				return fmt.Errorf("model: op on %v after its destroy: %w", e, ecd.ErrOp)
+			}
+			st.ops++
+			st.spawned = st.spawned || op.Code == ecd.OpSpawn
+			st.destroyed = op.Code == ecd.OpDestroy
 		}
 	}
 	return nil
@@ -276,7 +281,7 @@ func (m *Model) applyOp(op ecd.Op) error {
 		if def.Residency == ecd.Touched {
 			return nil
 		}
-		return fmt.Errorf("model: op %d on %v, which does not exist", op.Code, op.Entity)
+		return fmt.Errorf("model: op %d on %v: %w", op.Code, op.Entity, ecd.ErrAbsent)
 	}
 	switch op.Code {
 	case ecd.OpSet:

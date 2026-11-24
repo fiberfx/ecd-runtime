@@ -388,6 +388,9 @@ func TestStale(t *testing.T) {
 		if !errors.Is(err, ecd.ErrStale) {
 			t.Fatalf("Apply of a Set on an entity that does not exist: err = %v, want ErrStale", err)
 		}
+		if !errors.Is(err, ecd.ErrAbsent) {
+			t.Fatalf("the cause of a Set on an entity that does not exist: err = %v, want ErrAbsent", err)
+		}
 		if m.At() != 50 {
 			t.Fatalf("At() = %d after the failed Apply, want 50", m.At())
 		}
@@ -402,6 +405,33 @@ func TestStale(t *testing.T) {
 		}
 		allStale(t, m, x)
 	})
+}
+
+// J0M-06: New refuses a malformed catalog and builds no engine.
+func TestCatalog(t *testing.T) {
+	one := ecd.ComponentDef{CID: 1, Name: "one", Form: ecd.Component, Size: 8}
+	cases := []struct {
+		name  string
+		comps []ecd.ComponentDef
+		kinds []ecd.KindDef
+	}{
+		{"tag with a size", []ecd.ComponentDef{one, {CID: 3, Name: "mark", Form: ecd.Tag, Size: 4}}, nil},
+		{"component with size 0", []ecd.ComponentDef{{CID: 1, Name: "one", Form: ecd.Component}}, nil},
+		{"CID 0", []ecd.ComponentDef{{CID: 0, Name: "zero", Form: ecd.Component, Size: 8}}, nil},
+		{"CID twice", []ecd.ComponentDef{one, one}, nil},
+		{"kind twice", []ecd.ComponentDef{one}, []ecd.KindDef{{Kind: kindAaa, Residency: ecd.All}, {Kind: kindAaa, Residency: ecd.All}}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			e, err := New(&ecd.Catalog{Components: c.comps, Kinds: c.kinds})
+			if err == nil || e != nil {
+				t.Fatalf("New = %v, %v; want an error and no engine", e, err)
+			}
+		})
+	}
+	if _, err := New(testCatalog()); err != nil {
+		t.Fatalf("New of the test catalog: %v", err)
+	}
 }
 
 // L14-model: a Cold kind answers ErrCold, never an empty answer, and answers once it is hydrated.
@@ -604,7 +634,7 @@ func TestCheckAtomic(t *testing.T) {
 
 // J0M-03: with several faults the first in commit order is returned, and a gap is refused before any op.
 func TestCheckFirstFault(t *testing.T) {
-	a1 := entityID("aaa", 1)
+	a1, a2, a3 := entityID("aaa", 1), entityID("aaa", 2), entityID("aaa", 3)
 	badLength := set(a1, 1, []byte{1, 2})
 	undeclared := spawn(entityID("ccc", 1))
 	cases := []struct {
@@ -618,6 +648,11 @@ func TestCheckFirstFault(t *testing.T) {
 		{"list order inside a deed", 2, []ecd.Deed{deed(0, badLength, undeclared)}, ecd.ErrOp},
 		{"Ord order, not list order", 2, []ecd.Deed{deed(1, badLength), deed(0, undeclared)}, ecd.ErrKind},
 		{"gap before an op", 3, []ecd.Deed{deed(0, undeclared, badLength)}, ecd.ErrGap},
+		{"second spawn of one eid", 2, []ecd.Deed{deed(0, spawn(a3)), deed(1, spawn(a3))}, ecd.ErrOp},
+		{"op before its spawn, kind between", 2,
+			[]ecd.Deed{deed(0, set(a2, 1, val(2))), deed(1, undeclared), deed(2, spawn(a2))}, ecd.ErrKind},
+		{"spawn and destroy of one eid, kind between", 2,
+			[]ecd.Deed{deed(0, spawn(a3)), deed(1, undeclared), deed(2, destroy(a3))}, ecd.ErrKind},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

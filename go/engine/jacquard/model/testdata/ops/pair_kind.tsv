@@ -1,0 +1,21 @@
+# A Spawn and a Destroy of one eid are reported at the second of the two ops: an undeclared kind between them is reported first.
+hydrate	aaa	0	ok
+apply	1	ok
+deed	0
+spawn	aaa:1
+apply	2	kind
+deed	0
+spawn	aaa:3
+deed	1
+spawn	ccc:1
+deed	2
+destroy	aaa:3
+get	aaa:3	1	absent
+apply	2	op
+deed	0
+spawn	aaa:3
+deed	1
+destroy	aaa:3
+get	aaa:3	1	absent
+at	1
+query	4	ok	aaa:1
