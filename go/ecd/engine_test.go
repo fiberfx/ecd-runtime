@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	eid "github.com/fiberfx/ecd-id/go"
-	"github.com/fiberfx/ecd-loom/go/ecd"
+	"github.com/fiberfx/ecd-runtime/go/ecd"
 )
 
 // stub is the smallest type that satisfies ecd.Engine.

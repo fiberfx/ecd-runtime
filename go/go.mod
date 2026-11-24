@@ -1,4 +1,4 @@
-module github.com/fiberfx/ecd-loom/go
+module github.com/fiberfx/ecd-runtime/go
 
 go 1.27
 
