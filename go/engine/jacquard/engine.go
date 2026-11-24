@@ -45,6 +45,7 @@ type compDef struct {
 //	stamp   the seq being applied; every table records it as the stamp of its writes
 //	stale   set by fail; every read and apply then answers ecd.ErrStale
 //	moves   the number of archetype changes of existing entities
+//	queries the declared queries by QID; nil until addQuery
 //
 // Mutation happens on one goroutine; get writes nothing.
 type Engine struct {
@@ -57,6 +58,7 @@ type Engine struct {
 	stamp   uint64
 	stale   bool
 	moves   uint64
+	queries map[ecd.QID]*query // the declared queries by QID; nil until addQuery
 }
 
 // newEngine returns an empty engine over the declared kinds and components. It answers errCatalog, wrapped,
