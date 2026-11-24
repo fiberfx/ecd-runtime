@@ -652,7 +652,8 @@ func (s *jcSim) rowsOf(ids []eid.ID) []ecd.Row {
 func (s *jcSim) bare(id eid.ID) bool { return len(s.rowsOf([]eid.ID{id})) == 0 }
 
 // hydrateRows calls Hydrate of the kind k at seq at with the rows on the Engine and on the model, and requires the
-// same class and the same At, and sets loaded when the class is nil. It returns the class.
+// same class, the same sentinels of package ecd and the same At, and sets loaded when the class is nil. It returns
+// the class.
 func (s *jcSim) hydrateRows(step int, k ecd.Kind, at uint64, rows []ecd.Row) string {
 	s.t.Helper()
 	errE := s.en.Hydrate(k, at, &jcRowList{rows: rows})
@@ -660,6 +661,10 @@ func (s *jcSim) hydrateRows(step int, k ecd.Kind, at uint64, rows []ecd.Row) str
 	if jcClass(errE) != jcClass(errM) {
 		s.t.Fatalf("seed %d step %d: Hydrate(%v, %d, %d rows): engine %v; model %v",
 			s.seed, step, k, at, len(rows), errE, errM)
+	}
+	if se, sm := jcSentinels(errE), jcSentinels(errM); se != sm {
+		s.t.Fatalf("seed %d step %d: Hydrate(%v, %d, %d rows): the engine's error matches %q, the model's %q (%v; %v)",
+			s.seed, step, k, at, len(rows), se, sm, errE, errM)
 	}
 	if s.en.At() != s.m.At() {
 		s.t.Fatalf("seed %d step %d: Hydrate(%v, %d): engine at %d, model at %d",
@@ -838,7 +843,8 @@ func (s *jcSim) noteSkip(p *jcPlan, id eid.ID) {
 // At(), every Get, and for a seam sim State and Stats. The model gets a deep copy made before the Engine runs, so a
 // transaction that the Engine changes is not changed for the model; the Engine must leave the caller's deeds as
 // they were, order and values, and must not keep a value that the caller overwrites after Apply. A transaction that
-// both accept goes to the store too.
+// both accept goes to the store too. After a stale Apply, the errors of the Get, Apply, Hydrate and Evict that follow
+// must match the same sentinels of package ecd on both.
 func (s *jcSim) step(n int) {
 	s.t.Helper()
 	if s.seam {
@@ -898,25 +904,44 @@ func (s *jcSim) step(n int) {
 		if c1, c2 := s.get(n, id, j3U64); c1 != "ErrStale" || c2 != "ErrStale" {
 			s.t.Fatalf("seed %d step %d: Get after a stale Apply answers %q and %q, want ErrStale", s.seed, n, c1, c2)
 		}
+		_, gE := s.en.Get(id, j3U64, nil)
+		_, gM := s.m.Get(id, j3U64, nil)
+		s.sameSentinels(n, "Get", gE, gM)
 	}
-	e1, e2 := jcClass(s.en.Apply(s.en.appliedAt()+1, nil)), jcClass(s.m.Apply(s.m.At()+1, nil))
+	aE, aM := s.en.Apply(s.en.appliedAt()+1, nil), s.m.Apply(s.m.At()+1, nil)
+	e1, e2 := jcClass(aE), jcClass(aM)
 	if e1 != "ErrStale" || e2 != "ErrStale" {
 		s.t.Fatalf("seed %d step %d: Apply after a stale Apply answers %q and %q, want ErrStale", s.seed, n, e1, e2)
 	}
+	s.sameSentinels(n, "Apply", aE, aM)
 	if s.seam {
 		k := s.touchedKind()
-		e1, e2 = jcClass(s.en.Hydrate(k, s.en.appliedAt(), jcRows{})), jcClass(s.m.Hydrate(k, s.m.At(), jcRows{}))
+		hE, hM := s.en.Hydrate(k, s.en.appliedAt(), jcRows{}), s.m.Hydrate(k, s.m.At(), jcRows{})
+		e1, e2 = jcClass(hE), jcClass(hM)
 		if e1 != "ErrStale" || e2 != "ErrStale" {
 			s.t.Fatalf("seed %d step %d: Hydrate after a stale Apply answers %q and %q, want ErrStale", s.seed, n, e1, e2)
 		}
-		e1, e2 = jcClass(s.en.Evict(k, nil)), jcClass(s.m.Evict(k, nil))
+		s.sameSentinels(n, "Hydrate", hE, hM)
+		vE, vM := s.en.Evict(k, nil), s.m.Evict(k, nil)
+		e1, e2 = jcClass(vE), jcClass(vM)
 		if e1 != "ErrStale" || e2 != "ErrStale" {
 			s.t.Fatalf("seed %d step %d: Evict after a stale Apply answers %q and %q, want ErrStale", s.seed, n, e1, e2)
 		}
+		s.sameSentinels(n, "Evict", vE, vM)
 	}
 	s.query(n, 0, nil)
 	s.query(n, 42, []byte{1})
 	s.reset()
+}
+
+// sameSentinels requires that the Engine and the model answer the call named what with errors that match the same
+// sentinels of package ecd.
+func (s *jcSim) sameSentinels(step int, what string, errE, errM error) {
+	s.t.Helper()
+	if se, sm := jcSentinels(errE), jcSentinels(errM); se != sm {
+		s.t.Fatalf("seed %d step %d: %s after a stale Apply: the engine's error matches %q, the model's %q (%v; %v)",
+			s.seed, step, what, se, sm, errE, errM)
+	}
 }
 
 // applyStore applies a transaction that both engines accepted to the store, which must accept it as well: every
