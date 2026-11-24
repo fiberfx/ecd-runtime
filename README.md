@@ -13,7 +13,7 @@ The contract is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`. This re
 | `go/` | The Go module `github.com/fiberfx/ecd-runtime/go`. |
 | `go/engine/jacquard/` | Jacquard, the archetype engine. Its files that port Ark files name their source file in their header. |
 | `go/rt/` | The package `rt`: a command buffer per system and the flush that commits and applies their deeds. |
-| `go/enginecmp/gj/` | Benchmarks of Jacquard against Ark in module `go/enginecmp`; `rows/gj.bench.sh` runs them. |
+| `go/enginecmp/gj/` | Benchmarks of Jacquard against Ark in module `go/enginecmp`; `rows/gj.bench.rows.sh` runs them. |
 | `go/NOTICE.txt` | Every part taken from another project: the project, its source, commit, licence and copyright line, what is taken and the files that hold it, with the licence text that the project's licence requires, and the projects whose design Ecd Runtime follows. |
 | `rows/loom.rows.sh` | The rows script. |
 

@@ -6,12 +6,14 @@
 #
 # Run command (flow:row-container, image mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2, whose /usr/local/go is
 # go1.27.4), on a box that runs no other container, since a second load changes the timings:
-#   kan flow run flow:row-container --param script=rows/gj.bench.sh \
+#   kan flow run flow:row-container --param script=rows/gj.bench.rows.sh \
 #     --param checkout=CHECKOUT --param revision=SHA \
 #     --param paths='go rows README.md LICENSE' --param name=gj \
 #     --param image=mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2 \
 #     --param inputs=DIR \
 #     --param cpus=2 --param memory=4g --param timeout=1800
+# The timeout of the flow is at most 1800 s. Six rounds of at most 360 s each could exceed it, and a run that times out
+# is split into two runs.
 # CHECKOUT is the directory of a checkout of this repository on the machine that starts the run.
 # inputs is required and holds the GOPROXY file tree of the rows script: github.com/fiberfx/ecd-id/go and the Ark that
 # go/enginecmp requires. Without it GOPROXY is off, the module does not load, and every gate is CNM.
