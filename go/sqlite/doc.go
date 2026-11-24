@@ -1,6 +1,7 @@
 // Package sqlite is an owner store of Ecd Runtime in one SQLite file. A host passes a *Store to the Runtime as
 // its rt.Committer, so that committed deeds outlive the process. After a restart, Hydrate brings a fresh engine to
-// the store's seq with every All kind as it was committed, and Log yields the committed deeds for replay.
+// the store's seq with every All kind as it was committed, Log yields the committed deeds for replay, and Rows reads
+// given entities of one kind at the store's seq.
 //
 // # Tables
 //
@@ -43,9 +44,14 @@
 //
 // Hydrate reads the store's seq and then, for each All kind of the catalog in catalog order, the values in the
 // kind's eid range in eid order, all in one read transaction; the engine loads each kind at that seq. The values
-// of Touched kinds are written by Commit and not read back. When the catalog has no All kind and the seq is above
-// 0, Hydrate loads the first Touched kind with no row, so that a new engine takes the seq. Log yields the deeds
-// above a seq, in seq order, then Ord order, from one read transaction.
+// of Touched kinds are written by Commit and not read back. Log yields the deeds above a seq, in seq order, then Ord
+// order, from one read transaction.
+//
+// When no All kind was loaded and the seq is above 0, Hydrate calls the engine's Start at the seq, so that a new
+// engine takes it with no kind loaded. Hydrating an All kind makes the engine serve it from memory; until an engine
+// is admitted to serve All kinds, a product passes Hydrate a catalog without All kinds and reads their entities with
+// Rows. Rows yields the stored values of given entities of one kind, in eid order, then CID order, with the store's
+// seq, from one read transaction.
 //
 // # Settings
 //
@@ -62,6 +68,7 @@
 //   - One state table of opaque values: no typed column, no store-routed query and no index per declared query.
 //     A value is stored whole, whatever its size.
 //   - An entity with no component value is alive in the store, but no hydration can name it.
+//   - Rows yields no row both for an entity that is not alive and for one alive with no component value.
 //   - Conflict is answered only for a deed whose eid is committed; the first seq and Ord of that deed are not
 //     returned.
 //   - No file lock: one owner process per file. Two processes keep the seq consistent, since it is read inside
