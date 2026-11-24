@@ -1,10 +1,10 @@
 # Ecd Runtime
 
-Ecd Runtime is the entity store and runtime of an owner process. Callers change state only through deeds. The SQLite
-owner store records every deed, and engines answer reads from memory. Jacquard is the archetype engine.
+Ecd Runtime is the entity store and runtime of an owner process. Callers change state only through deeds, which are
+committed through the `Committer` interface of package `rt`, and engines answer reads from memory. The owner store, such
+as the SQLite store that the contract specifies, is not in this repository. Jacquard is the archetype engine.
 
-The contract is `specs/ecd_runtime/ecd_runtime.specs.md` in the KAN home `/Users/jonny/dev/ecd/kan`. This repository
-holds the implementation.
+The contract is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`. This repository holds the implementation.
 
 ## Layout
 
@@ -12,6 +12,8 @@ holds the implementation.
 |---|---|
 | `go/` | The Go module `github.com/fiberfx/ecd-runtime/go`. |
 | `go/engine/jacquard/` | Jacquard, the archetype engine. Its files that port Ark files name their source file in their header. |
+| `go/rt/` | The package `rt`: a command buffer per system and the flush that commits and applies their deeds. |
+| `go/enginecmp/gj/` | Benchmarks of Jacquard against Ark in module `go/enginecmp`; `rows/gj.bench.sh` runs them. |
 | `go/NOTICE.txt` | Every part taken from another project: the project, its source, commit, licence and copyright line, what is taken and the files that hold it, with the licence text that the project's licence requires, and the projects whose design Ecd Runtime follows. |
 | `rows/loom.rows.sh` | The rows script. |
 
@@ -74,7 +76,8 @@ only on the stages, the registration order and the record order.
 ### Example
 
 ```go
-// tick registers one system, records three writes and flushes them. cfg is built by the host.
+// tick registers one system, records three writes and flushes them. cfg is built by the host. The component pos is
+// declared in the catalog with Size 2, so every value that Set records for it holds exactly 2 bytes.
 func tick(cfg rt.Config, mover ecd.Kind, pos ecd.CID, known eid.ID) (rt.Result, error) {
 	r, err := rt.New(cfg)
 	if err != nil {
@@ -84,10 +87,10 @@ func tick(cfg rt.Config, mover ecd.Kind, pos ecd.CID, known eid.ID) (rt.Result, 
 	if err != nil {
 		return rt.Result{}, err // matches rt.ErrConfig
 	}
-	e := buf.Spawn(mover)                 // a placeholder, valid in buf until the next flush
-	buf.Set(e, pos, []byte{1, 2})         // in the same deed as its spawn
-	buf.Set(rt.Of(known), pos, []byte{3}) // an entity that exists, by its eid
-	return r.Flush()                      // Result.Outcomes names each deed's Outcome, for example rt.Committed
+	e := buf.Spawn(mover)                    // a placeholder, valid in buf until the next flush
+	buf.Set(e, pos, []byte{1, 2})            // in the same deed as its spawn
+	buf.Set(rt.Of(known), pos, []byte{3, 4}) // an entity that exists, by its eid
+	return r.Flush()                         // Result.Outcomes names each deed's Outcome, for example rt.Committed
 }
 ```
 

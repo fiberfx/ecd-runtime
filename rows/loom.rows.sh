@@ -5,11 +5,12 @@
 # Run command (flow:row-container, image mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2, whose /usr/local/go is
 # go1.27.4; the module's go line is go 1.27.4):
 #   kan flow run flow:row-container --param script=rows/loom.rows.sh \
-#     --param checkout=/Users/jonny/dev/ecd/ecd-runtime --param revision=SHA \
+#     --param checkout=CHECKOUT --param revision=SHA \
 #     --param paths='go rows README.md LICENSE' --param name=rt \
 #     --param image=mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2 \
 #     --param inputs=DIR \
 #     --param cpus=2 --param memory=4g --param timeout=1800
+# CHECKOUT is the directory of a checkout of this repository on the machine that starts the run.
 # inputs is required: a GOPROXY file tree that /w/inputs provides for github.com/fiberfx/ecd-id/go v0.8.0, the one
 # requirement of go/, and for github.com/mlange-42/ark v0.8.4-0.20261110114945-723f2ac3186a, which go/enginecmp also
 # requires. Without it GOPROXY is off, and every row that loads a module is CNM.
