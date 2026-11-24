@@ -11,10 +11,25 @@
 #            zero values and that no engine reads them (TestDeedSpanFields in go/ecd)
 #   SP-01p   plant: Deed.TraceID is of type SpanID (ecd/engine.go; TestDeedSpanFields, case types)
 #   SP-01q   plant: the Deed comment drops "No engine reads them." (ecd/engine.go; TestDeedSpanFields, case comment)
+#   SP-07    no non-test file of go/engine or go/enginecmp reads a field TraceID or SpanID
 #   SP-02    a deed carries its buffer's last Span ids, the zero values without one, and a flush that empties the
 #            buffer, committed or refused, resets them; a buffer with no record keeps them (TestBufferSpan in go/rt)
 #   SP-02p   plant: the flush builds the deed without the buffer's ids (rt/flush.go; TestBufferSpan, case carried)
 #   SP-02q   plant: emptying a buffer keeps its ids (rt/buffer.go; TestBufferSpan, case reset)
+#   SP-03    Commit stores a deed's ids as 16 and 8 bytes and the zero values as NULL, Log returns them, the schema
+#            refuses an id of another length, and Log answers an all-zero stored id with ErrSchema (TestDeedSpan)
+#   SP-03p   plant: Commit binds the zero trace id (sqlite/commit.go; TestDeedSpan, case ids)
+#   SP-03q   plant: decodeDeed skips the span id (sqlite/read.go; TestDeedSpan, case ids)
+#   SP-03r   plant: a refused stored trace id does not match ErrSchema (sqlite/read.go; TestDeedSpan, case malformed)
+#   SP-03s   plant: the span_id check admits 16 bytes (sqlite/store.go; TestDeedSpan, case length)
+#   SP-04    Create writes user version 2, and Open refuses a store of user version 1 (TestCreate)
+#   SP-04p   plant: Open admits user version 1 (sqlite/store.go; TestCreate)
+#   SP-04q   plant: Create writes user version 1 (sqlite/store.go; TestCreate)
+#
+# Rows SP-03, SP-04 and SP-05 and their plants load the driver and its modules from the module inputs, as the rows of
+# group sq40 do. The replace in go/sqlite/go.mod makes every build of go/sqlite here compile against the main module
+# of the same checkout, so these rows measure the two modules at one revision; the require line is what a consumer
+# outside the repository resolves, and SP-06 reads it.
 #
 # sp60_plant id expect mod pkg test case file sedexpr: copies /w/go to a temporary directory, applies the one-line sed
 # to go/<file> there and runs only the named test of package pkg in module directory go/<mod> of the copy. The copy is
@@ -65,8 +80,38 @@ sp60_plant SP-01p "TestDeedSpanFields/types fails on the plant" . ./ecd/ TestDee
 sp60_plant SP-01q "TestDeedSpanFields/comment fails on the plant" . ./ecd/ TestDeedSpanFields comment ecd/engine.go \
   's/ No engine reads them\.$//'
 
+if sel SP-07 sp60; then
+  sp60_pat='\.(TraceID|SpanID)\b'
+  sp60_ctl=$(grep -rnE "$sp60_pat" --include='*.go' /w/go/sqlite 2>/dev/null | grep -vc '_test\.go:')
+  if [ ! -d /w/go/engine ] || [ ! -d /w/go/enginecmp ]; then
+    say SP-07 "no engine file reads TraceID or SpanID" "go/engine or go/enginecmp is absent" CNM
+  elif [ "$sp60_ctl" -eq 0 ]; then
+    say SP-07 "no engine file reads TraceID or SpanID" "the pattern finds no line of go/sqlite either" CNM
+  else
+    sp60_n=$(grep -rnE "$sp60_pat" --include='*.go' /w/go/engine /w/go/enginecmp | grep -vc '_test\.go:')
+    if [ "$sp60_n" -eq 0 ]; then say SP-07 "no engine file reads TraceID or SpanID" "0 lines; go/sqlite $sp60_ctl" PASS
+    else say SP-07 "no engine file reads TraceID or SpanID" "$sp60_n lines" FAIL; fi
+  fi
+fi
+
 go_row SP-02 sp60 "TestBufferSpan rc=0" /w/go test -run '^TestBufferSpan$' ./rt/
 sp60_plant SP-02p "TestBufferSpan/carried fails on the plant" . ./rt/ TestBufferSpan carried rt/flush.go \
   's/TraceID: b\.trace, SpanID: b\.span, //'
 sp60_plant SP-02q "TestBufferSpan/reset fails on the plant" . ./rt/ TestBufferSpan reset rt/buffer.go \
   's/^\tb\.trace, b\.span = ecd\.TraceID{}, ecd\.SpanID{}$/\t\/\/ the reset of the ids is dropped/'
+
+go_row SP-03 sp60 "TestDeedSpan rc=0" /w/go/sqlite test -run '^TestDeedSpan$' .
+sp60_plant SP-03p "TestDeedSpan/ids fails on the plant" sqlite . TestDeedSpan ids sqlite/commit.go \
+  's/at, d\.TraceID, d\.SpanID))$/at, ecd.TraceID{}, d.SpanID))/'
+sp60_plant SP-03q "TestDeedSpan/ids fails on the plant" sqlite . TestDeedSpan ids sqlite/read.go \
+  's/^\tif span != nil {$/\tif span != nil \&\& false {/'
+sp60_plant SP-03r "TestDeedSpan/malformed fails on the plant" sqlite . TestDeedSpan malformed sqlite/read.go \
+  's/"sqlite: trace id: %w: %w", err, ErrSchema/"sqlite: trace id: %w", err/'
+sp60_plant SP-03s "TestDeedSpan/length fails on the plant" sqlite . TestDeedSpan length sqlite/store.go \
+  's/CHECK (span_id IS NULL OR length(span_id) = 8)/CHECK (span_id IS NULL OR length(span_id) >= 8)/'
+
+go_row SP-04 sp60 "TestCreate rc=0" /w/go/sqlite test -run '^TestCreate$' .
+sp60_plant SP-04p "TestCreate fails on the plant" sqlite . TestCreate '' sqlite/store.go \
+  's/^\tif v != 2 || mode != "wal" {$/\tif v > 2 || v < 1 || mode != "wal" {/'
+sp60_plant SP-04q "TestCreate fails on the plant" sqlite . TestCreate '' sqlite/store.go \
+  's/"PRAGMA user_version = 2"/"PRAGMA user_version = 1"/'

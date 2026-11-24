@@ -55,10 +55,12 @@ CREATE TABLE state (
   PRIMARY KEY (id, cid)
 ) STRICT, WITHOUT ROWID;
 CREATE TABLE deed (
-  id  BLOB    NOT NULL PRIMARY KEY CHECK (length(id) = 16),
-  seq INTEGER NOT NULL,
-  ord INTEGER NOT NULL,
-  at  INTEGER NOT NULL
+  id       BLOB    NOT NULL PRIMARY KEY CHECK (length(id) = 16),
+  seq      INTEGER NOT NULL,
+  ord      INTEGER NOT NULL,
+  at       INTEGER NOT NULL,
+  trace_id BLOB    CHECK (trace_id IS NULL OR length(trace_id) = 16),
+  span_id  BLOB    CHECK (span_id IS NULL OR length(span_id) = 8)
 ) STRICT, WITHOUT ROWID;
 CREATE UNIQUE INDEX deed_order ON deed (seq, ord);
 CREATE TABLE deed_body (
@@ -147,15 +149,16 @@ func initialize(db *sql.DB) error {
 	if _, err := tx.Exec(schema); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("PRAGMA user_version = 1"); err != nil {
+	if _, err := tx.Exec("PRAGMA user_version = 2"); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
 // Open opens the store at path: a writer and a reader of one connection each. It never creates a file; a missing
-// path is an error. A file whose user version or journal mode is not the store's is refused with an error that
-// matches ErrSchema. Both connections are open when Open returns.
+// path is an error. A file whose user version or journal mode is not the store's (2 and wal) is refused with an
+// error that matches ErrSchema, and Open never migrates: a store of user version 1, whose deed table has no trace id
+// and span id, is refused too. Both connections are open when Open returns.
 func Open(path string) (*Store, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -188,7 +191,7 @@ func (s *Store) check() error {
 	if err := s.w.QueryRow("PRAGMA journal_mode").Scan(&mode); err != nil {
 		return fmt.Errorf("sqlite: open: %w", err)
 	}
-	if v != 1 || mode != "wal" {
+	if v != 2 || mode != "wal" {
 		return fmt.Errorf("sqlite: open: user_version %d, journal_mode %q: %w", v, mode, ErrSchema)
 	}
 	if err := s.r.Ping(); err != nil {

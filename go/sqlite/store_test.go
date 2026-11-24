@@ -146,16 +146,19 @@ func copyDeeds(deeds []ecd.Deed) []ecd.Deed {
 			}
 			ops[j] = op
 		}
-		cp[i] = ecd.Deed{ID: d.ID, Ord: d.Ord, Ops: ops}
+		cp[i] = ecd.Deed{ID: d.ID, Ord: d.Ord, TraceID: d.TraceID, SpanID: d.SpanID, Ops: ops}
 	}
 	return cp
 }
 
-// encodeDeed is the canonical encoding of a deed: its eid, its Ord, then for each op its code, eid, CID, value
-// length and value; integers are big-endian. A nil value and an empty one encode alike.
+// encodeDeed is the canonical encoding of a deed: its eid, its Ord, its trace id (16 bytes) and span id (8 bytes),
+// zero bytes for the zero values, then for each op its code, eid, CID, value length and value; integers are
+// big-endian. A nil value and an empty one encode alike.
 func encodeDeed(d ecd.Deed) []byte {
 	b := append([]byte(nil), d.ID[:]...)
 	b = binary.BigEndian.AppendUint32(b, d.Ord)
+	b = append(b, d.TraceID.Bytes()...)
+	b = append(b, d.SpanID.Bytes()...)
 	for _, op := range d.Ops {
 		b = append(b, byte(op.Code))
 		b = append(b, op.Entity[:]...)
@@ -642,9 +645,10 @@ func runHistory(t *testing.T, ec engineCase, s *sqlite.Store, seed uint64) *hist
 }
 
 // TestCreate holds the settings and the refusals of Create and Open. Create makes a file whose own connection reads
-// journal mode WAL, page size 4096, incremental auto-vacuum and user version 1; a second Create on the path matches
+// journal mode WAL, page size 4096, incremental auto-vacuum and user version 2; a second Create on the path matches
 // ErrExist and leaves the deed committed before it in the log; Open of a missing path fails and makes no file; Open
-// of a SQLite file with user version 0, or with user version 1 and a rollback journal, matches ErrSchema.
+// of a SQLite file with user version 0, of a store of user version 1 and of a file with user version 2 and a
+// rollback journal matches ErrSchema.
 func TestCreate(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "owner.db")
@@ -660,7 +664,7 @@ func TestCreate(t *testing.T) {
 		{"journal_mode", "wal"},
 		{"page_size", "4096"},
 		{"auto_vacuum", "2"},
-		{"user_version", "1"},
+		{"user_version", "2"},
 	} {
 		var got string
 		if err := db.QueryRow("PRAGMA " + p.pragma).Scan(&got); err != nil || got != p.want {
@@ -700,7 +704,8 @@ func TestCreate(t *testing.T) {
 		stmts []string
 	}{
 		{"user_version 0", true, []string{"CREATE TABLE t (a INTEGER)"}},
-		{"journal_mode delete", false, []string{"CREATE TABLE t (a INTEGER)", "PRAGMA user_version = 1"}},
+		{"user_version 1", true, []string{schemaV1, "PRAGMA user_version = 1"}},
+		{"journal_mode delete", false, []string{"CREATE TABLE t (a INTEGER)", "PRAGMA user_version = 2"}},
 	} {
 		p := filepath.Join(dir, fmt.Sprintf("other%d.db", i))
 		makeFile(t, p, c.wal, c.stmts...)
@@ -713,6 +718,31 @@ func TestCreate(t *testing.T) {
 		}
 	}
 }
+
+// schemaV1 is the schema of a store of user version 1, whose deed table has no trace_id and span_id.
+const schemaV1 = `CREATE TABLE entity (
+  id   BLOB    NOT NULL PRIMARY KEY CHECK (length(id) = 16),
+  seq  INTEGER NOT NULL,
+  gone INTEGER
+) STRICT, WITHOUT ROWID;
+CREATE TABLE state (
+  id    BLOB    NOT NULL REFERENCES entity (id) CHECK (length(id) = 16),
+  cid   INTEGER NOT NULL,
+  value BLOB,
+  seq   INTEGER NOT NULL,
+  PRIMARY KEY (id, cid)
+) STRICT, WITHOUT ROWID;
+CREATE TABLE deed (
+  id  BLOB    NOT NULL PRIMARY KEY CHECK (length(id) = 16),
+  seq INTEGER NOT NULL,
+  ord INTEGER NOT NULL,
+  at  INTEGER NOT NULL
+) STRICT, WITHOUT ROWID;
+CREATE UNIQUE INDEX deed_order ON deed (seq, ord);
+CREATE TABLE deed_body (
+  id   BLOB NOT NULL UNIQUE CHECK (length(id) = 16),
+  body BLOB NOT NULL
+) STRICT;`
 
 // makeFile makes a SQLite file at path through its own connection, sets the WAL journal when wal is true, and runs
 // each statement.

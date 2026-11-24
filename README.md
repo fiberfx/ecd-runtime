@@ -121,17 +121,17 @@ the parent directory. The main module `go/` does not require the driver.
 
 - `Create(path)` makes the store file. It refuses a path at which anything exists, with an error that matches
   `ErrExist`, and changes nothing. It sets the page size to 4096 bytes and auto-vacuum to incremental before the first
-  table, then the journal to WAL, then creates the schema and sets `user_version` to 1. After a failure it removes the
+  table, then the journal to WAL, then creates the schema and sets `user_version` to 2. After a failure it removes the
   files it made.
 - `Open(path)` returns the `Store`. It never creates a file, and a missing path is an error. It refuses a file whose
-  `user_version` is not 1 or whose journal mode is not WAL, with an error that matches `ErrSchema`. It opens one writer
+  `user_version` is not 2 or whose journal mode is not WAL, with an error that matches `ErrSchema`. It opens one writer
   connection and one reader connection, and each holds a connection before `Open` returns.
 - The writer opens an immediate transaction, with `busy_timeout` of 2000 ms, foreign keys on and `synchronous` FULL.
   The reader has `busy_timeout` of 2000 ms and `query_only` on.
 - `Store.Commit(deeds, out)` is the `rt.Committer`. It commits the deeds of one flush in one SQLite transaction and
   writes one `rt.Outcome` per deed into `out`.
 - `Store.Hydrate(e, cat)` loads every kind of residency `All` of the catalog into a fresh engine and returns the seq.
-  When it loads no kind and the seq is above 0, it calls the engine's `Start` with the seq.
+  When the catalog has no All kind and the seq is above 0, it calls the engine's `Start` with the seq.
 - `Store.Rows(k, ids, f)` calls `f` once, inside one read transaction, with the seq of the store and a `RowSource` of
   the stored values of the entities `ids` of kind `k`, in eid order and then CID order. The ids may be in any order and
   may repeat; an eid of another kind is an error before `f` is called. An entity that is not alive, or alive with no
@@ -141,12 +141,13 @@ the parent directory. The main module `go/` does not require the driver.
   error of `f` stops the walk and is returned unchanged. A body that does not decode matches `ErrSchema`.
 - `Store.Close` closes both connections, and a second `Close` returns nil.
 - `ErrExist` is matched by a `Create` that finds a file at its path. `ErrSchema` is matched by an `Open` of a file that
-  is not an owner store and by a `Log` that reads a malformed body.
+  is not an owner store of user version 2 and by a `Log` that reads a malformed body, trace id or span id.
 
 A `Store` is used on the owner goroutine only. The tables are `entity` (one row per entity, with the seq of its last
 change and the seq of its destroy), `state` (one row per component value of an entity, whatever its kind), `deed` and
 `deed_body` (the log). The seq of the store is the highest `seq` of `deed`, so only a transaction that commits a deed
-advances it.
+advances it. The store is at user version 2, whose `deed` also holds each deed's trace id and span id, NULL for the
+zero values; `Open` refuses a store of user version 1, written by `go/v0.4.0` to `go/v0.5.1`, and never migrates.
 
 ### Starting a host
 
@@ -218,8 +219,8 @@ deed whose transaction failed. Only a deed answered `Committed` reaches the engi
 - The store holds no outbox, no intents, no `_feed` or `_store` tables, no lineage and no replication, and it projects
   nothing to a lake. `wal_autocheckpoint` keeps the default of SQLite.
 - The state of a kind of residency `Touched` is written, and `Hydrate` loads none of it: it skips every Touched kind,
-  and when it loads no kind and the seq is above 0 it calls the engine's `Start`, which loads no kind. Only `Rows`
-  reads that state back, for the entities a host names; the store keeps no residency.
+  and when the catalog has no All kind and the seq is above 0 it calls the engine's `Start`, which loads no kind.
+  Only `Rows` reads that state back, for the entities a host names; the store keeps no residency.
 - An entity with no component value is alive in the store, and `Hydrate` cannot load it, since a `Row` of the hydration
   cannot name it. It is absent after a hydration.
 - One `state` table holds opaque values for every kind. The store has no typed tables, routes no query and keeps no
@@ -233,8 +234,9 @@ deed whose transaction failed. Only a deed answered `Committed` reaches the engi
 - On macOS the writer also sets `fullfsync` and `checkpoint_fullfsync`. The rows run on Linux and do not measure them.
 
 Rows SQ-01 to SQ-14, in `rows/groups/78-sq40.sh`, SQ-20 to SQ-22, in `rows/groups/79-sq50.sh`, SQ-30 with the
-plants SQ-22q and SQ-22r, in `rows/groups/80-fx51.sh`, L12-model, in `rows/groups/50-j0m.sh`, and MQ-01, in
-`rows/groups/85-mq60.sh`, measure the module. They load the driver and its modules from the offline module inputs.
+plants SQ-22q and SQ-22r, in `rows/groups/80-fx51.sh`, SP-03 and SP-04, in `rows/groups/82-sp60.sh`, L12-model, in
+`rows/groups/50-j0m.sh`, and MQ-01, in `rows/groups/85-mq60.sh`, measure the module. They load the driver and its
+modules from the offline module inputs.
 
 ## Rows
 

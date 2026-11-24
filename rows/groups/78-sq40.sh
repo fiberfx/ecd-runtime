@@ -199,7 +199,7 @@ sq40_plant SQ-12p "TestRefused fails on the plant" TestRefused commit.go \
 sq40_plant SQ-12q "TestRefused fails on the plant" TestRefused commit.go \
   's/^const sqlSpawn = `INSERT INTO entity (id, seq) VALUES (?1, ?2) ON CONFLICT DO NOTHING`$/const sqlSpawn = `INSERT OR REPLACE INTO entity (id, seq) VALUES (?1, ?2)`/'
 sq40_plant SQ-12c "TestRefused fails on the plant" TestRefused commit.go \
-  's/^const sqlDeed = `INSERT INTO deed (id, seq, ord, at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT (id) DO NOTHING`$/const sqlDeed = `INSERT INTO deed (id, seq, ord, at) VALUES (?1, ?2, ?3, ?4)`/'
+  's/^ON CONFLICT (id) DO NOTHING`$/`/'
 sq40_plant SQ-12r "TestRefusedAtomic fails on the plant" TestRefusedAtomic commit.go \
   's/if _, err := tx\.Exec("ROLLBACK TO deed"); err != nil {/if _, err := tx.Exec("SELECT 1"); err != nil {/'
 sq40_plant SQ-12s "TestRefused fails on the plant" TestRefused commit.go 's/if committed == 0 {/if false {/'

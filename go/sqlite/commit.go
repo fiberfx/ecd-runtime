@@ -15,8 +15,10 @@ var _ rt.Committer = (*Store)(nil)
 // sqlSeq is the store's seq: the highest committed deed.seq, or 0. Commit and Hydrate read it.
 const sqlSeq = `SELECT coalesce(max(seq), 0) FROM deed`
 
-// The statements of a deed and its ops. In each, ?1 is an eid.
-const sqlDeed = `INSERT INTO deed (id, seq, ord, at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT (id) DO NOTHING`
+// The statements of a deed and its ops. In each, ?1 is an eid. In sqlDeed, ?5 and ?6 are the deed's trace id and
+// span id, which bind NULL for the zero values.
+const sqlDeed = `INSERT INTO deed (id, seq, ord, at, trace_id, span_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+ON CONFLICT (id) DO NOTHING`
 
 const sqlBody = `INSERT INTO deed_body (id, body) VALUES (?1, ?2)`
 
@@ -109,7 +111,7 @@ func (s *Store) commit(deeds []ecd.Deed, out []rt.Outcome) (uint64, error) {
 // write writes one deed at seq and answers its outcome. Conflict and Refused each come from a statement that
 // changed no row.
 func write(tx *sql.Tx, d *ecd.Deed, seq, at int64) (rt.Outcome, error) {
-	ok, err := changed(tx.Exec(sqlDeed, d.ID[:], seq, int64(d.Ord), at))
+	ok, err := changed(tx.Exec(sqlDeed, d.ID[:], seq, int64(d.Ord), at, d.TraceID, d.SpanID))
 	if err != nil {
 		return 0, err
 	}

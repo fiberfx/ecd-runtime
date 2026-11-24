@@ -17,12 +17,12 @@ const sqlRows = `SELECT id, cid, value FROM state WHERE id >= ?1 AND id < ?2 ORD
 
 const sqlEntity = `SELECT id, cid, value FROM state WHERE id = ?1 ORDER BY cid`
 
-const sqlLog = `SELECT d.seq, d.ord, d.id, b.body FROM deed d JOIN deed_body b ON b.id = d.id WHERE d.seq > ?1
-ORDER BY d.seq, d.ord`
+const sqlLog = `SELECT d.seq, d.ord, d.id, d.trace_id, d.span_id, b.body FROM deed d JOIN deed_body b ON b.id = d.id
+WHERE d.seq > ?1 ORDER BY d.seq, d.ord`
 
 // Hydrate loads every All kind of cat into e from one read transaction on the reader: it reads the store's seq,
 // then, for each All kind in catalog order, the stored values of the kind's eid range in eid order, which
-// e.Hydrate loads at that seq. Touched kinds are skipped. When no All kind was loaded and the seq is above 0,
+// e.Hydrate loads at that seq. Touched kinds are skipped. When cat has no All kind and the seq is above 0,
 // Hydrate calls e.Start with the seq, so that a new engine takes it with no kind loaded. Hydrating an All kind makes
 // the engine serve it from memory; until an engine is admitted to serve All kinds, a product passes a catalog
 // without All kinds and reads their entities with Rows. An error stops, rolls the transaction back and is returned
@@ -196,11 +196,11 @@ func (s *Store) Log(after uint64, f func(seq uint64, d ecd.Deed) error) error {
 	defer rows.Close()
 	for rows.Next() {
 		var seq, ord int64
-		var id, body []byte
-		if err := rows.Scan(&seq, &ord, &id, &body); err != nil {
+		var id, trace, span, body []byte
+		if err := rows.Scan(&seq, &ord, &id, &trace, &span, &body); err != nil {
 			return fmt.Errorf("sqlite: log: %w", err)
 		}
-		d, err := decodeDeed(id, ord, body)
+		d, err := decodeDeed(id, ord, trace, span, body)
 		if err != nil {
 			return fmt.Errorf("sqlite: log: seq %d: %w", seq, err)
 		}
@@ -214,10 +214,11 @@ func (s *Store) Log(after uint64, f func(seq uint64, d ecd.Deed) error) error {
 	return nil
 }
 
-// decodeDeed rebuilds a deed from its stored eid, its ord and its body, the encoding of encodeBody. A value of
-// length 0 decodes as nil. An eid of another length than 16, an ord out of range, a body that ends inside an op and
-// a value length past the body's end each match ErrSchema.
-func decodeDeed(id []byte, ord int64, body []byte) (ecd.Deed, error) {
+// decodeDeed rebuilds a deed from its stored eid, its ord, its trace id, its span id and its body, the encoding of
+// encodeBody. A NULL trace id or span id decodes as the zero value, and a value of length 0 as nil. An eid of another
+// length than 16, an ord out of range, a trace id or span id that ecd.TraceIDFromBytes or ecd.SpanIDFromBytes
+// refuses, a body that ends inside an op and a value length past the body's end each match ErrSchema.
+func decodeDeed(id []byte, ord int64, trace, span, body []byte) (ecd.Deed, error) {
 	d := ecd.Deed{}
 	var err error
 	if d.ID, err = entity(id); err != nil {
@@ -227,6 +228,16 @@ func decodeDeed(id []byte, ord int64, body []byte) (ecd.Deed, error) {
 		return ecd.Deed{}, fmt.Errorf("sqlite: ord %d: %w", ord, ErrSchema)
 	}
 	d.Ord = uint32(ord)
+	if trace != nil {
+		if d.TraceID, err = ecd.TraceIDFromBytes(trace); err != nil {
+			return ecd.Deed{}, fmt.Errorf("sqlite: trace id: %w: %w", err, ErrSchema)
+		}
+	}
+	if span != nil {
+		if d.SpanID, err = ecd.SpanIDFromBytes(span); err != nil {
+			return ecd.Deed{}, fmt.Errorf("sqlite: span id: %w: %w", err, ErrSchema)
+		}
+	}
 	for b := body; len(b) > 0; {
 		if len(b) < opHead {
 			return ecd.Deed{}, fmt.Errorf("sqlite: deed body ends inside an op: %w", ErrSchema)

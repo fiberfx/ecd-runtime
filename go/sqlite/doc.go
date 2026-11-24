@@ -9,8 +9,9 @@
 //     The row of a destroyed entity is a tombstone that is never deleted, so its eid is never spawned again.
 //   - state: one row per component value of a live entity, of every kind, keyed by eid and CID. A value of length
 //     0, a tag or a nil value, is stored as NULL.
-//   - deed: one row per committed deed: its eid, the seq of its transaction, its Ord and the commit time in Unix
-//     milliseconds, which is kept for audit only.
+//   - deed: one row per committed deed: its eid, the seq of its transaction, its Ord, the commit time in Unix
+//     milliseconds, which is kept for audit only, and the deed's trace id (16 bytes) and span id (8 bytes), each
+//     NULL for its zero value.
 //   - deed_body: the ops of each committed deed, for replay: for each op in list order, its code (1 byte), its
 //     entity (16 bytes), its CID (2 bytes) and its value's length (4 bytes), both big-endian, then the value.
 //
@@ -47,7 +48,7 @@
 // no value of a Touched kind; Rows reads such values back for given entities. Log yields the deeds above a seq, in
 // seq order, then Ord order, from one read transaction.
 //
-// When no All kind was loaded and the seq is above 0, Hydrate calls the engine's Start at the seq, so that a new
+// When the catalog has no All kind and the seq is above 0, Hydrate calls the engine's Start at the seq, so that a new
 // engine takes it with no kind loaded. Hydrating an All kind makes the engine serve it from memory; until an engine
 // is admitted to serve All kinds, a product passes Hydrate a catalog without All kinds and reads their entities with
 // Rows. Rows yields the stored values of given entities of one kind, in eid order, then CID order, with the store's
@@ -56,8 +57,8 @@
 // # Settings
 //
 // Create refuses a path where anything exists. It sets page_size 4096 and auto_vacuum INCREMENTAL before the first
-// table, then journal_mode WAL, and writes the schema and user_version 1 in one transaction. Open never creates a
-// file, and refuses a file whose user_version is not 1 or whose journal_mode is not wal. The writer is one
+// table, then journal_mode WAL, and writes the schema and user_version 2 in one transaction. Open never creates or
+// migrates a file, and refuses a file whose user_version is not 2 or whose journal_mode is not wal. The writer is one
 // connection with busy_timeout 2000 ms, foreign_keys on, synchronous FULL and, on darwin, fullfsync and
 // checkpoint_fullfsync; each of its transactions begins BEGIN IMMEDIATE. The reader is one connection with
 // busy_timeout 2000 ms and query_only. wal_autocheckpoint keeps SQLite's default.
