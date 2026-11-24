@@ -242,7 +242,7 @@ func TestJ1_05(t *testing.T) {
 	}
 }
 
-// TestJ1_10 (J1-10, L-3): record 0 is reserved and never alive; the first spawn takes index 1 with
+// TestJ1_10 (J1-10): record 0 is reserved and never alive; the first spawn takes index 1 with
 // generation 0; no spawn returns the null handle.
 func TestJ1_10(t *testing.T) {
 	ks := j1Kinds()

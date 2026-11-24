@@ -1,7 +1,7 @@
 # Group i2b of Ecd Runtime: I2B-01 to I2B-04 and their plants (the rows ending in p).
 # Package ecd (go/ecd): the seam's hardening. Apply is all or nothing, in a check pass and a commit pass; QueryDef holds
 # an Any term; ErrOp is the tenth sentinel; the host's one Minter is the only minter; the catalog names are ecd_*.
-# Sourced by rows/loom.rows.sh from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
 #
 #   row     check
 #   I2B-01  QueryDef has a field Any of type []ecd.CID, between None and Exact (TestSeamQueryAny)

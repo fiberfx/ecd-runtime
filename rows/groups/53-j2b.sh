@@ -1,5 +1,5 @@
 # Group j2b of Ecd Runtime: archetypes and the graph of package jacquard.
-# Sourced by rows/loom.rows.sh from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
 #
 #   J04      after random withAdd/withRemove walks over 3 kinds, every edge equals find(kind, mask with the bit toggled)
 #            and has its back edge (TestGraphEdges, JI3)

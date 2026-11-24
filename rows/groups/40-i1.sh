@@ -2,7 +2,7 @@
 # The vectors of ecd-id v0.8.0 (go/ecd/testdata/eid, pinned by SHA256SUMS) run through the encodings of the eid the
 # module requires: MarshalText, UnmarshalText, Value and Scan. The run's inputs folder is
 # /home/jonny/.local/share/ech/mx-box/loom-inputs-080, which holds ecd-id v0.8.0 only.
-# Sourced by rows/loom.rows.sh from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
 #
 #   row    check
 #   I1-01  every valid.tsv id: UnmarshalText gives the bytes of its hex, MarshalText its text, Value its 16 bytes, Scan of them the id; the fields agree

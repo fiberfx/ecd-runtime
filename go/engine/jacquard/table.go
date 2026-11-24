@@ -172,8 +172,9 @@ func (t *table) ptr(row uint32, col int) unsafe.Pointer {
 	return t.slot(ch, i, col)
 }
 
-// set copies the value at src into column col of a row and stamps the column. src is read, never kept.
-// A pointer-holding column is copied as a typed value (L-7).
+// set copies the value at src into column col of a row and stamps the column. src is read, never kept. A
+// pointer-holding column is copied as a typed value; a pointer, slice or string inside the value is copied as a
+// reference, so the caller passes a value that owns its memory (E4).
 func (t *table) set(row uint32, col int, src unsafe.Pointer) {
 	ch, i := t.locate(row)
 	copyElem(t.defs[col], t.slot(ch, i, col), src)
