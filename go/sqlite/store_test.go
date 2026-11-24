@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	eid "github.com/fiberfx/ecd-id/go"
@@ -1008,7 +1009,8 @@ func TestRefusedAtomic(t *testing.T) {
 // TestHydrateTouchedOnly holds that Hydrate brings a new engine to the store's seq when the catalog declares no All
 // kind. After two committed transactions, a fresh engine over a catalog of one Touched kind is at seq 2 and Hydrate
 // returns 2; a third commit then returns seq 3, and its Apply at 3 succeeds and makes the spawned entity resident,
-// on the reference model and on Jacquard.
+// on the reference model and on Jacquard. An engine already at seq 1 is refused: Hydrate returns an error that
+// matches ecd.ErrGap and names the Touched kind.
 func TestHydrateTouchedOnly(t *testing.T) {
 	cat := &ecd.Catalog{
 		Components: storeCatalog().Components,
@@ -1040,6 +1042,19 @@ func TestHydrateTouchedOnly(t *testing.T) {
 		}
 		if v, err := ens[i].Get(c, cidOne, nil); ens[i].At() != 3 || err != nil || !bytes.Equal(v, vc) {
 			t.Fatalf("%s: after Apply(3): At() %d, Get(C, 1) %x, %v; want 3, %x", ec.name, ens[i].At(), v, err, vc)
+		}
+	}
+
+	kind := fmt.Sprint(kindTouch)
+	for _, ec := range engineCases {
+		en := openEngine(t, ec, cat)
+		if err := en.Hydrate(kindTouch, 1, emptyRows{}); err != nil || en.At() != 1 {
+			t.Fatalf("%s: Hydrate(bbb, 1) of the engine: At() %d, %v; want 1, nil", ec.name, en.At(), err)
+		}
+		_, err := s.Hydrate(en, cat)
+		if !errors.Is(err, ecd.ErrGap) || !strings.Contains(err.Error(), kind) {
+			t.Fatalf("%s: Hydrate of an engine at seq 1, store at 3: %v; want an error that matches ErrGap and "+
+				"names the kind %s", ec.name, err, kind)
 		}
 	}
 }
