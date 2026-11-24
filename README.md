@@ -1,17 +1,18 @@
-# Ecd Loom
+# Ecd Runtime
 
-Ecd Loom is the entity store and runtime of an owner process. Callers change state only through deeds. The SQLite
+Ecd Runtime is the entity store and runtime of an owner process. Callers change state only through deeds. The SQLite
 owner store records every deed, and engines answer reads from memory. Jacquard is the archetype engine.
 
-The contract is the Ecd specification `ecd_loom.specs.md`. This repository holds the implementation.
+The contract is `specs/ecd_runtime/ecd_runtime.specs.md` in the KAN home `/Users/jonny/dev/ecd/kan`. This repository
+holds the implementation.
 
 ## Layout
 
 | Path | Content |
 |---|---|
-| `go/` | The Go module `github.com/fiberfx/ecd-loom/go`. |
+| `go/` | The Go module `github.com/fiberfx/ecd-runtime/go`. |
 | `go/engine/jacquard/` | Jacquard, the archetype engine. Its files that port Ark files name their source file in their header; the cut in `go/third_party/ark/` is the source. |
-| `go/third_party/ark/` | Ark, the `ark` reference engine, copied byte for byte. It is a nested Go module and is not a dependency of the Loom module. `SOURCE.txt` names the commit. |
+| `go/third_party/ark/` | Ark, the `ark` reference engine, copied byte for byte. It is a nested Go module and is not a dependency of the Ecd Runtime module. `SOURCE.txt` names the commit. |
 | `go/NOTICE` | The attribution for the code derived from Ark. |
 | `rows/loom.rows.sh` | The rows script. |
 

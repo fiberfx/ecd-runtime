@@ -1,4 +1,4 @@
-// Package jacquard is Loom's archetype engine.
+// Package jacquard is the archetype engine of Ecd Runtime.
 //
 // Engine is the central type of the package. An entity is known by two names: the eid is its durable key and
 // crosses every boundary, and Entity is the process-local handle that the hot paths use and that never leaves

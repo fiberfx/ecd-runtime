@@ -1,4 +1,4 @@
-# Group cut of Ecd Loom: AK1, AK2 and AK2p.
+# Group cut of Ecd Runtime: AK1, AK2 and AK2p.
 # Sourced by rows/loom.rows.sh from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
 go_row AK1 cut "go test ./... rc=0 in third_party/ark" /w/go/third_party/ark test ./...
 if sel AK2 cut || sel AK2p cut; then

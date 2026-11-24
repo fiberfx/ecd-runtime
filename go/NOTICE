@@ -1,4 +1,4 @@
-Ecd Loom contains code derived from Ark (github.com/mlange-42/ark).
+Ecd Runtime contains code derived from Ark (github.com/mlange-42/ark).
 
   third_party/ark/     Ark at commit 723f2ac, copied verbatim. SOURCE.txt names the commit and the copied paths.
   engine/jacquard/     Jacquard, the archetype engine. Jacquard's files that port Ark files name their source file in

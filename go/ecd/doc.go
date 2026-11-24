@@ -1,4 +1,4 @@
-// Package ecd holds the types that Ecd Loom builds over the Ecd ID (package eid, github.com/fiberfx/ecd-id/go):
+// Package ecd holds the types that Ecd Runtime builds over the Ecd ID (package eid, github.com/fiberfx/ecd-id/go):
 // Kind and the byte ranges of a kind, TraceID and SpanID, and the Engine seam that every engine implements.
 //
 // An eid is used as eid.ID and is never wrapped. The eid is the identity at every boundary: the seam takes and

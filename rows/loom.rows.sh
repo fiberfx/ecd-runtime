@@ -1,11 +1,11 @@
 #!/bin/sh
-# Rows of Ecd Loom: the checks of the repository, run offline from the root of the unpacked tree (/w).
+# Rows of Ecd Runtime: the checks of the repository, run offline from the root of the unpacked tree (/w).
 # The script needs the Go toolchain and git. Rows sit in groups, and ROWS selects them.
 #
 # Run command (flow:row-container, image mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2, whose /usr/local/go is
 # go1.27.4; the module's floor is go 1.27):
 #   kan flow run flow:row-container --param script=rows/loom.rows.sh \
-#     --param checkout=/Users/jonny/dev/ecd/ecd-loom --param revision=SHA --param paths='go rows' --param name=loom \
+#     --param checkout=/Users/jonny/dev/ecd/ecd-runtime --param revision=SHA --param paths='go rows' --param name=rt \
 #     --param image=mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2 \
 #     [--param inputs=DIR] \
 #     --param cpus=2 --param memory=4g --param timeout=1800

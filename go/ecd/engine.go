@@ -71,7 +71,7 @@ const (
 	OpDestroy
 )
 
-// Op is one change. Value is the component's value in the Loom codec, or nil for a tag,
+// Op is one change. Value is the component's value in the Ecd Runtime codec, or nil for a tag,
 // an unset, a spawn's header op and a destroy. A spawn is one OpSpawn followed by its OpSet ops.
 type Op struct {
 	Code   OpCode
@@ -143,7 +143,7 @@ type Engine interface {
 	// ErrMiss: not resident (Touched). ErrAbsent: resident, and the entity or component is absent.
 	Get(id eid.ID, c CID, dst []byte) ([]byte, error)
 
-	// Query runs a declared query. arg holds its parameters in the Loom codec (empty for none).
+	// Query runs a declared query. arg holds its parameters in the Ecd Runtime codec (empty for none).
 	Query(q QID, arg []byte, out *Answer) error
 
 	Stats() Stats
