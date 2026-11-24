@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"math/rand/v2"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -84,7 +85,22 @@ type jcPlan struct {
 	deeds     []ecd.Deed
 	spawned   []eid.ID
 	destroyed []eid.ID
-	want      string // the class that both engines must answer
+	wants     []string // the class of each fault that the transaction carries; none for a valid one
+}
+
+// want returns the class that both engines must answer: nil for a valid transaction, the class of the one fault,
+// ErrGap when a gap is among several faults (it is checked before any op), and "" when several faults leave the
+// first one in commit order to decide; the answer is then one of wants and the model is the reference.
+func (p *jcPlan) want() string {
+	switch {
+	case len(p.wants) == 0:
+		return "nil"
+	case len(p.wants) == 1:
+		return p.wants[0]
+	case slices.Contains(p.wants, "ErrGap"):
+		return "ErrGap"
+	}
+	return ""
 }
 
 // jcSim drives the Engine and the model with the same seeded random transactions.
@@ -156,52 +172,108 @@ func (s *jcSim) put(acts [][][]ecd.Op, action []ecd.Op) {
 	acts[d] = slices.Insert(acts[d], s.rng.IntN(len(acts[d])+1), action)
 }
 
-// build returns the next transaction: one to four deeds of random Ord, each of one to four entity actions that
-// spawn an entity with up to three Sets, set and unset components of a live entity, or destroy one (one in
-// five). No entity is touched by two actions. With a chance of one in five the transaction carries one fault
-// that the check pass refuses, and with a chance of one in fifty one fault that only the commit pass finds.
+// revive returns a destroyed eid that the transaction does not touch, one time in six. A later Spawn of it is
+// accepted by both engines: only the store refuses such a Spawn, and the comparison fixes that the two engines
+// answer alike and that the new entity holds the new values.
+func (s *jcSim) revive(touched map[eid.ID]bool) (eid.ID, bool) {
+	if len(s.dead) == 0 || s.rng.IntN(6) != 0 {
+		return eid.ID{}, false
+	}
+	id := s.dead[s.rng.IntN(len(s.dead))]
+	return id, !touched[id]
+}
+
+// scatter puts the ops of one entity into the deeds in commit order: one piece in one deed, or two or three
+// consecutive pieces in deeds that commit in turn, so that the deed order decides the entity's final state.
+// The deed of each piece is order[pos], with pos not decreasing along the pieces.
+func (s *jcSim) scatter(acts [][][]ecd.Op, order []int, ords []uint32, ops []ecd.Op) {
+	k := 1
+	if len(ops) >= 2 && s.rng.IntN(3) == 0 {
+		k = min(len(ops), 2+s.rng.IntN(2))
+	}
+	cuts := []int{0, len(ops)}
+	for len(cuts) < k+1 {
+		if c := 1 + s.rng.IntN(len(ops)-1); !slices.Contains(cuts, c) {
+			cuts = append(cuts, c)
+		}
+	}
+	slices.Sort(cuts)
+	pos := make([]int, k)
+	for i := range pos {
+		pos[i] = s.rng.IntN(len(order))
+	}
+	slices.Sort(pos)
+	for i := range pos {
+		d := order[pos[i]]
+		acts[d] = append(acts[d], ops[cuts[i]:cuts[i+1]])
+		if ords[d] != ords[order[pos[0]]] {
+			s.counts["split"]++
+		}
+	}
+}
+
+// build returns the next transaction: one to four deeds of random Ord, equal Ord included, and for each deed one
+// to four entity actions on average. An action spawns an entity (a fresh eid, or sometimes a destroyed one) with
+// up to three Set or Unset ops, sets and unsets components of a live entity, or destroys one (one in five). No
+// entity has two actions, but one action may be split over several deeds of different Ord, so that the commit
+// order of the deeds decides its result. With a chance of one in five the transaction carries a fault that the
+// check pass refuses, and one time in four of those two or three, which leaves the first in commit order to
+// decide; with a chance of one in fifty it carries one fault that only the commit pass finds.
 func (s *jcSim) build() *jcPlan {
-	p := &jcPlan{seq: s.en.appliedAt() + 1, want: "nil"}
-	acts := make([][][]ecd.Op, 1+s.rng.IntN(4))
+	p := &jcPlan{seq: s.en.appliedAt() + 1}
+	nd := 1 + s.rng.IntN(4)
+	ords := make([]uint32, nd)
+	order := make([]int, nd)
+	for i := range ords {
+		ords[i], order[i] = uint32(s.rng.IntN(4)), i
+	}
+	slices.SortStableFunc(order, func(a, b int) int { return int(ords[a]) - int(ords[b]) })
+	acts := make([][][]ecd.Op, nd)
 	touched := map[eid.ID]bool{}
-	for d := range acts {
-		for n := 1 + s.rng.IntN(4); n > 0; n-- {
-			if len(s.live) == 0 || s.rng.IntN(10) < 3 {
-				id := s.fresh()
-				touched[id] = true
-				ops := []ecd.Op{j3Spawn(id)}
-				for k := s.rng.IntN(4); k > 0; k-- {
-					ops = append(ops, s.randOp(id))
-				}
-				p.spawned = append(p.spawned, id)
-				acts[d] = append(acts[d], ops)
-				continue
-			}
-			id := s.live[s.rng.IntN(len(s.live))]
-			if touched[id] {
-				continue
+	for n := nd * (1 + s.rng.IntN(4)); n > 0; n-- {
+		if len(s.live) == 0 || s.rng.IntN(10) < 3 {
+			id, ok := s.revive(touched)
+			if !ok {
+				id = s.fresh()
 			}
 			touched[id] = true
-			var ops []ecd.Op
-			if s.rng.IntN(5) == 0 {
-				ops = []ecd.Op{j3Destroy(id)}
-				p.destroyed = append(p.destroyed, id)
-			} else {
-				for k := 1 + s.rng.IntN(4); k > 0; k-- {
-					ops = append(ops, s.randOp(id))
-				}
+			ops := []ecd.Op{j3Spawn(id)}
+			for k := s.rng.IntN(4); k > 0; k-- {
+				ops = append(ops, s.randOp(id))
 			}
-			acts[d] = append(acts[d], ops)
+			p.spawned = append(p.spawned, id)
+			s.scatter(acts, order, ords, ops)
+			continue
 		}
+		id := s.live[s.rng.IntN(len(s.live))]
+		if touched[id] {
+			continue
+		}
+		touched[id] = true
+		var ops []ecd.Op
+		if s.rng.IntN(5) == 0 {
+			ops = []ecd.Op{j3Destroy(id)}
+			p.destroyed = append(p.destroyed, id)
+		} else {
+			for k := 1 + s.rng.IntN(4); k > 0; k-- {
+				ops = append(ops, s.randOp(id))
+			}
+		}
+		s.scatter(acts, order, ords, ops)
 	}
 	switch x := s.rng.IntN(100); {
 	case x < 20:
 		s.checkFault(p, acts, touched)
+		if s.rng.IntN(4) == 0 {
+			for k := 1 + s.rng.IntN(2); k > 0; k-- {
+				s.checkFault(p, acts, touched)
+			}
+		}
 	case x < 22:
 		acts = s.commitFault(p, acts)
 	}
 	for d := range acts {
-		p.deeds = append(p.deeds, ecd.Deed{Ord: uint32(s.rng.IntN(4)), Ops: slices.Concat(acts[d]...)})
+		p.deeds = append(p.deeds, ecd.Deed{Ord: ords[d], Ops: slices.Concat(acts[d]...)})
 	}
 	return p
 }
@@ -214,10 +286,10 @@ func (s *jcSim) checkFault(p *jcPlan, acts [][][]ecd.Op, touched map[eid.ID]bool
 		s.next++
 		bad := j1ID(s.t, s.other, s.next)
 		s.put(acts, [][]ecd.Op{{j3Spawn(bad)}, {j3Set(bad, j3U64, j3Num(1))}, {j3Destroy(bad)}}[s.rng.IntN(3)])
-		p.want = "ErrKind"
+		p.wants = append(p.wants, "ErrKind")
 	case 1: // an undeclared CID
 		s.put(acts, []ecd.Op{j3Spawn(x), j3Set(x, 99, nil)})
-		p.want = "ErrOp"
+		p.wants = append(p.wants, "ErrOp")
 	case 2: // a value one byte short or long
 		c := ecd.CID(1 + s.rng.IntN(3))
 		n := j3Size[c] + 1
@@ -225,27 +297,28 @@ func (s *jcSim) checkFault(p *jcPlan, acts [][][]ecd.Op, touched map[eid.ID]bool
 			n = j3Size[c] - 1
 		}
 		s.put(acts, []ecd.Op{j3Spawn(x), j3Set(x, c, make([]byte, n))})
-		p.want = "ErrOp"
+		p.wants = append(p.wants, "ErrOp")
 	case 3: // a tag Set with a value
 		s.put(acts, []ecd.Op{j3Spawn(x), j3Set(x, j3TagA+ecd.CID(s.rng.IntN(2)), make([]byte, 1+s.rng.IntN(3)))})
-		p.want = "ErrOp"
+		p.wants = append(p.wants, "ErrOp")
 	case 4: // an op code that does not exist
 		s.put(acts, []ecd.Op{{Code: []ecd.OpCode{0, 9}[s.rng.IntN(2)], Entity: x}})
-		p.want = "ErrOp"
+		p.wants = append(p.wants, "ErrOp")
 	case 5: // a second Spawn of an eid, in the same deed or a later one
 		s.put(acts, []ecd.Op{j3Spawn(x)})
 		s.put(acts, []ecd.Op{j3Spawn(x)})
-		p.want = "ErrOp"
+		p.wants = append(p.wants, "ErrOp")
 	case 6: // a Set before the Spawn of its eid
 		s.put(acts, []ecd.Op{j3Set(x, j3U64, j3Num(1)), j3Spawn(x)})
-		p.want = "ErrOp"
+		p.wants = append(p.wants, "ErrOp")
 	case 7: // an op after the Destroy of its eid
 		y, ok := s.untouched(touched)
 		if !ok {
 			return
 		}
+		touched[y] = true
 		s.put(acts, []ecd.Op{j3Destroy(y), j3Set(y, j3U64, j3Num(1))})
-		p.want = "ErrOp"
+		p.wants = append(p.wants, "ErrOp")
 	case 8: // a Spawn and a Destroy of one eid
 		if s.rng.IntN(2) == 0 {
 			s.put(acts, []ecd.Op{j3Spawn(x), j3Destroy(x)})
@@ -253,20 +326,20 @@ func (s *jcSim) checkFault(p *jcPlan, acts [][][]ecd.Op, touched map[eid.ID]bool
 			s.put(acts, []ecd.Op{j3Spawn(x)})
 			s.put(acts, []ecd.Op{j3Destroy(x)})
 		}
-		p.want = "ErrOp"
+		p.wants = append(p.wants, "ErrOp")
 	case 9: // a gap ahead
 		p.seq = s.en.appliedAt() + 2
-		p.want = "ErrGap"
+		p.wants = append(p.wants, "ErrGap")
 	default: // a repeat of the applied seq
 		p.seq = s.en.appliedAt()
-		p.want = "ErrGap"
+		p.wants = append(p.wants, "ErrGap")
 	}
 }
 
 // commitFault adds one fault that only the commit pass finds: a Set of an eid that was never spawned, or a
 // transaction that is only the Spawn of a live eid. Both engines answer ecd.ErrStale.
 func (s *jcSim) commitFault(p *jcPlan, acts [][][]ecd.Op) [][][]ecd.Op {
-	p.want = "ErrStale"
+	p.wants = append(p.wants, "ErrStale")
 	if len(s.live) > 0 && s.rng.IntN(2) == 0 {
 		return [][][]ecd.Op{{{j3Spawn(s.live[s.rng.IntN(len(s.live))])}}}
 	}
@@ -274,8 +347,15 @@ func (s *jcSim) commitFault(p *jcPlan, acts [][][]ecd.Op) [][][]ecd.Op {
 	return acts
 }
 
-// accept records the effect of a transaction that both engines accepted.
+// accept records the effect of a transaction that both engines accepted. A spawned eid that was destroyed
+// before is live again.
 func (s *jcSim) accept(p *jcPlan) {
+	for _, id := range p.spawned {
+		if i := slices.Index(s.dead, id); i >= 0 {
+			s.dead = slices.Delete(s.dead, i, i+1)
+			s.counts["respawn"]++
+		}
+	}
 	s.live = append(s.live, p.spawned...)
 	for _, id := range p.destroyed {
 		i := slices.Index(s.live, id)
@@ -311,17 +391,53 @@ func (s *jcSim) compareAll(step int) {
 	s.get(step, j1ID(s.t, s.other, 1), j3U64)
 }
 
-// step applies one transaction to both engines and compares the answers, At() and every Get.
+// jcClone returns a deep copy of deeds: the deeds, their ops and the value of each op. A nil slice stays nil
+// and an empty one stays empty.
+func jcClone(deeds []ecd.Deed) []ecd.Deed {
+	out := slices.Clone(deeds)
+	for i := range out {
+		out[i].Ops = slices.Clone(deeds[i].Ops)
+		for j := range out[i].Ops {
+			out[i].Ops[j].Value = slices.Clone(out[i].Ops[j].Value)
+		}
+	}
+	return out
+}
+
+// jcScribble overwrites every value of deeds, as a caller that reuses its buffers does.
+func jcScribble(deeds []ecd.Deed) {
+	for _, d := range deeds {
+		for _, op := range d.Ops {
+			for i := range op.Value {
+				op.Value[i] ^= 0xA5
+			}
+		}
+	}
+}
+
+// step applies one transaction to both engines and compares the answers, At() and every Get. The model gets a
+// deep copy made before the Engine runs, so a transaction that the Engine changes is not changed for the model;
+// the Engine must leave the caller's deeds as they were, order and values, and must not keep a value that the
+// caller overwrites after Apply.
 func (s *jcSim) step(n int) {
 	s.t.Helper()
 	p := s.build()
+	forModel, orig := jcClone(p.deeds), jcClone(p.deeds)
 	errE := s.en.apply(p.seq, p.deeds)
-	errM := s.m.Apply(p.seq, p.deeds)
+	if !reflect.DeepEqual(p.deeds, orig) {
+		s.t.Fatalf("seed %d step %d: apply(%d) changed the caller's deeds: %v, was %v", s.seed, n, p.seq, p.deeds, orig)
+	}
+	errM := s.m.Apply(p.seq, forModel)
+	jcScribble(p.deeds)
 	ce, cm := jcClass(errE), jcClass(errM)
-	if ce != cm || ce != p.want {
-		s.t.Fatalf("seed %d step %d: apply(%d): engine %q (%v), model %q (%v), want %q", s.seed, n, p.seq, ce, errE, cm, errM, p.want)
+	want := p.want()
+	if ce != cm || (want != "" && ce != want) || (want == "" && !slices.Contains(p.wants, ce)) {
+		s.t.Fatalf("seed %d step %d: apply(%d): engine %q (%v), model %q (%v), want %q of %v", s.seed, n, p.seq, ce, errE, cm, errM, want, p.wants)
 	}
 	s.counts[ce]++
+	if len(p.wants) > 1 {
+		s.counts["multi"]++
+	}
 	if s.en.appliedAt() != s.m.At() {
 		s.t.Fatalf("seed %d step %d: engine at %d, model at %d", s.seed, n, s.en.appliedAt(), s.m.At())
 	}
@@ -346,8 +462,10 @@ func (s *jcSim) step(n int) {
 
 // TestCompare (JC-01): four seeds of 2,000 random transactions run through the Engine and the reference model.
 // After each one the answer class, At() and every Get, byte for byte on success and on error, are equal. The
-// transactions include spawns that stay bare, tag Sets with a nil and with an empty value, out-of-order Ord, the
-// faults that the check pass refuses, and the faults that make both engines stale and start a new episode.
+// transactions include spawns that stay bare, tag Sets with a nil and with an empty value, Ord that differs from
+// the list order, one entity touched from several deeds of different Ord, the respawn of a destroyed eid, the
+// faults that the check pass refuses (one or several in one transaction), and the faults that make both engines
+// stale and start a new episode.
 func TestCompare(t *testing.T) {
 	for seed := uint64(1); seed <= 4; seed++ {
 		s := jcNewSim(t, seed)
@@ -355,9 +473,9 @@ func TestCompare(t *testing.T) {
 			s.step(n)
 		}
 		t.Logf("seed %d: answers %v", seed, s.counts)
-		for _, class := range []string{"nil", "ErrGap", "ErrKind", "ErrOp", "ErrStale"} {
+		for _, class := range []string{"nil", "ErrGap", "ErrKind", "ErrOp", "ErrStale", "multi", "split", "respawn"} {
 			if s.counts[class] == 0 {
-				t.Errorf("seed %d: no transaction was answered %s", seed, class)
+				t.Errorf("seed %d: no transaction counted as %s", seed, class)
 			}
 		}
 	}

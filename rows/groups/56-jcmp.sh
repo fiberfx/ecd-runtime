@@ -2,12 +2,16 @@
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
 #
 #   JC-01    the Engine and the reference model answer alike, in answer class and in every byte that Get returns, on four
-#            seeds of 2,000 random transactions: valid ones with out-of-order Ord, tag values nil and empty, bare spawns
-#            and destroys; refused ones (kind, CID, value length, op order, gap); and ones that make both stale
-#            (TestCompare)
+#            seeds of 2,000 random transactions: valid ones with Ord that differs from the list order, one entity
+#            touched from deeds of different Ord, tag values nil and empty, bare spawns, destroys and respawns; refused
+#            ones (kind, CID, value length, op order, gap), also several faults in one transaction; and ones that make
+#            both stale. The model gets a deep copy, the Engine leaves the caller's deeds unchanged and keeps no
+#            caller buffer (TestCompare)
 #   JC-01p   plant: the check pass lets a second Spawn of one eid through (engine.go)
 #   JC-01pt  plant: the check pass refuses an empty non-nil tag value (engine.go)
 #   JC-01pd  plant: get drops the caller's buffer when the entity lacks the component (engine.go)
+#   JC-01po  plant: the commit pass reads the deeds in list order, not Ord order (engine.go)
+#   JC-01pg  plant: get returns the caller's buffer without the value (engine.go)
 #
 # jc_plant id expect test file sedexpr [flags]: copies /w/go to a temporary directory, applies the one-line sed to
 # engine/jacquard/<file> and runs only the named test there. KILLED: the test failed. SURVIVED: it passed.
@@ -37,3 +41,5 @@ go_row JC-01 jcmp "TestCompare rc=0" /w/go test -run '^TestCompare$' ./engine/ja
 jc_plant JC-01p "TestCompare fails on the plant" TestCompare engine.go 's/if op\.Code == ecd\.OpSpawn && st\.ops > 0 {/if false {/'
 jc_plant JC-01pt "TestCompare fails on the plant" TestCompare engine.go 's/case cd\.tag && len(op\.Value) != 0:/case cd.tag \&\& op.Value != nil:/'
 jc_plant JC-01pd "TestCompare fails on the plant" TestCompare engine.go 's/return dst, fmt\.Errorf("%w: entity %s holds no component %d"/return nil, fmt.Errorf("%w: entity %s holds no component %d"/'
+jc_plant JC-01po "TestCompare fails on the plant" TestCompare engine.go '/en\.stamp = seq/,/inOrder/s/range inOrder(deeds) {/range deeds {/'
+jc_plant JC-01pg "TestCompare fails on the plant" TestCompare engine.go 's/return t\.appendBytes(r\.row, col, dst), nil/return dst, nil/'

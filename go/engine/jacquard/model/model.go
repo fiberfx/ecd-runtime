@@ -40,8 +40,8 @@ var _ ecd.Engine = (*Model)(nil)
 
 // New returns an empty model for the catalog. An All kind starts Cold and a Touched kind starts Warm and empty.
 // The model copies what it keeps from the catalog. It refuses a CID 0, a CID or a kind declared twice, a form
-// other than Component and Tag, a tag with a nonzero Size, and a component of form Component with a Size of 0
-// or less, and returns the error without a model.
+// other than Component, Tag and Edge, a tag with a nonzero Size, and a component of form Component with a Size
+// of 0 or less, and returns the error without a model. The model holds an Edge as it holds a Component.
 func New(cat *ecd.Catalog) (ecd.Engine, error) {
 	if cat == nil {
 		return nil, fmt.Errorf("model: nil catalog")
@@ -61,7 +61,7 @@ func New(cat *ecd.Catalog) (ecd.Engine, error) {
 		if _, dup := m.comps[c.CID]; dup {
 			return nil, fmt.Errorf("model: CID %d is declared twice", c.CID)
 		}
-		if c.Form != ecd.Component && c.Form != ecd.Tag {
+		if c.Form != ecd.Component && c.Form != ecd.Tag && c.Form != ecd.Edge {
 			return nil, fmt.Errorf("model: component %q has form %d", c.Name, c.Form)
 		}
 		if c.Form == ecd.Tag && c.Size != 0 {
