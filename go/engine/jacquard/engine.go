@@ -16,8 +16,9 @@ import (
 var errCatalog = errors.New("jacquard: catalog refused")
 
 // errOp is returned by the check pass for an op that no engine state could apply: an undeclared CID, a value of
-// the wrong length, an op out of order, or a destroy and a spawn of one eid in one transaction.
-var errOp = errors.New("jacquard: op refused")
+// the wrong length, an op out of order, or a destroy and a spawn of one eid in one transaction. It matches
+// ecd.ErrOp.
+var errOp = fmt.Errorf("jacquard: op refused: %w", ecd.ErrOp)
 
 // compDef describes one declared component. A component's compID is its position in the list that newEngine
 // receives.
@@ -46,19 +47,23 @@ type compDef struct {
 //	stale   set by fail; every read and apply then answers ecd.ErrStale
 //	moves   the number of archetype changes of existing entities
 //	queries the declared queries by QID; nil until addQuery
+//	res     the residency of each kind by kind index; nil: every kind is All and Warm
+//	allKinds the indexes of the All kinds, in kind order
 //
 // Mutation happens on one goroutine; get writes nothing.
 type Engine struct {
-	idx     *index
-	gr      *graph
-	tables  []*table
-	comps   []compDef
-	byCID   map[ecd.CID]compID
-	applied uint64
-	stamp   uint64
-	stale   bool
-	moves   uint64
-	queries map[ecd.QID]*query // the declared queries by QID; nil until addQuery
+	idx      *index
+	gr       *graph
+	tables   []*table
+	comps    []compDef
+	byCID    map[ecd.CID]compID
+	applied  uint64
+	stamp    uint64
+	stale    bool
+	moves    uint64
+	queries  map[ecd.QID]*query // the declared queries by QID; nil until addQuery
+	res      []kindRes          // the residency of each kind by kind index; nil: every kind is All and Warm
+	allKinds []uint16           // the indexes of the All kinds, in kind order
 }
 
 // newEngine returns an empty engine over the declared kinds and components. It answers errCatalog, wrapped,
@@ -96,6 +101,9 @@ func newEngine(kinds []ecd.Kind, comps []compDef) (*Engine, error) {
 	}
 	en.idx = x
 	en.gr = newGraph(tags)
+	for i := range kinds {
+		en.allKinds = append(en.allKinds, uint16(i))
+	}
 	return en, nil
 }
 
@@ -239,11 +247,14 @@ func (en *Engine) checkValue(op *ecd.Op) error {
 	return nil
 }
 
-// opState is one entity's ops of one deed reduced in list order.
+// opState is one entity's ops of one deed reduced in list order. A skipped state holds an entity whose ops change
+// nothing: the kind is Cold, or the entity is a Touched entity that is not resident and its first op in the deed
+// is not a Spawn. Its later ops in the deed are ignored and applyDeed applies nothing for it.
 type opState struct {
 	id        eid.ID
 	spawned   bool
 	destroyed bool
+	skipped   bool
 	mask      mask              // the final mask, tags included
 	vals      map[compID][]byte // the final value per set column
 }
@@ -253,13 +264,18 @@ type opState struct {
 // replaces its value in place; an Unset of an absent component changes nothing; a Set then an Unset of one
 // component leaves it unset. An entity whose last component is unset stays alive in the empty node of its
 // kind: only ecd.OpDestroy frees an entity. A Set, Unset or Destroy of an absent entity, or a Spawn of a present
-// eid, makes the engine stale and answers an error that wraps ecd.ErrAbsent or errExists.
+// eid, makes the engine stale and answers an error that wraps ecd.ErrAbsent or errExists. An entity whose state is
+// skipped is left as it is: an op on a Cold kind, and a Set, Unset or Destroy of a Touched entity that is not
+// resident, change nothing and never make the engine stale.
 func (en *Engine) applyDeed(d *ecd.Deed) error {
 	states, err := en.reduce(d)
 	if err != nil {
 		return en.fail(err)
 	}
 	for i := range states {
+		if states[i].skipped {
+			continue
+		}
 		if err := en.applyState(&states[i]); err != nil {
 			return en.fail(err)
 		}
@@ -287,6 +303,9 @@ func (en *Engine) reduce(d *ecd.Deed) ([]opState, error) {
 			return nil, fmt.Errorf("%w: spawn of %s is not its first op", errOp, op.Entity)
 		}
 		st := &states[n]
+		if st.skipped {
+			continue
+		}
 		switch op.Code {
 		case ecd.OpSet:
 			c, ok := en.byCID[op.CID]
@@ -318,9 +337,19 @@ func (en *Engine) reduce(d *ecd.Deed) ([]opState, error) {
 }
 
 // begin returns the state of the entity of op before its ops apply: a new entity for a Spawn, with an empty
-// component set, and the current component set of a present entity otherwise.
+// component set, and the current component set of a present entity otherwise. The state is skipped when skips
+// holds for the entity's kind.
 func (en *Engine) begin(op *ecd.Op) (opState, error) {
 	e, present := en.idx.entity(op.Entity)
+	if en.res != nil {
+		ki, err := en.idx.kindIndex(ecd.KindOf(op.Entity))
+		if err != nil {
+			return opState{}, err
+		}
+		if en.skips(ki, present, op.Code == ecd.OpSpawn) {
+			return opState{id: op.Entity, skipped: true}, nil
+		}
+	}
 	if op.Code == ecd.OpSpawn {
 		if present {
 			return opState{}, fmt.Errorf("spawn of %s: %w", op.Entity, errExists)
@@ -335,18 +364,27 @@ func (en *Engine) begin(op *ecd.Op) (opState, error) {
 }
 
 // get appends a copy of the value of component cid of the entity id to dst and returns it. A tag that is present
-// appends nothing. A stale engine answers ecd.ErrStale; an eid of an undeclared kind, ecd.ErrKind; an absent
-// entity, an undeclared CID, or a component that the entity does not hold, ecd.ErrAbsent. A pointer-holding
-// component has no byte form and answers errOp. No pointer into a table leaves the engine (E4).
+// appends nothing. A stale engine answers ecd.ErrStale; an eid of an undeclared kind, ecd.ErrKind; a Cold kind,
+// ecd.ErrCold; a Touched entity that is not resident, which includes one destroyed while resident, ecd.ErrMiss;
+// an absent entity of another kind, an undeclared CID, or a component that the entity does not hold,
+// ecd.ErrAbsent. A pointer-holding component has no byte form and answers errOp. No pointer into a table leaves
+// the engine (E4).
 func (en *Engine) get(id eid.ID, cid ecd.CID, dst []byte) ([]byte, error) {
 	if en.stale {
 		return dst, ecd.ErrStale
 	}
-	if _, err := en.idx.kindIndex(ecd.KindOf(id)); err != nil {
+	ki, err := en.idx.kindIndex(ecd.KindOf(id))
+	if err != nil {
 		return dst, err
+	}
+	if en.coldKind(ki) {
+		return dst, fmt.Errorf("%w: entity %s", ecd.ErrCold, id)
 	}
 	e, ok := en.idx.entity(id)
 	if !ok {
+		if en.touchedKind(ki) {
+			return dst, fmt.Errorf("%w: entity %s", ecd.ErrMiss, id)
+		}
 		return dst, fmt.Errorf("%w: entity %s", ecd.ErrAbsent, id)
 	}
 	c, ok := en.byCID[cid]

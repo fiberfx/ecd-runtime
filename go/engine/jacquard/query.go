@@ -17,7 +17,7 @@ var _ func(a, b eid.ID) int = eid.ID.Compare
 
 // query is one declared query, compiled against the Engine's catalog.
 //
-//	kinds   the kind indexes the query runs on; empty: every declared kind
+//	kinds   the kind indexes the query runs on; empty: every All kind
 //	all     the components that an entity must hold
 //	none    the components that an entity must not hold
 //	any     the components of which an entity must hold at least one; zero: no term
@@ -26,7 +26,7 @@ var _ func(a, b eid.ID) int = eid.ID.Compare
 //	badKind kinds names an undeclared kind: the query answers ecd.ErrQuery
 //	nodes   the nodes that hold a table and that the query runs on, kept current by announce (JI4)
 type query struct {
-	kinds   []uint16 // empty: every declared kind
+	kinds   []uint16 // empty: every All kind
 	all     mask
 	none    mask
 	any     mask
@@ -112,11 +112,17 @@ func (q *query) wants(a *archetype) bool {
 	return true
 }
 
+// runs reports whether q runs on the nodes of a: q.wants holds, and a query with no kinds does not run on the
+// nodes of a Touched kind, which it never names.
+func (en *Engine) runs(q *query, a *archetype) bool {
+	return q.wants(a) && (len(q.kinds) > 0 || !en.touchedKind(a.kind))
+}
+
 // scan returns, in node order, the nodes that hold a table and that q runs on: a fresh match (JI4).
 func (en *Engine) scan(q *query) []uint32 {
 	var nodes []uint32
 	for node := uint32(1); node <= uint32(en.gr.len()); node++ {
-		if int(node) < len(en.tables) && en.tables[node] != nil && q.wants(en.gr.arch(node)) {
+		if int(node) < len(en.tables) && en.tables[node] != nil && en.runs(q, en.gr.arch(node)) {
 			nodes = append(nodes, node)
 		}
 	}
@@ -128,16 +134,18 @@ func (en *Engine) scan(q *query) []uint32 {
 func (en *Engine) announce(node uint32) {
 	a := en.gr.arch(node)
 	for _, q := range en.queries {
-		if q.wants(a) {
+		if en.runs(q, a) {
 			q.nodes = append(q.nodes, node)
 		}
 	}
 }
 
 // query appends the eids that satisfy the declared query qid to out.IDs, in eid order, and adds their number to
-// out.Count. A stale engine answers ecd.ErrStale; an undeclared QID, a non-empty arg or a query that names an
-// undeclared kind answers ecd.ErrQuery. A refusal appends nothing. A query with no kinds runs on every
-// declared kind. It reads only the query's node list.
+// out.Count. The refusals come in this order, and a refusal appends nothing and leaves out.Count as it was: a
+// stale engine answers ecd.ErrStale; an undeclared QID, a non-empty arg, a query that names an undeclared kind
+// and a query that names a Touched kind answer ecd.ErrQuery; a query with a Cold kind among its kinds answers
+// ecd.ErrCold. A query with no kinds runs on every All kind, and is Cold when one of them is. It reads only the
+// query's node list.
 func (en *Engine) query(qid ecd.QID, arg []byte, out *ecd.Answer) error {
 	if en.stale {
 		return ecd.ErrStale
@@ -151,6 +159,20 @@ func (en *Engine) query(qid ecd.QID, arg []byte, out *ecd.Answer) error {
 	}
 	if q.badKind {
 		return fmt.Errorf("%w: query %d names a kind that is not declared", ecd.ErrQuery, qid)
+	}
+	for _, ki := range q.kinds {
+		if en.touchedKind(ki) {
+			return fmt.Errorf("%w: query %d names kind %d, which is a Touched kind", ecd.ErrQuery, qid, ki)
+		}
+	}
+	kinds := q.kinds
+	if len(kinds) == 0 {
+		kinds = en.allKinds
+	}
+	for _, ki := range kinds {
+		if en.coldKind(ki) {
+			return fmt.Errorf("%w: query %d: kind %d is cold", ecd.ErrCold, qid, ki)
+		}
 	}
 	start := len(out.IDs)
 	for _, node := range q.nodes {
