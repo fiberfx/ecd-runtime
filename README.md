@@ -33,4 +33,5 @@ it.
 
 ## Attribution
 
-Code taken from other projects is listed in `go/NOTICE.txt` with each project's licence text.
+Ecd Runtime's own code is under the MIT License, in `LICENSE` and `go/LICENSE`. Code taken from other projects is
+listed in `go/NOTICE.txt` with each project's licence text.

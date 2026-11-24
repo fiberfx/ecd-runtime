@@ -176,6 +176,32 @@ func TestSeamApplyText(t *testing.T) {
 	}
 }
 
+// SC-01: engine.go states the decided text of the Budget, write, Hydrate, query and ErrOp comments.
+func TestSeamDecidedText(t *testing.T) {
+	src, err := os.ReadFile("engine.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(src)
+	for _, want := range []string{
+		"for both residencies",
+		"0 means no limit",
+		"0 keeps none",
+		"committed deed (E1).",
+		"Hydrate is all or nothing per call",
+		"when Any is not empty",
+		", or a Hydrate row:",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("engine.go lacks %q", want)
+		}
+	}
+	const retired = "Touched kinds only; 0 means no residency"
+	if strings.Contains(text, retired) {
+		t.Errorf("engine.go still states %q", retired)
+	}
+}
+
 // I2B-01: QueryDef.Any is a []CID that sits between None and Exact.
 func TestSeamQueryAny(t *testing.T) {
 	typ := reflect.TypeOf(ecd.QueryDef{})

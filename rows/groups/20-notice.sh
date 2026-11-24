@@ -1,8 +1,9 @@
-# Group notice of Ecd Runtime: NT1 to NT5 and their plants.
+# Group notice of Ecd Runtime: NT1 to NT6 and their plants.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, go_row and HAVE_GO.
 #
-# The checks keep the attribution of code taken from other projects in one file, go/NOTICE.txt, and keep the module's
-# go line and requirements as they are declared.
+# The checks keep the attribution of code taken from other projects in one file, go/NOTICE.txt, keep the module's
+# go line and requirements as they are declared, and keep the licence text of Ecd Runtime's own code in LICENSE and
+# go/LICENSE.
 #
 #   NT1   no path, Go file or README names the directory of a vendored copy
 #   NT1p  plant: a copy of go/ with a file added below a directory of that name; NT1 must turn red
@@ -18,6 +19,11 @@
 #   NT4q  plant: the go line of a copy of go/go.mod is "go 1.27"; NT4 must turn red
 #   NT5   go mod tidy in a copy of go/, offline, leaves go.mod and go.sum byte-equal
 #   NT5p  plant: a copy of go.sum without the go.mod line of the requirement; tidy restores it, so the copy differs
+#   NT6   LICENSE and go/LICENSE are both present, byte-equal, and begin with "MIT License" and the copyright line
+#         "Copyright (c) 2026 Jonnify"; the unpacked tree holds LICENSE only when the run archives it
+#   NT6p  plant: a copy of the tree without go/LICENSE; NT6 must turn red
+#   NT6q  plant: the copyright line of the copy of go/LICENSE reads "Jonnify Ltd"; the files differ, NT6 must turn red
+#   NT6r  plant: a copy of the tree without LICENSE; NT6 answers could-not-measure, which is the expected verdict
 #
 # A plant edits text files or comments only, so a planted copy still compiles. A plant that changes other than exactly
 # one line, or that cannot be applied, is CNM.
@@ -34,10 +40,12 @@ nt_changed() {
   if [ "$nt_nl" -gt "$nt_ng" ]; then echo "$nt_nl"; else echo "$nt_ng"; fi
 }
 
-# nt_mk: a temporary root holding a copy of /w/go and of /w/README.md; its path is in nt_root.
+# nt_mk: a temporary root holding a copy of /w/go, of /w/README.md and, when it exists, of /w/LICENSE; its path is in
+# nt_root.
 nt_mk() {
   nt_root=$(mktemp -d /tmp/rows/plant.XXXXXX) || return 1
-  cp -a /w/go "$nt_root/go" && cp /w/README.md "$nt_root/README.md"
+  cp -a /w/go "$nt_root/go" && cp /w/README.md "$nt_root/README.md" &&
+    { [ ! -f /w/LICENSE ] || cp /w/LICENSE "$nt_root/LICENSE"; }
 }
 
 # nt_verdict RC: the plant verdict of a check status: 0 stayed green, 1 turned red, anything else not measured.
@@ -119,6 +127,20 @@ nt4_check() {
   if [ "$nt_tc" -ne 0 ]; then echo "a toolchain line is present"; return 1; fi
   if [ "$nt_req" != "github.com/fiberfx/ecd-id/go v0.8.0;" ]; then echo "requirements: $nt_req"; return 1; fi
   echo "go 1.27.4, no toolchain line, requires only github.com/fiberfx/ecd-id/go v0.8.0"
+}
+
+# nt6_check ROOT: LICENSE and go/LICENSE are present and byte-equal, and begin with the MIT License title and the
+# copyright line of Ecd Runtime. A tree without go/LICENSE is red; a tree without LICENSE could not be measured, as the
+# run's archive holds LICENSE only when its paths name it.
+nt6_check() {
+  if [ ! -f "$1/go/LICENSE" ]; then echo "go/LICENSE is absent"; return 1; fi
+  if [ ! -f "$1/LICENSE" ]; then echo "LICENSE is not in the tree under test"; return 2; fi
+  if ! cmp -s "$1/LICENSE" "$1/go/LICENSE"; then echo "LICENSE and go/LICENSE differ"; return 1; fi
+  if [ "$(sed -n 1p "$1/LICENSE")" != "MIT License" ]; then echo "line 1 of LICENSE is not MIT License"; return 1; fi
+  if [ "$(sed -n 3p "$1/LICENSE")" != "Copyright (c) 2026 Jonnify" ]; then
+    echo "line 3 of LICENSE is not the copyright line of Ecd Runtime"; return 1
+  fi
+  echo "LICENSE and go/LICENSE are byte-equal, MIT License, Copyright (c) 2026 Jonnify"
 }
 
 # nt5_tidy GODIR LOG: go mod tidy, offline, in a copy of GODIR; 0 when go.mod and go.sum stay byte-equal.
@@ -287,6 +309,48 @@ if sel NT5p notice; then
     fi
   else
     say NT5p "a go.sum without the go.mod line of the requirement differs after go mod tidy" "the copy failed" CNM
+  fi
+  rm -rf "$nt_root"
+fi
+
+# NT6
+if sel NT6 notice; then
+  nt_o=$(nt6_check /w); nt_r=$?
+  say NT6 "LICENSE and go/LICENSE are byte-equal and carry the MIT License and the copyright line of Ecd Runtime" "$nt_o" "$([ $nt_r -eq 0 ] && echo PASS || { [ $nt_r -eq 1 ] && echo FAIL || echo CNM; })"
+fi
+if sel NT6p notice; then
+  if nt_mk; then
+    rm -f "$nt_root/go/LICENSE"
+    nt_o=$(nt6_check "$nt_root"); nt_r=$?
+    say NT6p "a tree without go/LICENSE turns NT6 red" "$nt_o" "$(nt_verdict $nt_r)"
+  else
+    say NT6p "a tree without go/LICENSE turns NT6 red" "the copy failed" CNM
+  fi
+  rm -rf "$nt_root"
+fi
+if sel NT6q notice; then
+  if nt_mk; then
+    cp "$nt_root/go/LICENSE" "$nt_root/license.orig"
+    sed -i '3s/Jonnify/Jonnify Ltd/' "$nt_root/go/LICENSE"
+    nt_n=$(nt_changed "$nt_root/license.orig" "$nt_root/go/LICENSE")
+    if [ "$nt_n" -ne 1 ]; then
+      say NT6q "a copyright line of go/LICENSE that differs from LICENSE turns NT6 red" "the plant changed $nt_n lines" CNM
+    else
+      nt_o=$(nt6_check "$nt_root"); nt_r=$?
+      say NT6q "a copyright line of go/LICENSE that differs from LICENSE turns NT6 red" "$nt_o" "$(nt_verdict $nt_r)"
+    fi
+  else
+    say NT6q "a copyright line of go/LICENSE that differs from LICENSE turns NT6 red" "the copy failed" CNM
+  fi
+  rm -rf "$nt_root"
+fi
+if sel NT6r notice; then
+  if nt_mk; then
+    rm -f "$nt_root/LICENSE"
+    nt_o=$(nt6_check "$nt_root"); nt_r=$?
+    say NT6r "a tree without LICENSE makes NT6 answer could-not-measure" "$nt_o" "$([ $nt_r -eq 2 ] && echo KILLED || { [ $nt_r -eq 0 ] && echo SURVIVED || echo CNM; })"
+  else
+    say NT6r "a tree without LICENSE makes NT6 answer could-not-measure" "the copy failed" CNM
   fi
   rm -rf "$nt_root"
 fi
