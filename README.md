@@ -1,8 +1,9 @@
 # Ecd Runtime
 
 Ecd Runtime is the entity store and runtime of an owner process. Callers change state only through deeds, which are
-committed through the `Committer` interface of package `rt`, and engines answer reads from memory. The owner store, such
-as the SQLite store that the contract specifies, is not in this repository. Jacquard is the archetype engine.
+committed through the `Committer` interface of package `rt`, and engines answer reads from memory. The owner store is
+the nested module `go/sqlite`, an SQLite file that a host passes in through `rt.Config.Committer`. Jacquard is the
+archetype engine.
 
 The contract is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`. This repository holds the implementation.
 
@@ -13,6 +14,7 @@ The contract is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`. This re
 | `go/` | The Go module `github.com/fiberfx/ecd-runtime/go`. |
 | `go/engine/jacquard/` | Jacquard, the archetype engine. Its files that port Ark files name their source file in their header. |
 | `go/rt/` | The package `rt`: a command buffer per system and the flush that commits and applies their deeds. |
+| `go/sqlite/` | The nested Go module `github.com/fiberfx/ecd-runtime/go/sqlite`: the owner store in one SQLite file, an implementation of `rt.Committer` that also hydrates an engine. |
 | `go/enginecmp/gj/` | Benchmarks of Jacquard against Ark in module `go/enginecmp`; `rows/gj.bench.rows.sh` runs them. |
 | `go/NOTICE.txt` | Every part taken from another project: the project, its source, commit, licence and copyright line, what is taken and the files that hold it, with the licence text that the project's licence requires, and the projects whose design Ecd Runtime follows. |
 | `rows/loom.rows.sh` | The rows script. |
@@ -96,8 +98,8 @@ func tick(cfg rt.Config, mover ecd.Kind, pos ecd.CID, known eid.ID) (rt.Result, 
 
 ### Limits
 
-- The store is the interface `Committer`. The repository holds no owner store; the only implementation of `Committer`
-  is the fake of the tests.
+- The store is the interface `Committer`. Package `rt` holds no owner store: the module `go/sqlite` implements
+  `Committer`, and the tests of package `rt` use a fake.
 - A record names an entity by its eid or by a placeholder of its own buffer. No hot handle for an entity exists.
 - The package runs no scheduler, no parallel stage and no observer. The host calls `Flush` at its sync points.
 - The eid of a spawned entity is not handed back to the system after the flush. It is found in the deeds that the
@@ -105,6 +107,121 @@ func tick(cfg rt.Config, mover ecd.Kind, pos ecd.CID, known eid.ID) (rt.Result, 
 - The package does not rebuild a stale engine: `Flush` returns the engine's error.
 - A deed answered `Conflict`, `Refused` or `Unknown` returns no error, and its records are not listed by stage;
   `Result.Outcomes` names the deed by its ord.
+
+## SQLite store
+
+The module `github.com/fiberfx/ecd-runtime/go/sqlite`, in `go/sqlite/`, package `sqlite`, is an owner store in one
+SQLite file. A host passes it to the Runtime as `rt.Config.Committer`, and after a restart it brings a fresh engine to
+the seq of the committed history. The module has its own tags, `go/sqlite/vX.Y.Z`; `go/sqlite/v0.4.0` is the first. It
+requires `github.com/fiberfx/ecd-runtime/go` v0.3.0, `github.com/fiberfx/ecd-id/go` v0.8.0 and the pure-Go driver
+`modernc.org/sqlite` v1.37.0. Inside this repository a `replace` directive points the requirement on the main module at
+the parent directory. The main module `go/` does not require the driver.
+
+### What the store gives
+
+- `Create(path)` makes the store file. It refuses a path at which anything exists, with an error that matches
+  `ErrExist`, and changes nothing. It sets the page size to 4096 bytes and auto-vacuum to incremental before the first
+  table, then the journal to WAL, then creates the schema and sets `user_version` to 1. After a failure it removes the
+  files it made.
+- `Open(path)` returns the `Store`. It never creates a file, and a missing path is an error. It refuses a file whose
+  `user_version` is not 1 or whose journal mode is not WAL, with an error that matches `ErrSchema`. It opens one writer
+  connection and one reader connection, and each holds a connection before `Open` returns.
+- The writer opens an immediate transaction, with `busy_timeout` of 2000 ms, foreign keys on and `synchronous` FULL.
+  The reader has `busy_timeout` of 2000 ms and `query_only` on.
+- `Store.Commit(deeds, out)` is the `rt.Committer`. It commits the deeds of one flush in one SQLite transaction and
+  writes one `rt.Outcome` per deed into `out`.
+- `Store.Hydrate(e, cat)` loads every kind of residency `All` of the catalog into a fresh engine and returns the seq.
+- `Store.Log(after, f)` calls `f` with each committed deed of a seq above `after`, in seq order and then ord order. An
+  error of `f` stops the walk and is returned unchanged. A body that does not decode matches `ErrSchema`.
+- `Store.Close` closes both connections, and a second `Close` returns nil.
+- `ErrExist` is matched by a `Create` that finds a file at its path. `ErrSchema` is matched by an `Open` of a file that
+  is not an owner store and by a `Log` that reads a malformed body.
+
+A `Store` is used on the owner goroutine only. The tables are `entity` (one row per entity, with the seq of its last
+change and the seq of its destroy), `state` (one row per component value of an entity, whatever its kind), `deed` and
+`deed_body` (the log). The seq of the store is the highest `seq` of `deed`, so only a transaction that commits a deed
+advances it.
+
+### Starting a host
+
+```go
+// start opens the store at path, creating the file when it is absent, brings the fresh engine of cfg to the seq of the
+// store and returns the Runtime that commits into it. cfg holds the Catalog, a fresh Engine, the Minter and the
+// DeedKind of the host.
+func start(path string, cfg rt.Config) (*rt.Runtime, *sqlite.Store, error) {
+	if err := sqlite.Create(path); err != nil && !errors.Is(err, sqlite.ErrExist) {
+		return nil, nil, err
+	}
+	s, err := sqlite.Open(path) // matches sqlite.ErrSchema when the file is not an owner store
+	if err != nil {
+		return nil, nil, err
+	}
+	if _, err := s.Hydrate(cfg.Engine, cfg.Catalog); err != nil { // every All kind, read at one seq
+		s.Close()
+		return nil, nil, err
+	}
+	cfg.Committer = s
+	r, err := rt.New(cfg) // matches rt.ErrConfig
+	if err != nil {
+		s.Close()
+		return nil, nil, err
+	}
+	return r, s, nil
+}
+```
+
+After `Hydrate` the engine is at the seq of the store, and the next flush commits at that seq plus one.
+
+### The order of a commit
+
+`Commit` runs on the owner goroutine and takes these steps in this order.
+
+1. A `len(out)` that differs from `len(deeds)` is an error, and no transaction is begun. With no deed, `Commit` returns
+   0 and a nil error, again with no transaction.
+2. The writer begins an immediate transaction and reads the seq of the store. The seq of the transaction is that seq
+   plus one.
+3. Each deed is handled in slice order, inside a savepoint. The deed row takes the eid, the seq of the transaction, the
+   ord and the commit time in Unix milliseconds. An eid that is already in the log answers `Conflict`. Then the body is
+   written, and each op follows in list order:
+   - `OpSpawn` inserts the entity. An eid that exists, alive or destroyed, answers `Refused`.
+   - `OpSet` needs a live entity, else it answers `Refused`; it then writes the value of the component.
+   - `OpUnset` needs a live entity, else it answers `Refused`; it then deletes the value of the component.
+   - `OpDestroy` needs a live entity, else it answers `Refused`; it then marks the entity gone and deletes every value
+     of the entity. The entity row stays as a tombstone, so a destroyed eid is never spawned again.
+   - Any other op code answers `Refused`.
+4. A deed whose ops all applied answers `Committed` and its savepoint is released. A deed answered `Conflict` or
+   `Refused` is rolled back to its savepoint, so nothing of it stays.
+5. With no committed deed the transaction is rolled back, and `Commit` returns 0 and a nil error.
+6. Otherwise the transaction commits, and `Commit` returns its seq.
+
+An SQL error in step 2 to 6 rolls the transaction back, writes `Unknown` into every outcome and returns 0 and the error
+wrapped with the text `sqlite: commit: `. A value of length 0 is stored as NULL. `Commit` keeps no deed and no value
+after it returns.
+
+The outcomes are those of package `rt`. `Committed` is a deed written to the log. `Conflict` is a deed whose eid is
+already committed, which is a retry. `Refused` is a deed that the state of the store does not allow. `Unknown` is a
+deed whose transaction failed. Only a deed answered `Committed` reaches the engine.
+
+### Limits of the store
+
+- The store holds no outbox, no intents, no `_feed` or `_store` tables, no lineage and no replication, and it projects
+  nothing to a lake. `wal_autocheckpoint` keeps the default of SQLite.
+- The state of a kind of residency `Touched` is written, and nothing reads it back: there is no miss path and no
+  residency. `Hydrate` skips such a kind.
+- An entity with no component value is alive in the store, and `Hydrate` cannot load it, since a `Row` of the hydration
+  cannot name it. It is absent after a hydration.
+- One `state` table holds opaque values for every kind. The store has no typed tables, routes no query and keeps no
+  index per declared query.
+- `Conflict` is answered only for a deed whose eid is committed. With one writer there is no revision conflict, and an
+  entity row carries no revision. The seq of the first commit of a retried deed is not returned.
+- The store takes no file lock and expects one owner process per file. Two processes would keep the seq consistent, but
+  each engine would miss the deeds of the other.
+- A value is stored in the row of its component whatever its size; a large value is not split into a separate table.
+- The deed kind is provisional: the tests of the module use kind `ded` of system `tst`, a code registered nowhere.
+- On macOS the writer also sets `fullfsync` and `checkpoint_fullfsync`. The rows run on Linux and do not measure them.
+
+Rows SQ-01 to SQ-14, in `rows/groups/78-sq40.sh`, measure the module. They load the driver and its modules from the
+offline module inputs.
 
 ## Rows
 

@@ -34,8 +34,8 @@
 #   J0M-06-p     plant: the tag-size check is skipped; TestCatalog must fail
 #   J0M-06-pz    plant: the Size check of a component is skipped; TestCatalog must fail
 #   J0M-06-pe    plant: the Size check of an Edge is skipped; TestCatalog must fail
-#   L12-model    CNM: the model against a SQL twin needs a SQLite driver (modernc.org/sqlite v1.37.0), and the module
-#                inputs hold ecd-id only
+#   L12-model    CNM: the SQL twin of the declared queries is not built: go/sqlite stores component values
+#                and routes no query
 #
 # j0m_plant id expect tests sedexpr: copies /w/go to a temporary directory, applies the one-line sed to
 # engine/jacquard/model/model.go and runs only the named tests there (several names joined with |).
@@ -94,5 +94,5 @@ j0m_plant J0M-06-pz "TestCatalog fails on the plant" TestCatalog 's/if c\.Form =
 j0m_plant J0M-06-pe "TestCatalog fails on the plant" TestCatalog 's/if c\.Form == ecd\.Edge && c\.Size <= 0 {/if false {/'
 
 if sel L12-model j0m; then
-  say L12-model "every declared query equals its SQL twin on 100,000 entities" "no SQLite driver: modernc.org/sqlite v1.37.0 is not in the module inputs, which hold ecd-id only" CNM
+  say L12-model "every declared query equals its SQL twin on 100,000 entities" "the SQL twin of the declared queries is not built: go/sqlite stores component values and routes no query" CNM
 fi
