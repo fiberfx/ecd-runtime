@@ -3,6 +3,12 @@ package ecd_test
 import (
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"reflect"
+	"regexp"
+	"strings"
 	"testing"
 
 	eid "github.com/fiberfx/ecd-id/go"
@@ -98,13 +104,17 @@ var seamErrors = []struct {
 	{"ErrMiss", ecd.ErrMiss, "ecd: not resident"},
 	{"ErrAbsent", ecd.ErrAbsent, "ecd: absent"},
 	{"ErrKind", ecd.ErrKind, "ecd: kind not in catalog"},
+	{"ErrOp", ecd.ErrOp, "ecd: op refused"},
 	{"ErrBudget", ecd.ErrBudget, "ecd: over budget"},
 	{"ErrQuery", ecd.ErrQuery, "ecd: query refused"},
 	{"ErrOwner", ecd.ErrOwner, "ecd: call off the owner goroutine"},
 }
 
-// I2-05: the nine error texts.
+// I2-05, I2B-03: the ten error texts.
 func TestSeamErrorTexts(t *testing.T) {
+	if len(seamErrors) != 10 {
+		t.Fatalf("the seam lists %d error texts, want 10", len(seamErrors))
+	}
 	for _, c := range seamErrors {
 		if c.err.Error() != c.text {
 			t.Errorf("%s = %q, want %q", c.name, c.err.Error(), c.text)
@@ -120,6 +130,122 @@ func TestSeamSentinelsDistinct(t *testing.T) {
 			if got := errors.Is(wrapped, b.err); got != (i == j) {
 				t.Errorf("errors.Is(wrapped %s, %s) = %v, want %v", a.name, b.name, got, i == j)
 			}
+		}
+	}
+}
+
+// I2B-03: ErrOp matches itself, wrapped, and none of the nine other sentinels.
+func TestSeamErrOpDistinct(t *testing.T) {
+	wrapped := fmt.Errorf("check pass: %w", ecd.ErrOp)
+	if !errors.Is(wrapped, ecd.ErrOp) {
+		t.Errorf("errors.Is(wrapped ErrOp, ErrOp) = false")
+	}
+	for _, c := range seamErrors {
+		if c.err != ecd.ErrOp && errors.Is(ecd.ErrOp, c.err) {
+			t.Errorf("errors.Is(ErrOp, %s) = true, want false", c.name)
+		}
+	}
+}
+
+// I2B-03: the comment above Apply in engine.go states the two passes and the stale rule.
+func TestSeamApplyText(t *testing.T) {
+	src, err := os.ReadFile("engine.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(string(src), "\n")
+	at := -1
+	for i, l := range lines {
+		if strings.HasPrefix(l, "\tApply(seq uint64, deeds []Deed) error") {
+			at = i
+			break
+		}
+	}
+	if at < 0 {
+		t.Fatal("engine.go declares no Apply method in Engine")
+	}
+	var doc []string
+	for i := at - 1; i >= 0 && strings.HasPrefix(lines[i], "\t//"); i-- {
+		doc = append(doc, lines[i])
+	}
+	text := strings.Join(doc, "\n")
+	for _, want := range []string{"all or nothing", "check pass", "makes the engine Stale"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the Apply comment lacks %q", want)
+		}
+	}
+}
+
+// I2B-01: QueryDef.Any is a []CID that sits between None and Exact.
+func TestSeamQueryAny(t *testing.T) {
+	typ := reflect.TypeOf(ecd.QueryDef{})
+	anyF, ok := typ.FieldByName("Any")
+	if !ok {
+		t.Fatal("QueryDef has no field Any")
+	}
+	if anyF.Type != reflect.TypeOf([]ecd.CID(nil)) {
+		t.Errorf("QueryDef.Any has type %v, want []ecd.CID", anyF.Type)
+	}
+	none, _ := typ.FieldByName("None")
+	exact, _ := typ.FieldByName("Exact")
+	if anyF.Index[0] != none.Index[0]+1 || exact.Index[0] != anyF.Index[0]+1 {
+		t.Errorf("field order: None %d, Any %d, Exact %d; want consecutive", none.Index[0], anyF.Index[0], exact.Index[0])
+	}
+}
+
+// I2B-02: *eid.Minter satisfies the host's Minter.
+var _ ecd.Minter = (*eid.Minter)(nil)
+
+// sourceFiles lists the non-test Go files under go/ecd and go/engine, and fails when either holds none.
+func sourceFiles(t *testing.T) []string {
+	t.Helper()
+	var all []string
+	for _, root := range []string{".", filepath.Join("..", "engine")} {
+		n := 0
+		err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !d.IsDir() && strings.HasSuffix(p, ".go") && !strings.HasSuffix(p, "_test.go") {
+				all = append(all, p)
+				n++
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("scan %s: %v", root, err)
+		}
+		if n == 0 {
+			t.Fatalf("scan %s: no non-test Go file found", root)
+		}
+	}
+	return all
+}
+
+// I2B-02: no engine or seam file builds a Minter or clones one; the host's Minter is the only one.
+func TestNoSecondMinter(t *testing.T) {
+	re := regexp.MustCompile(`eid\.NewMinter\b|\.Clone\(\)`)
+	for _, p := range sourceFiles(t) {
+		src, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m := re.Find(src); m != nil {
+			t.Errorf("%s builds or clones a Minter: %q", p, m)
+		}
+	}
+}
+
+// I2B-04: no source file under go/ecd and go/engine carries the retired product name, in any case.
+func TestNoLoomName(t *testing.T) {
+	retired := "lo" + "om"
+	for _, p := range sourceFiles(t) {
+		src, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(strings.ToLower(string(src)), retired) {
+			t.Errorf("%s contains the retired name", p)
 		}
 	}
 }
