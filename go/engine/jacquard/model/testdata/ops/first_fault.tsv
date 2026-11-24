@@ -1,0 +1,28 @@
+# A transaction with several faults answers the first in commit order (Ord, then list order); a gap comes before any op.
+hydrate	aaa	0	ok
+apply	1	ok
+deed	0
+spawn	aaa:1
+set	aaa:1	1	0102030405060708
+apply	2	op
+deed	0
+set	aaa:1	1	0102
+deed	1
+spawn	ccc:1
+apply	2	kind
+deed	0
+spawn	ccc:1
+deed	1
+set	aaa:1	1	0102
+apply	2	op
+deed	1
+spawn	ccc:1
+deed	0
+set	aaa:1	1	0102
+apply	3	gap
+deed	0
+spawn	ccc:1
+set	aaa:1	1	0102
+get	aaa:1	1	=0102030405060708
+query	4	ok	aaa:1
+at	1

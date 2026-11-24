@@ -1,0 +1,19 @@
+# Unset of an entity's last component leaves the entity alive: query 4 counts it once, and a later Set succeeds.
+hydrate	aaa	0	ok
+apply	1	ok
+deed	0
+spawn	aaa:1
+set	aaa:1	1	0102030405060708
+apply	2	ok
+deed	0
+unset	aaa:1	1
+get	aaa:1	1	absent
+query	0	ok
+query	3	ok
+query	4	ok	aaa:1
+apply	3	ok
+deed	0
+set	aaa:1	1	1112131415161718
+get	aaa:1	1	=1112131415161718
+query	0	ok	aaa:1
+query	4	ok	aaa:1

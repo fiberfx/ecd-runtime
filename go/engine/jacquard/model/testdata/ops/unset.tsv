@@ -1,0 +1,26 @@
+# Unset removes one component; Unset of an absent component changes nothing; Set then Unset in one deed leaves the value absent.
+hydrate	aaa	0	ok
+apply	1	ok
+deed	0
+spawn	aaa:1
+set	aaa:1	1	0102030405060708
+set	aaa:1	2	1112131415161718
+apply	2	ok
+deed	0
+unset	aaa:1	1
+get	aaa:1	1	absent
+get	aaa:1	2	=1112131415161718
+apply	3	ok
+deed	0
+unset	aaa:1	1
+get	aaa:1	1	absent
+get	aaa:1	2	=1112131415161718
+apply	4	ok
+deed	0
+set	aaa:1	1	2122232425262728
+unset	aaa:1	1
+get	aaa:1	1	absent
+get	aaa:1	2	=1112131415161718
+query	0	ok
+query	4	ok	aaa:1
+at	4

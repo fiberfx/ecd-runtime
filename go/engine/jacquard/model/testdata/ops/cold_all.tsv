@@ -1,0 +1,27 @@
+# An All kind is cold until hydrated: ops on it change nothing, and reads and queries answer cold.
+state	aaa	cold
+state	bbb	warm
+apply	1	ok
+deed	0
+spawn	aaa:1
+set	aaa:1	1	0102030405060708
+at	1
+state	aaa	cold
+get	aaa:1	1	cold
+query	0	cold
+query	4	cold
+query	6	cold
+hydrate	aaa	1	ok	aaa:2/1=1112131415161718	aaa:2/3=-
+state	aaa	warm
+get	aaa:1	1	absent
+get	aaa:2	1	=1112131415161718
+get	aaa:2	3	=
+query	0	ok	aaa:2
+query	4	ok	aaa:2
+query	6	ok	aaa:2
+apply	2	ok
+deed	0
+spawn	aaa:1
+set	aaa:1	1	2122232425262728
+query	0	ok	aaa:1	aaa:2
+at	2

@@ -1,0 +1,27 @@
+# A seq other than At()+1 answers gap and changes nothing.
+hydrate	aaa	0	ok
+apply	2	gap
+deed	0
+spawn	aaa:1
+at	0
+get	aaa:1	1	absent
+apply	1	ok
+deed	0
+spawn	aaa:1
+set	aaa:1	1	0102030405060708
+at	1
+apply	3	gap
+deed	0
+set	aaa:1	1	1112131415161718
+at	1
+get	aaa:1	1	=0102030405060708
+apply	1	gap
+deed	0
+set	aaa:1	1	1112131415161718
+at	1
+get	aaa:1	1	=0102030405060708
+apply	2	ok
+deed	0
+set	aaa:1	1	1112131415161718
+get	aaa:1	1	=1112131415161718
+at	2

@@ -1,0 +1,22 @@
+# Destroy removes the entity; its eid reads absent and no query counts it; another eid takes its place.
+hydrate	aaa	0	ok
+apply	1	ok
+deed	0
+spawn	aaa:1
+set	aaa:1	1	0102030405060708
+spawn	aaa:2
+set	aaa:2	1	1112131415161718
+apply	2	ok
+deed	0
+destroy	aaa:1
+get	aaa:1	1	absent
+get	aaa:2	1	=1112131415161718
+query	0	ok	aaa:2
+query	4	ok	aaa:2
+apply	3	ok
+deed	0
+spawn	aaa:3
+set	aaa:3	1	2122232425262728
+query	0	ok	aaa:2	aaa:3
+get	aaa:1	1	absent
+at	3

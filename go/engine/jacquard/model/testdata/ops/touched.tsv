@@ -1,0 +1,36 @@
+# A Touched kind starts warm and empty. Ops on a non-resident entity change nothing, a Spawn makes it resident,
+# Evict makes it a miss again, and a Touched kind has no engine query.
+state	bbb	warm
+get	bbb:1	1	miss
+apply	1	ok
+deed	0
+set	bbb:1	1	0102030405060708
+unset	bbb:1	1
+destroy	bbb:1
+get	bbb:1	1	miss
+at	1
+apply	2	ok
+deed	0
+spawn	bbb:1
+set	bbb:1	1	0102030405060708
+get	bbb:1	1	=0102030405060708
+get	bbb:1	2	absent
+get	bbb:2	1	miss
+apply	3	ok
+deed	0
+spawn	bbb:2
+get	bbb:2	1	absent
+evict	bbb	ok	bbb:1
+get	bbb:1	1	miss
+get	bbb:2	1	absent
+apply	4	ok
+deed	0
+set	bbb:1	1	1112131415161718
+get	bbb:1	1	miss
+evict	bbb	ok	bbb:1	bbb:9
+hydrate	bbb	4	ok	bbb:1/1=2122232425262728
+get	bbb:1	1	=2122232425262728
+get	bbb:1	2	absent
+get	bbb:2	1	absent
+query	5	query
+query	99	query
