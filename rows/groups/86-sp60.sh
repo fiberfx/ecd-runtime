@@ -2,7 +2,8 @@
 # ecd.Deed holds them as ecd.TraceID and ecd.SpanID and that no engine reads them; that a buffer's Span call puts
 # them on the buffer's next deed and the flush that empties the buffer resets them; that the owner store keeps them
 # in deed.trace_id and deed.span_id, NULL for the zero values, and Log returns them; that Open refuses any user
-# version but 2; and that Migrate brings a store of user version 1 to 2.
+# version but 2; that Migrate brings a store of user version 1 to 2; and that the nested module go/sqlite requires
+# the main module at v0.6.0 and replaces it by its parent directory.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #
@@ -29,10 +30,12 @@
 #   SP-05p   plant: Migrate sets user version 1 (sqlite/migrate.go; TestMigrate, case v1)
 #   SP-05q   plant: Migrate alters a store of user version 2 (sqlite/migrate.go; TestMigrate, case current)
 #   SP-05r   plant: Migrate skips the journal mode check (sqlite/migrate.go; TestMigrate, case refused)
+#   SP-06    go/sqlite/go.mod requires github.com/fiberfx/ecd-runtime/go v0.6.0 and replaces it by ../
 #
 # Rows SP-03, SP-04 and SP-05 and their plants load the driver and its modules from the module inputs, as the rows of
 # group sq40 do. The replace in go/sqlite/go.mod makes every build of go/sqlite here compile against the main module
-# of the same checkout, so these rows measure the two modules at one revision.
+# of the same checkout, so these rows measure the two modules at one revision; the require line is what a consumer
+# outside the repository resolves, and SP-06 reads it.
 #
 # sp60_plant id expect mod pkg test case file sedexpr: copies /w/go to a temporary directory, applies the one-line sed
 # to go/<file> there and runs only the named test of package pkg in module directory go/<mod> of the copy. The copy is
@@ -126,3 +129,11 @@ sp60_plant SP-05q "TestMigrate/current fails on the plant" sqlite . TestMigrate 
   's/^\tcase v == 2:$/\tcase v == 3:/'
 sp60_plant SP-05r "TestMigrate/refused fails on the plant" sqlite . TestMigrate refused sqlite/migrate.go \
   's/^\tcase mode != "wal" || v < 1 || v > 2:$/\tcase v < 1 || v > 2:/'
+
+if sel SP-06 sp60; then
+  sp60_req=$(grep -cE '^[[:space:]]+github\.com/fiberfx/ecd-runtime/go v0\.6\.0$' /w/go/sqlite/go.mod)
+  sp60_rep=$(grep -cxF 'replace github.com/fiberfx/ecd-runtime/go => ../' /w/go/sqlite/go.mod)
+  if [ "$sp60_req" -eq 1 ] && [ "$sp60_rep" -eq 1 ]; then
+    say SP-06 "go/sqlite requires go v0.6.0 and replaces it by ../" "require 1, replace 1" PASS
+  else say SP-06 "go/sqlite requires go v0.6.0 and replaces it by ../" "require $sp60_req, replace $sp60_rep" FAIL; fi
+fi

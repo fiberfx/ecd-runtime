@@ -113,7 +113,7 @@ func tick(cfg rt.Config, mover ecd.Kind, pos ecd.CID, known eid.ID) (rt.Result, 
 The module `github.com/fiberfx/ecd-runtime/go/sqlite`, in `go/sqlite/`, package `sqlite`, is an owner store in one
 SQLite file. A host passes it to the Runtime as `rt.Config.Committer`, and after a restart it brings a fresh engine to
 the seq of the committed history. The module has its own tags, `go/sqlite/vX.Y.Z`; `go/sqlite/v0.4.0` is the first. It
-requires `github.com/fiberfx/ecd-runtime/go` v0.5.0, `github.com/fiberfx/ecd-id/go` v0.8.0 and the pure-Go driver
+requires `github.com/fiberfx/ecd-runtime/go` v0.6.0, `github.com/fiberfx/ecd-id/go` v0.8.0 and the pure-Go driver
 `modernc.org/sqlite` v1.37.0. Inside this repository a `replace` directive points the requirement on the main module at
 the parent directory. The main module `go/` does not require the driver.
 
@@ -236,7 +236,7 @@ deed whose transaction failed. Only a deed answered `Committed` reaches the engi
 - On macOS the writer also sets `fullfsync` and `checkpoint_fullfsync`. The rows run on Linux and do not measure them.
 
 Rows SQ-01 to SQ-14, in `rows/groups/78-sq40.sh`, SQ-20 to SQ-22, in `rows/groups/79-sq50.sh`, SQ-30 with the
-plants SQ-22q and SQ-22r, in `rows/groups/80-fx51.sh`, SP-03 to SP-05, in `rows/groups/82-sp60.sh`, L12-model, in
+plants SQ-22q and SQ-22r, in `rows/groups/80-fx51.sh`, SP-03 to SP-06, in `rows/groups/86-sp60.sh`, L12-model, in
 `rows/groups/50-j0m.sh`, and MQ-01, in `rows/groups/85-mq60.sh`, measure the module. They load the driver and its
 modules from the offline module inputs.
 
