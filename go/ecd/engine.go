@@ -165,6 +165,7 @@ type Engine interface {
 	// of Any; with Exact, its components equal All.
 	Query(q QID, arg []byte, out *Answer) error
 
+	// Stats reports the numbers of every kind. On a Stale engine a Touched kind's Bytes may exceed its Budget.
 	Stats() Stats
 	Close() error
 }

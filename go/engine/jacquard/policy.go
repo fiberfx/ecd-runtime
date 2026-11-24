@@ -50,7 +50,8 @@ func (p *policy) Get(id eid.ID, c ecd.CID, dst []byte) ([]byte, error) {
 
 // Apply is the Apply of the Engine, followed by a trim of every Touched kind. When the call succeeds it first clears
 // the clock bit of each resident Touched entity that the transaction destroys, so the entity that later takes a
-// freed index does not inherit a mark. A refused or failed call changes no residency and no mark.
+// freed index does not inherit a mark. A refused call changes no residency and no mark; a call that fails in its
+// commit pass leaves the engine stale, untrimmed, with every mark as it was.
 func (p *policy) Apply(seq uint64, deeds []ecd.Deed) error {
 	var freed []freedIndex
 	for _, d := range deeds {

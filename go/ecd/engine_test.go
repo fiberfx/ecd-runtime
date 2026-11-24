@@ -176,7 +176,7 @@ func TestSeamApplyText(t *testing.T) {
 	}
 }
 
-// SC-01: engine.go states the decided text of the Budget, write, Hydrate, query and ErrOp comments.
+// SC-01: engine.go states the decided text of the Budget, write, Hydrate, query, ErrOp and Stats comments.
 func TestSeamDecidedText(t *testing.T) {
 	src, err := os.ReadFile("engine.go")
 	if err != nil {
@@ -192,6 +192,7 @@ func TestSeamDecidedText(t *testing.T) {
 		"Hydrate is all or nothing per call",
 		"when Any is not empty",
 		", or a Hydrate row:",
+		"On a Stale engine a Touched kind's Bytes may exceed its Budget.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("engine.go lacks %q", want)

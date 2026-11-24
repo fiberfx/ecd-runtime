@@ -2,8 +2,8 @@
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, go_row and HAVE_GO.
 #
 # TestSeamDecidedText reads engine.go and requires the words of the KindDef Budget comment, of the Op comment on
-# committed deeds, of the Hydrate comment, of the Query comment and of the ErrOp comment. The plants of this group
-# edit one line of engine.go each and run that test.
+# committed deeds, of the Hydrate comment, of the Query comment, of the ErrOp comment and of the Stats comment. The
+# plants of this group edit one line of engine.go each and run that test.
 #
 #   SC-01    TestSeamDecidedText passes on engine.go
 #   SC-01p   plant: the Budget comment ends "and 0 means no residency", not "and 0 keeps none resident" (engine.go)
@@ -12,6 +12,7 @@
 #   SC-01s   plant: the ErrOp comment does not name a Hydrate row (engine.go)
 #   SC-01t   plant: the Query comment drops the rule for a non-empty Any (engine.go)
 #   SC-01u   plant: the Budget comment drops the empty-kind case (engine.go)
+#   SC-01v   plant: the Stats comment drops the Stale case (engine.go)
 #
 # seamc_plant id expect sedexpr: copies /w/go to a temporary directory, applies the one-line sed to ecd/engine.go and
 # runs only TestSeamDecidedText there. KILLED: the test failed. SURVIVED: it passed.
@@ -48,3 +49,4 @@ seamc_plant SC-01s "TestSeamDecidedText fails on the plant" \
   's/, or a Hydrate row: an undeclared CID/: an undeclared CID/'
 seamc_plant SC-01t "TestSeamDecidedText fails on the plant" 's/and, when Any is not empty, one$/and one/'
 seamc_plant SC-01u "TestSeamDecidedText fails on the plant" 's/within it, or holds no$/within it, and holds no/'
+seamc_plant SC-01v "TestSeamDecidedText fails on the plant" 's/ On a Stale engine a Touched kind.s Bytes may exceed its Budget\.$//'
