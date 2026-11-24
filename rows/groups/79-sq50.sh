@@ -80,9 +80,9 @@ sq50_plant() {
 sq50_notnew='s/^\(\t*\)if \(.*\) { \/\/ start: not new$/\1if (\2) \&\& false { \/\/ start: not new/'
 
 go_row ST-01 sq50 "TestStart rc=0" /w/go test -run '^TestStart$' ./rt/
-sq50_plant ST-01p "TestStart/model fails on the plant" . ./rt/ TestStart model \
+sq50_plant ST-01p "TestStart/model/hydrated fails on the plant" . ./rt/ TestStart model/hydrated \
   engine/jacquard/model/model.go "$sq50_notnew"
-sq50_plant ST-01q "TestStart/jacquard fails on the plant" . ./rt/ TestStart jacquard \
+sq50_plant ST-01q "TestStart/jacquard/hydrated fails on the plant" . ./rt/ TestStart jacquard/hydrated \
   engine/jacquard/hydrate.go "$sq50_notnew"
 
 go_row ST-02 sq50 "ark TestStart rc=0" /w/go/enginecmp test -run '^TestStart$' ./ark/
