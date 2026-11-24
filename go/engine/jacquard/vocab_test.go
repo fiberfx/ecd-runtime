@@ -80,7 +80,7 @@ func TestVocabulary(t *testing.T) {
 	bad := map[string]string{
 		"package clause": "package " + "ecs\n",
 		"banned word":    "package jacquard\n\n// Wor" + "ld holds the entities.\n",
-		"port marker":    "package jacquard\n\n// " + portMarker + "mask256.go of the cut.\n",
+		"port marker":    "package jacquard\n\n// " + portMarker + "mask256.go of Ark.\n",
 		"second word":    "package jacquard\n\n// the Pla" + "yer moves.\n",
 	}
 	for name, src := range bad {
@@ -89,7 +89,7 @@ func TestVocabulary(t *testing.T) {
 		}
 	}
 	for name, src := range map[string]string{
-		"path on a port line":    "package jacquard\n\n// " + attribution + "\n// Port of ecs/wor" + "ld.go of the cut.\n",
+		"path on a port line":    "package jacquard\n\n// " + attribution + "\n// Port of ecs/wor" + "ld.go of Ark.\n",
 		"port line of two files": "package jacquard\n\n// " + attribution + "\n// Port of ecs/storage.go and of ecs/wor" + "ld.go.\n",
 	} {
 		if issues := vocabIssues(name, src); len(issues) != 0 {
@@ -105,7 +105,7 @@ func TestVocabulary(t *testing.T) {
 			t.Errorf("the violating source %q is not detected", name)
 		}
 	}
-	good := "package jacquard\n\n// " + attribution + "\n// " + portMarker + "mask256.go of the cut.\n"
+	good := "package jacquard\n\n// " + attribution + "\n// " + portMarker + "mask256.go of Ark.\n"
 	if issues := vocabIssues("good", good); len(issues) != 0 {
 		t.Errorf("a ported file with the attribution line is refused: %v", issues)
 	}

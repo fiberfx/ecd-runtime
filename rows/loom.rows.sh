@@ -3,7 +3,7 @@
 # The script needs the Go toolchain and git. Rows sit in groups, and ROWS selects them.
 #
 # Run command (flow:row-container, image mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2, whose /usr/local/go is
-# go1.27.4; the module's floor is go 1.27):
+# go1.27.4; the module's go line is go 1.27.4):
 #   kan flow run flow:row-container --param script=rows/loom.rows.sh \
 #     --param checkout=/Users/jonny/dev/ecd/ecd-runtime --param revision=SHA --param paths='go rows' --param name=rt \
 #     --param image=mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2 \
@@ -26,14 +26,16 @@
 #   tools     R0    go and git are on PATH
 #   repo      RP1   go vet ./... in /w/go
 #   repo      RP2   go build ./... in /w/go
-#   cut       AK1   go test ./... in /w/go/third_party/ark: Ark's tests on the cut
-#   cut       AK2   the tree hash of /w/go/third_party/ark/ecs equals the hash in third_party/ark/SOURCE.txt
-#   cut       AK2p  plant: one byte appended to ecs/entity.go in a temporary copy, the hash comparison must turn red
+#   notice    NT1   no path, Go file or README names a vendored directory; NT1p is its plant
+#   notice    NT2   every "// Derived from" line of a Go file is in go/NOTICE.txt; plants NT2p and NT2q
+#   notice    NT3   every file that go/NOTICE.txt lists carries its attribution line; plant NT3p
+#   notice    NT4   go/go.mod has go 1.27.4, no toolchain line and the one requirement; plants NT4p and NT4q
+#   notice    NT5   go mod tidy in a copy of go/ leaves go.mod and go.sum byte-equal; plant NT5p
 #   other groups    each group file lists its own rows in its header
 #
 # A plant is KILLED when its row turns red and SURVIVED when it stays green. A plant that cannot be applied, or in
 # which no test ran, is CNM.
-# Group files: 10-repo.sh (RP1, RP2), 20-cut.sh (AK1, AK2, AK2p), and one NN-<group>.sh per later group.
+# Group files: 10-repo.sh (RP1, RP2), 20-notice.sh (NT1 to NT5 and their plants), and one NN-<group>.sh per later group.
 # Exit: 0 every selected row as expected, 1 a row FAIL or a plant SURVIVED, 3 any CNM (and no FAIL or SURVIVED).
 set -u
 cd /w || exit 3

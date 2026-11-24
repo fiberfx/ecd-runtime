@@ -1,7 +1,7 @@
 //go:build jacquard512
 
 // Derived from Ark (github.com/mlange-42/ark) at commit 723f2ac. Copyright (c) 2025 Martin Lange. MIT License.
-// Port of ecs/mask_tiny.go of the cut in go/third_party/ark/.
+// Port of ecs/mask_tiny.go.
 
 package jacquard
 

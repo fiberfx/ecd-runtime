@@ -1,5 +1,5 @@
 // Derived from Ark (github.com/mlange-42/ark) at commit 723f2ac. Copyright (c) 2025 Martin Lange. MIT License.
-// Port of ecs/filter.go and ecs/cache.go of the cut in go/third_party/ark/: the mask test of a query and the
+// Port of ecs/filter.go and ecs/cache.go: the mask test of a query and the
 // node list of a declared query.
 
 package jacquard
