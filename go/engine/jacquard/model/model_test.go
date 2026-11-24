@@ -434,6 +434,11 @@ func TestCatalog(t *testing.T) {
 	if _, err := New(testCatalog()); err != nil {
 		t.Fatalf("New of the test catalog: %v", err)
 	}
+	// An Edge is a form of the seam that the model holds as it holds a Component.
+	edge := &ecd.Catalog{Components: []ecd.ComponentDef{one, {CID: 4, Name: "link", Form: ecd.Edge, Size: 16}}}
+	if e, err := New(edge); err != nil || e == nil {
+		t.Fatalf("New of a catalog with an Edge component = %v, %v; want an engine", e, err)
+	}
 }
 
 // L14-model: a Cold kind answers ErrCold, never an empty answer, and answers once it is hydrated.
