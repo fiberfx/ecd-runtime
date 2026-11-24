@@ -1,11 +1,12 @@
 # Group notice of Ecd Runtime: NT1 to NT5 and their plants.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, go_row and HAVE_GO.
 #
 # The checks keep the attribution of code taken from other projects in one file, go/NOTICE.txt, and keep the module's
 # go line and requirements as they are declared.
 #
 #   NT1   no path, Go file or README names the directory of a vendored copy
 #   NT1p  plant: a copy of go/ with a file added below a directory of that name; NT1 must turn red
+#   NT1r  plant: a copy of the tree without README.md; NT1 answers could-not-measure, which is the expected verdict
 #   NT2   every "// Derived from" line of a Go file is a line of go/NOTICE.txt, in at least 12 files
 #   NT2p  plant: the attribution line of engine/jacquard/pool.go names another project; NT2 must turn red
 #   NT2q  plant: a copy of go/NOTICE.txt without the Ark attribution line; NT2 must turn red
@@ -53,6 +54,7 @@ nt1_check() {
   nt_m=
   if [ -f "$1/README.md" ] && grep -qF -- "$nt_tp" "$1/README.md"; then nt_m="$1/README.md"; fi
   if [ -n "$nt_p$nt_f$nt_m" ]; then echo "names $nt_tp: $nt_p$nt_f$nt_m"; return 1; fi
+  if [ ! -f "$1/README.md" ]; then echo "README.md is not in the tree under test"; return 2; fi
   echo "no path, Go file or README names $nt_tp"
 }
 
@@ -147,6 +149,16 @@ if sel NT1p notice; then
     say NT1p "a file added below go/$nt_tp turns NT1 red" "$nt_o" "$(nt_verdict $nt_r)"
   else
     say NT1p "a file added below go/$nt_tp turns NT1 red" "the copy failed" CNM
+  fi
+  rm -rf "$nt_root"
+fi
+if sel NT1r notice; then
+  if nt_mk; then
+    rm -f "$nt_root/README.md"
+    nt_o=$(nt1_check "$nt_root"); nt_r=$?
+    say NT1r "a tree without README.md makes NT1 answer could-not-measure" "$nt_o" "$([ $nt_r -eq 2 ] && echo KILLED || { [ $nt_r -eq 0 ] && echo SURVIVED || echo CNM; })"
+  else
+    say NT1r "a tree without README.md makes NT1 answer could-not-measure" "the copy failed" CNM
   fi
   rm -rf "$nt_root"
 fi
