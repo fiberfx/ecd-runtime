@@ -141,13 +141,15 @@ the parent directory. The main module `go/` does not require the driver.
   error of `f` stops the walk and is returned unchanged. A body that does not decode matches `ErrSchema`.
 - `Store.Close` closes both connections, and a second `Close` returns nil.
 - `ErrExist` is matched by a `Create` that finds a file at its path. `ErrSchema` is matched by an `Open` of a file that
-  is not an owner store of user version 2 and by a `Log` that reads a malformed body, trace id or span id.
+  is not an owner store of user version 2, by a `Migrate` of a file that is not an owner store of user version 1 or 2
+  and by a `Log` that reads a malformed body, trace id or span id.
 
 A `Store` is used on the owner goroutine only. The tables are `entity` (one row per entity, with the seq of its last
 change and the seq of its destroy), `state` (one row per component value of an entity, whatever its kind), `deed` and
 `deed_body` (the log). The seq of the store is the highest `seq` of `deed`, so only a transaction that commits a deed
 advances it. The store is at user version 2, whose `deed` also holds each deed's trace id and span id, NULL for the
-zero values; `Open` refuses a store of user version 1, written by `go/v0.4.0` to `go/v0.5.1`, and never migrates.
+zero values; `Open` refuses a store of user version 1, written by `go/v0.4.0` to `go/v0.5.1`, and never migrates;
+`Migrate` brings it to user version 2 in one transaction.
 
 ### Starting a host
 
@@ -234,7 +236,7 @@ deed whose transaction failed. Only a deed answered `Committed` reaches the engi
 - On macOS the writer also sets `fullfsync` and `checkpoint_fullfsync`. The rows run on Linux and do not measure them.
 
 Rows SQ-01 to SQ-14, in `rows/groups/78-sq40.sh`, SQ-20 to SQ-22, in `rows/groups/79-sq50.sh`, SQ-30 with the
-plants SQ-22q and SQ-22r, in `rows/groups/80-fx51.sh`, SP-03 and SP-04, in `rows/groups/82-sp60.sh`, L12-model, in
+plants SQ-22q and SQ-22r, in `rows/groups/80-fx51.sh`, SP-03 to SP-05, in `rows/groups/82-sp60.sh`, L12-model, in
 `rows/groups/50-j0m.sh`, and MQ-01, in `rows/groups/85-mq60.sh`, measure the module. They load the driver and its
 modules from the offline module inputs.
 

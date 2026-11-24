@@ -2,8 +2,7 @@
 # ecd.Deed holds them as ecd.TraceID and ecd.SpanID and that no engine reads them; that a buffer's Span call puts
 # them on the buffer's next deed and the flush that empties the buffer resets them; that the owner store keeps them
 # in deed.trace_id and deed.span_id, NULL for the zero values, and Log returns them; that Open refuses any user
-# version but 2; that Migrate brings a store of user version 1 to 2; and that the nested module go/sqlite requires
-# the main module at v0.6.0 and replaces it by its parent directory.
+# version but 2; and that Migrate brings a store of user version 1 to 2.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #
@@ -25,11 +24,15 @@
 #   SP-04    Create writes user version 2, and Open refuses a store of user version 1 (TestCreate)
 #   SP-04p   plant: Open admits user version 1 (sqlite/store.go; TestCreate)
 #   SP-04q   plant: Create writes user version 1 (sqlite/store.go; TestCreate)
+#   SP-05    Migrate brings a store of user version 1 to 2 with its deed intact, leaves a store of version 2 unchanged
+#            and refuses other files with ErrSchema and no change (TestMigrate)
+#   SP-05p   plant: Migrate sets user version 1 (sqlite/migrate.go; TestMigrate, case v1)
+#   SP-05q   plant: Migrate alters a store of user version 2 (sqlite/migrate.go; TestMigrate, case current)
+#   SP-05r   plant: Migrate skips the journal mode check (sqlite/migrate.go; TestMigrate, case refused)
 #
 # Rows SP-03, SP-04 and SP-05 and their plants load the driver and its modules from the module inputs, as the rows of
 # group sq40 do. The replace in go/sqlite/go.mod makes every build of go/sqlite here compile against the main module
-# of the same checkout, so these rows measure the two modules at one revision; the require line is what a consumer
-# outside the repository resolves, and SP-06 reads it.
+# of the same checkout, so these rows measure the two modules at one revision.
 #
 # sp60_plant id expect mod pkg test case file sedexpr: copies /w/go to a temporary directory, applies the one-line sed
 # to go/<file> there and runs only the named test of package pkg in module directory go/<mod> of the copy. The copy is
@@ -115,3 +118,11 @@ sp60_plant SP-04p "TestCreate fails on the plant" sqlite . TestCreate '' sqlite/
   's/^\tif v != 2 || mode != "wal" {$/\tif v > 2 || v < 1 || mode != "wal" {/'
 sp60_plant SP-04q "TestCreate fails on the plant" sqlite . TestCreate '' sqlite/store.go \
   's/"PRAGMA user_version = 2"/"PRAGMA user_version = 1"/'
+
+go_row SP-05 sp60 "TestMigrate rc=0" /w/go/sqlite test -run '^TestMigrate$' .
+sp60_plant SP-05p "TestMigrate/v1 fails on the plant" sqlite . TestMigrate v1 sqlite/migrate.go \
+  's/^PRAGMA user_version = 2;`$/PRAGMA user_version = 1;`/'
+sp60_plant SP-05q "TestMigrate/current fails on the plant" sqlite . TestMigrate current sqlite/migrate.go \
+  's/^\tcase v == 2:$/\tcase v == 3:/'
+sp60_plant SP-05r "TestMigrate/refused fails on the plant" sqlite . TestMigrate refused sqlite/migrate.go \
+  's/^\tcase mode != "wal" || v < 1 || v > 2:$/\tcase v < 1 || v > 2:/'

@@ -58,7 +58,8 @@
 //
 // Create refuses a path where anything exists. It sets page_size 4096 and auto_vacuum INCREMENTAL before the first
 // table, then journal_mode WAL, and writes the schema and user_version 2 in one transaction. Open never creates or
-// migrates a file, and refuses a file whose user_version is not 2 or whose journal_mode is not wal. The writer is one
+// migrates a file, and refuses a file whose user_version is not 2 or whose journal_mode is not wal. Migrate brings
+// a store of user_version 1, whose deed table has no trace_id and span_id, to user_version 2. The writer is one
 // connection with busy_timeout 2000 ms, foreign_keys on, synchronous FULL and, on darwin, fullfsync and
 // checkpoint_fullfsync; each of its transactions begins BEGIN IMMEDIATE. The reader is one connection with
 // busy_timeout 2000 ms and query_only. wal_autocheckpoint keeps SQLite's default.

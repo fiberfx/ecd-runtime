@@ -16,8 +16,10 @@ import (
 
 // The sentinels of the package.
 var (
-	ErrExist  = errors.New("sqlite: store exists")       // Create: a file is at the path
-	ErrSchema = errors.New("sqlite: not an owner store") // Open: wrong schema or journal mode; Log: a malformed body
+	ErrExist = errors.New("sqlite: store exists") // Create: a file is at the path
+	// ErrSchema is matched by Open and Migrate of a file with the wrong schema, user version or journal mode, and by
+	// Log of a deed with a malformed body, trace id or span id.
+	ErrSchema = errors.New("sqlite: not an owner store")
 )
 
 // Store is an owner store in one SQLite file. It is used on the owner goroutine only.
@@ -158,7 +160,7 @@ func initialize(db *sql.DB) error {
 // Open opens the store at path: a writer and a reader of one connection each. It never creates a file; a missing
 // path is an error. A file whose user version or journal mode is not the store's (2 and wal) is refused with an
 // error that matches ErrSchema, and Open never migrates: a store of user version 1, whose deed table has no trace id
-// and span id, is refused too. Both connections are open when Open returns.
+// and span id, is refused too, and Migrate brings it to 2. Both connections are open when Open returns.
 func Open(path string) (*Store, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
