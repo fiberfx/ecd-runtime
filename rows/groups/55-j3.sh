@@ -32,6 +32,9 @@
 #   J3-05p  plant: fail does not mark the engine stale
 #   J3-06   a Destroy and a Spawn of one eid in one transaction answer errOp and change nothing (TestJ3_06)
 #   J3-06p  plant: the destroy and spawn refusal is not returned
+#   J3-07   deeds commit in Ord order whatever their order in the list, and the check pass reads them in the same order
+#           (TestJ3Ord)
+#   J3-07p  plant: inOrder never sorts
 #
 # j3_plant id expect test file sedexpr [flags]: copies /w/go to a temporary directory, applies the one-line sed to
 # engine/jacquard/<file> and runs only the named test there. KILLED: the test failed. SURVIVED: it passed.
@@ -89,3 +92,6 @@ j3_plant J3-05p "TestJ3_05 fails on the plant" TestJ3_05 engine.go 's/^\ten\.sta
 
 go_row J3-06 j3 "TestJ3_06 rc=0" /w/go test -run '^TestJ3_06$' ./engine/jacquard/
 j3_plant J3-06p "TestJ3_06 fails on the plant" TestJ3_06 engine.go 's/return fmt\.Errorf("%w: destroy and spawn of %s in one transaction", errOp, op\.Entity)/_ = fmt.Errorf("%w", errOp)/'
+
+go_row J3-07 j3 "TestJ3Ord rc=0" /w/go test -run '^TestJ3Ord$' ./engine/jacquard/
+j3_plant J3-07p "TestJ3Ord fails on the plant" TestJ3Ord engine.go 's/if slices\.IsSortedFunc(deeds, cmp) {/if true {/'

@@ -1,5 +1,5 @@
 // Derived from Ark (github.com/mlange-42/ark) at commit 723f2ac. Copyright (c) 2025 Martin Lange. MIT License.
-// Port of ecs/storage.go of the cut in go/third_party/ark/: entity storage only.
+// Port of ecs/storage.go and of the exchange in ecs/world_internal.go of the cut in go/third_party/ark/: entity storage only.
 
 package jacquard
 
@@ -100,7 +100,8 @@ func newEngine(kinds []ecd.Kind, comps []compDef) (*Engine, error) {
 // appliedAt returns the seq of the last transaction applied in full.
 func (en *Engine) appliedAt() uint64 { return en.applied }
 
-// isStale reports whether a failure after the first change left the engine unusable until it is rebuilt.
+// isStale reports whether the engine is unusable until it is rebuilt: any error or panic of the commit pass, including
+// one before the first change, makes it stale; a refusal of the check pass does not.
 func (en *Engine) isStale() bool { return en.stale }
 
 // moveCount returns the number of archetype changes of existing entities since the engine was built. A spawn
