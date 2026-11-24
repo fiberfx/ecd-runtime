@@ -443,6 +443,87 @@ func TestCatalog(t *testing.T) {
 	}
 }
 
+// J0M-07: a hydrated row whose value is not the Size of its component, or a tag's row with a value, is refused with
+// an error that matches ecd.ErrOp, on a Cold and a Warm All kind and on a Touched kind; the model does not become
+// stale and nothing changes.
+func TestHydrateRows(t *testing.T) {
+	a1, a2, b1 := entityID("aaa", 1), entityID("aaa", 2), entityID("bbb", 1)
+	good := ecd.Row{Entity: a1, CID: 1, Value: val(1)}
+	cases := []struct {
+		name string
+		row  ecd.Row
+	}{
+		{"one byte short", ecd.Row{Entity: a2, CID: 1, Value: make([]byte, 7)}},
+		{"one byte long", ecd.Row{Entity: a2, CID: 2, Value: make([]byte, 9)}},
+		{"tag with a value", ecd.Row{Entity: a2, CID: 3, Value: []byte{1}}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			m := newModel(t)
+			err := m.Hydrate(kindAaa, 0, &rowList{rows: []ecd.Row{good, c.row}})
+			if !errors.Is(err, ecd.ErrOp) || errors.Is(err, ecd.ErrStale) {
+				t.Fatalf("Cold kind: Hydrate = %v, want ErrOp", err)
+			}
+			if s := m.State(kindAaa); s != ecd.Cold || m.At() != 0 {
+				t.Fatalf("Cold kind after the refusal: State %v, At %d, want Cold, 0", s, m.At())
+			}
+			if err := m.Hydrate(kindAaa, 0, &rowList{rows: []ecd.Row{good}}); err != nil {
+				t.Fatalf("Hydrate of the good row: %v", err)
+			}
+			if err := m.Hydrate(kindAaa, 0, &rowList{rows: []ecd.Row{c.row}}); !errors.Is(err, ecd.ErrOp) {
+				t.Fatalf("Warm kind: Hydrate = %v, want ErrOp", err)
+			}
+			if got, err := m.Get(a1, 1, nil); err != nil || !bytes.Equal(got, val(1)) {
+				t.Fatalf("Warm kind after the refusal: Get = %x, %v, want %x", got, err, val(1))
+			}
+			bad := c.row
+			bad.Entity = b1
+			if err := m.Hydrate(kindBbb, 0, &rowList{rows: []ecd.Row{bad}}); !errors.Is(err, ecd.ErrOp) {
+				t.Fatalf("Touched kind: Hydrate = %v, want ErrOp", err)
+			}
+			if _, err := m.Get(b1, bad.CID, nil); !errors.Is(err, ecd.ErrMiss) {
+				t.Fatalf("Touched kind after the refusal: Get = %v, want ErrMiss", err)
+			}
+		})
+	}
+}
+
+// J0M-08: New refuses a kind whose Budget is below 0, All or Touched, with an error that matches ecd.ErrOp, an Exact
+// query whose All repeats a CID and a query whose Kinds repeat a kind, and builds no engine; it builds a Budget of 0
+// and a query that repeats a CID without Exact.
+func TestCatalogRefusals(t *testing.T) {
+	for ki := range 2 {
+		for _, b := range []int64{-1, -1 << 40} {
+			cat := testCatalog()
+			cat.Kinds[ki].Budget = b
+			if e, err := New(cat); !errors.Is(err, ecd.ErrOp) || e != nil {
+				t.Errorf("New with kind %d at Budget %d = %v, %v; want ErrOp and no engine", ki, b, e, err)
+			}
+		}
+		cat := testCatalog()
+		cat.Kinds[ki].Budget = 0
+		if _, err := New(cat); err != nil {
+			t.Errorf("New with kind %d at Budget 0: %v", ki, err)
+		}
+	}
+	aaa := []ecd.Kind{kindAaa}
+	for name, q := range map[string]ecd.QueryDef{
+		"an Exact query that repeats a CID": {QID: 20, Kinds: aaa, All: []ecd.CID{1, 1}, Exact: true},
+		"a query that repeats a kind":       {QID: 20, Kinds: []ecd.Kind{kindAaa, kindAaa}},
+	} {
+		cat := testCatalog()
+		cat.Queries = append(cat.Queries, q)
+		if e, err := New(cat); err == nil || e != nil {
+			t.Errorf("New with %s = %v, %v; want an error and no engine", name, e, err)
+		}
+	}
+	cat := testCatalog()
+	cat.Queries = append(cat.Queries, ecd.QueryDef{QID: 20, Kinds: aaa, All: []ecd.CID{1, 1}})
+	if _, err := New(cat); err != nil {
+		t.Errorf("New with a query that repeats a CID without Exact: %v", err)
+	}
+}
+
 // L14-model: a Cold kind answers ErrCold, never an empty answer, and answers once it is hydrated.
 func TestCold(t *testing.T) {
 	a1, a2 := entityID("aaa", 1), entityID("aaa", 2)
