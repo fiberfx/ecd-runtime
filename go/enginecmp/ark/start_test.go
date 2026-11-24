@@ -74,3 +74,37 @@ func TestStart(t *testing.T) {
 		})
 	}
 }
+
+// TestStartClosed: a closed engine is Stale, and Start answers ErrStale on it, both on an engine that was new and on
+// one hydrated at the seq of the call. The adapter and the reference model run over atCatalog.
+func TestStartClosed(t *testing.T) {
+	cases := []struct {
+		name string
+		open func(cat *ecd.Catalog) (ecd.Engine, error)
+	}{
+		{"ark", New},
+		{"model", refmodel.New},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fresh, err := c.open(atCatalog())
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			fresh.Close()
+			if s := fresh.State(atKindA); s != ecd.Stale {
+				t.Fatalf("the All kind of a closed engine is %v, want Stale", s)
+			}
+			atWantErr(t, "Start(5) on a closed new engine", fresh.Start(5), ecd.ErrStale)
+			at3, err := c.open(atCatalog())
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			if err := at3.Hydrate(atKindA, 3, &atRows{}); err != nil {
+				t.Fatalf("Hydrate at 3: %v", err)
+			}
+			at3.Close()
+			atWantErr(t, "Start(3) on a closed engine at 3", at3.Start(3), ecd.ErrStale)
+		})
+	}
+}

@@ -106,3 +106,34 @@ func TestStart(t *testing.T) {
 		})
 	}
 }
+
+// TestStartClosed: a closed engine is Stale, and Start answers ErrStale on it, both on an engine that was new and on
+// one hydrated at the seq of the call. Every engine case runs over testCatalog.
+func TestStartClosed(t *testing.T) {
+	for _, ec := range engineCases {
+		t.Run(ec.name, func(t *testing.T) {
+			fresh, err := ec.open(testCatalog())
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			fresh.Close()
+			if s := fresh.State(kindAll); s != ecd.Stale {
+				t.Fatalf("the All kind of a closed engine is %v, want Stale", s)
+			}
+			if err := fresh.Start(5); !errors.Is(err, ecd.ErrStale) {
+				t.Errorf("Start(5) on a closed new engine: err = %v, want ErrStale", err)
+			}
+			at3, err := ec.open(testCatalog())
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			if err := at3.Hydrate(kindAll, 3, emptyRows{}); err != nil {
+				t.Fatalf("Hydrate at 3: %v", err)
+			}
+			at3.Close()
+			if err := at3.Start(3); !errors.Is(err, ecd.ErrStale) {
+				t.Errorf("Start(3) on a closed engine at 3: err = %v, want ErrStale", err)
+			}
+		})
+	}
+}
