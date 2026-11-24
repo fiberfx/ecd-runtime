@@ -185,7 +185,8 @@ func TestSeamDecidedText(t *testing.T) {
 	text := string(src)
 	for _, want := range []string{
 		"for both residencies",
-		"New refuses a Budget below 0",
+		"New refuses a Budget below 0 with an error that matches ErrOp",
+		"may be refused with that fault's error instead",
 		"the kind as it was, and 0 means no limit",
 		"within it, or holds no",
 		"0 keeps none",
@@ -193,6 +194,7 @@ func TestSeamDecidedText(t *testing.T) {
 		"Hydrate is all or nothing per call",
 		"when Any is not empty",
 		", or a Hydrate row:",
+		", or a Budget below 0 at New",
 		"a non-empty arg for a query that takes none",
 		"On a Stale engine a Touched kind's Bytes may exceed its Budget.",
 	} {

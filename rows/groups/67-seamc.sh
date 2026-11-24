@@ -6,7 +6,7 @@
 # Stats comment. The plants of this group edit one line of engine.go each and run that test.
 #
 #   SC-01    TestSeamDecidedText passes on engine.go
-#   SC-01p   plant: the Budget comment ends "and 0 means no residency", not "and 0 keeps none resident" (engine.go)
+#   SC-01p   plant: the Budget comment reads "and 0 means no residency;", not "and 0 keeps none resident;" (engine.go)
 #   SC-01q   plant: the Op comment drops the reference "(E1)" (engine.go)
 #   SC-01r   plant: the Hydrate comment does not state that a call is all or nothing (engine.go)
 #   SC-01s   plant: the ErrOp comment does not name a Hydrate row (engine.go)
@@ -15,6 +15,9 @@
 #   SC-01v   plant: the Stats comment drops the Stale case (engine.go)
 #   SC-01w   plant: the Budget comment says New accepts a Budget below 0 (engine.go)
 #   SC-01x   plant: the Query comment drops the refusal of a non-empty arg for a query that takes none (engine.go)
+#   SC-01y   plant: the Budget comment drops the case of a catalog with another fault (engine.go)
+#   SC-01z   plant: the Budget comment drops the error that New's refusal matches (engine.go)
+#   SC-01za  plant: the ErrOp comment drops New's refusal of a Budget below 0 (engine.go)
 #
 # seamc_plant id expect sedexpr: copies /w/go to a temporary directory, applies the one-line sed to ecd/engine.go and
 # runs only TestSeamDecidedText there. KILLED: the test failed. SURVIVED: it passed.
@@ -44,7 +47,8 @@ seamc_plant() {
 }
 
 go_row SC-01 seamc "TestSeamDecidedText rc=0" /w/go test -run '^TestSeamDecidedText$' ./ecd/
-seamc_plant SC-01p "TestSeamDecidedText fails on the plant" 's/, and 0 keeps none resident;$/, and 0 means no residency;/'
+seamc_plant SC-01p "TestSeamDecidedText fails on the plant" \
+  's/, and 0 keeps none resident;$/, and 0 means no residency;/'
 seamc_plant SC-01q "TestSeamDecidedText fails on the plant" 's/ (E1)\.$/./'
 seamc_plant SC-01r "TestSeamDecidedText fails on the plant" 's/Hydrate is all or nothing per call:/Hydrate loads rows:/'
 seamc_plant SC-01s "TestSeamDecidedText fails on the plant" \
@@ -56,3 +60,9 @@ seamc_plant SC-01w "TestSeamDecidedText fails on the plant" \
   's/New refuses a Budget below 0/New accepts a Budget below 0/'
 seamc_plant SC-01x "TestSeamDecidedText fails on the plant" \
   's/, a non-empty arg for a query that takes none, and/, and/'
+seamc_plant SC-01y "TestSeamDecidedText fails on the plant" \
+  's/may be refused with that fault.s error instead$/is refused for its Budget/'
+seamc_plant SC-01z "TestSeamDecidedText fails on the plant" \
+  's/below 0 with an error that matches ErrOp;/below 0;/'
+seamc_plant SC-01za "TestSeamDecidedText fails on the plant" \
+  's/, or a Budget below 0 at New$//'

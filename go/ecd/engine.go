@@ -47,7 +47,8 @@ type KindDef struct {
 	Budget    int64 // bytes, for both residencies: a Hydrate of an All kind over it answers ErrBudget and leaves
 	// the kind as it was, and 0 means no limit; a Touched kind keeps its resident bytes within it, or holds no
 	// entity, and 0 keeps none resident;
-	// an engine's New refuses a Budget below 0 with an error that matches ErrOp
+	// an engine's New refuses a Budget below 0 with an error that matches ErrOp; a catalog that holds another
+	// fault as well may be refused with that fault's error instead
 }
 
 type QueryDef struct {
@@ -187,7 +188,7 @@ var (
 	ErrMiss   = errors.New("ecd: not resident")                 // a Touched entity; read the store
 	ErrAbsent = errors.New("ecd: absent")                       // resident, and the entity or component is absent
 	ErrKind   = errors.New("ecd: kind not in catalog")          // an op on an entity whose kind the catalog does not declare
-	ErrOp     = errors.New("ecd: op refused")                   // Apply's check pass, or a Hydrate row: an undeclared CID, a value of the wrong length or an op out of order
+	ErrOp     = errors.New("ecd: op refused")                   // Apply's check pass, or a Hydrate row: an undeclared CID, a value of the wrong length or an op out of order, or a Budget below 0 at New
 	ErrBudget = errors.New("ecd: over budget")                  // an All kind exceeds its budget at hydration
 	ErrQuery  = errors.New("ecd: query refused")                // a refusal that the Query comment lists
 	ErrOwner  = errors.New("ecd: call off the owner goroutine") // debug builds

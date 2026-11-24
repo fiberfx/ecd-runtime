@@ -412,3 +412,25 @@ func TestJ5SBudget(t *testing.T) {
 		}
 	}
 }
+
+// TestJ5SMultiFault (J5S-04) requires build, New and the reference model to refuse, without an engine, a catalog with
+// a kind whose Budget is below 0 and a later kind declared twice. Which fault's error each answers is not specified
+// by the seam, and the test logs it.
+func TestJ5SMultiFault(t *testing.T) {
+	cat := j5rCatalog()
+	cat.Kinds[0].Budget = -1
+	cat.Kinds = append(cat.Kinds, cat.Kinds[1])
+	en, errB := build(cat)
+	p, errN := New(cat)
+	m, errM := refmodel.New(cat)
+	for name, err := range map[string]error{"build": errB, "New": errN, "model": errM} {
+		if err == nil {
+			t.Errorf("%s accepted the catalog", name)
+			continue
+		}
+		t.Logf("%s answers %v; matches ecd.ErrOp: %t", name, err, errors.Is(err, ecd.ErrOp))
+	}
+	if en != nil || p != nil || m != nil {
+		t.Errorf("an engine was built: build %v, New %v, model %v", en != nil, p != nil, m != nil)
+	}
+}

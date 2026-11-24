@@ -12,8 +12,12 @@ import (
 // jcTouchedQID is the QID of the query of jcQueries that names the Touched kind.
 const jcTouchedQID ecd.QID = 11
 
-// jcQueries returns the declared queries of the comparison. No term repeats a CID and no kind is repeated. A query
-// with no kinds runs on the All kinds job and evt, and the kind log is Touched in a seam sim.
+// jcRepeatQID is the QID of the query of jcQueries whose All repeats a CID without Exact.
+const jcRepeatQID ecd.QID = 12
+
+// jcQueries returns the declared queries of the comparison. No kind is repeated, and only query 12 repeats a CID: in
+// All, without Exact, which matches as All [u64] does. A query with no kinds runs on the All kinds job and evt, and
+// the kind log is Touched in a seam sim.
 //
 //	0   All [u64]                                     a required component
 //	1   All [u64], None [u32]                         an excluded component
@@ -26,6 +30,7 @@ const jcTouchedQID ecd.QID = 11
 //	8   All [99]                                      an undeclared CID matches nothing
 //	9   Kinds [tst/abc]                               an undeclared kind: ecd.ErrQuery
 //	11  Kinds [log]                                   the Touched kind: ecd.ErrQuery in a seam sim
+//	12  All [u64, u64]                                a repeated CID without Exact: query 0's answers
 func jcQueries() []ecd.QueryDef {
 	k := j1Kinds()
 	abc := ecd.Kind{System: k[0].System, Kind: eid.MustCode("abc")}
@@ -41,6 +46,7 @@ func jcQueries() []ecd.QueryDef {
 		{QID: 8, Name: "undeclared", All: []ecd.CID{99}},
 		{QID: 9, Name: "bad kind", Kinds: []ecd.Kind{abc}},
 		{QID: jcTouchedQID, Name: "touched", Kinds: []ecd.Kind{k[2]}},
+		{QID: jcRepeatQID, Name: "repeat", All: []ecd.CID{j3U64, j3U64}},
 	}
 }
 
@@ -102,7 +108,8 @@ func (s *jcSim) queryIs(want string, qid ecd.QID) int {
 // reference model: the answer class, the eids appended after a caller's prefix, in order, and Count are equal. A
 // query on a Cold kind answers ErrCold and one on the Touched kind ErrQuery, and neither appends anything. Two
 // queries also run on a stale engine before it is rebuilt, and each of queries 0 to 7 must answer an eid in at
-// least 10 steps of a seed.
+// least 10 steps of a seed; query 12, whose All repeats a CID without Exact, must answer an eid in as many steps as
+// query 0.
 func TestCompareQuery(t *testing.T) {
 	for seed := uint64(1); seed <= 4; seed++ {
 		s := jcNewSeamSim(t, seed)
@@ -123,6 +130,10 @@ func TestCompareQuery(t *testing.T) {
 				t.Errorf("seed %d: query %d answered an eid after %d of %d steps, want at least 10",
 					seed, qid, answered[qid], jcSteps)
 			}
+		}
+		if answered[jcRepeatQID] != answered[0] {
+			t.Errorf("seed %d: query %d answered an eid after %d steps and query 0 after %d, want equal",
+				seed, jcRepeatQID, answered[jcRepeatQID], answered[0])
 		}
 		for _, class := range []string{"query ErrStale", "query ErrCold", "query touched"} {
 			if s.counts[class] == 0 {
