@@ -27,7 +27,8 @@
 #   J3-04   a transaction that the check pass refuses leaves entities, nodes, tables and appliedAt as they were and the
 #           engine not stale; two faults answer the first in commit order (TestJ3_04)
 #   J3-04p  plant: the check pass reads no deed
-#   J3-04pf plant: the check pass reads the deeds in list order, so the first fault in list order answers
+#   J3-04pf plant: the check pass reads the deeds in list order: the first fault and the order of one eid's ops
+#           across deeds follow list order
 #   J3-05   a Set, Unset or Destroy of an absent entity and a Spawn of a present one make the engine stale, wrapping
 #           ecd.ErrStale and the cause; get and apply then answer ecd.ErrStale (TestJ3_05)
 #   J3-05p  plant: fail does not mark the engine stale

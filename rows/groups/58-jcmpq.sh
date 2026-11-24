@@ -3,7 +3,7 @@
 #
 #   JC-02    the Engine and the reference model answer every declared query, an undeclared QID and a query with an
 #            argument alike, in answer class, in the eids appended after a caller's prefix and in Count, after each of
-#            four seeds of 2,000 random transactions (TestCompareQuery)
+#            four seeds of 2,000 random transactions, and on a stale engine before it is rebuilt (TestCompareQuery)
 #   JC-02pk  plant: the kind list of a query is ignored (query.go)
 #   JC-02pe  plant: Exact is ignored (query.go)
 #   JC-02pr  plant: the last row of every table is skipped (query.go)

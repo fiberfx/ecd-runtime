@@ -1,12 +1,13 @@
 # Group jcmp of Ecd Runtime: the comparison of the Engine of package jacquard with the reference model.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
 #
-#   JC-01    the Engine and the reference model answer alike, in answer class and in every byte that Get returns, on four
-#            seeds of 2,000 random transactions: valid ones with Ord that differs from the list order, one entity
-#            touched from deeds of different Ord, tag values nil and empty, bare spawns and destroys; refused
-#            ones (kind, CID, value length, op order, gap), also several faults of different classes in one transaction; and ones that make
-#            both stale. The model gets a deep copy, the Engine leaves the caller's deeds unchanged and keeps no
-#            caller buffer (TestCompare)
+#   JC-01    the Engine and the reference model answer alike, in answer class and in every byte that Get returns, on
+#            four seeds of 2,000 random transactions: valid ones with Ord that differs from the list order, one entity
+#            touched from deeds of different Ord, tag values nil and empty, bare spawns and destroys; refused ones
+#            (kind, CID, value length, op order, gap), also several faults of different classes in one transaction,
+#            among them an undeclared kind and an op fault in one transaction; and ones that make both stale, where a
+#            query on the stale engine is compared before the rebuild. The model gets a deep copy, the Engine leaves the
+#            caller's deeds unchanged and keeps no caller buffer (TestCompare)
 #   JC-01p   plant: the check pass lets a second Spawn of one eid through (engine.go)
 #   JC-01pt  plant: the check pass refuses an empty non-nil tag value (engine.go)
 #   JC-01pd  plant: get drops the caller's buffer when the entity lacks the component (engine.go)
