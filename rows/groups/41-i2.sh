@@ -6,13 +6,13 @@
 #   row    check
 #   L06    the TraceID and SpanID declarations refuse every conversion with eid.ID and with an array (a probe package
 #          fails to build with six "cannot convert" errors and no other error); eid.ParseString refuses 32 and 16 hex
-#          characters, ParseTraceID and ParseSpanID refuse an eid text
+#          characters, ParseTraceID and ParseSpanID refuse an eid text; MarshalText and Value of the zero eid refuse with eid.ErrZero
 #   I2-01  KindRange bytes, the ids inside and the ids of the neighbouring kinds and systems outside; Window(k, 0, TimeMax+1) equals KindRange(k)
 #   I2-02  Window bounds at from-1, from, to-1 and to; Contains(Hi) is false; from > to and to > TimeMax+1 answer eid.ErrRange
 #   I2-03  Day at 0, 86,399,999 and 86,400,000 ms
 #   I2-04  trace and span id: parse, String, Bytes, IsZero, Value, Scan; uppercase, 0x, UUID text, all zero, wrong length and a Scan of a string refused
-#   I2-05  the seam: a stub satisfies ecd.Engine, the constant values, the nine error texts, the sentinels never match each other
-#   I2-06  go/go.mod says go 1.27 and requires only ecd-id v0.7.0, go/go.sum holds its two lines, go version reads go1.27; a go.mod with another require is refused
+#   I2-05  the seam: a stub satisfies ecd.Engine, the constant values, the error texts, the sentinels never match each other
+#   I2-06  go/go.mod says go 1.27 and requires only ecd-id v0.8.0, go/go.sum holds its two lines, go version reads go1.27; a go.mod with another require is refused
 #
 # Each plant is a one-line sed on a temporary copy of /w/go that re-runs only the tests of its row. A plant is KILLED
 # when a test fails and SURVIVED when every test passes; a plant that does not change exactly one line, or in which no
@@ -59,27 +59,27 @@ i2_plant I2-03p kind.go 's/86_400_000/86_400/' '^TestDay$' "the day length is 86
 go_row I2-04 i2 "trace and span ids: the good forms accepted, the violating forms refused" /w/go test -run '^Test(Trace|Span)ID' ./ecd/
 i2_plant I2-04p trace.go 's/parseHex(t\.b\[:\], s, ErrTraceID)/parseHex(t.b[:], strings.ToLower(s), ErrTraceID)/' '^Test(Trace|Span)ID' "ParseTraceID lowercases its input and the I2-04 tests fail"
 
-go_row I2-05 i2 "a stub satisfies ecd.Engine, constants, nine error texts, distinct sentinels" /w/go test -run '^TestSeam' ./ecd/
+go_row I2-05 i2 "a stub satisfies ecd.Engine, constants, error texts, distinct sentinels" /w/go test -run '^TestSeam' ./ecd/
 i2_plant I2-05p engine.go 's/^\tOpSet$/\tOpSet OpCode = iota + 2/' '^TestSeam' "OpSet takes the value 3 and the I2-05 tests fail"
 
-# i2_gomod_ok file: 0 when the file says "go 1.27" and its only requirement is ecd-id v0.7.0.
+# i2_gomod_ok file: 0 when the file says "go 1.27" and its only requirement is ecd-id v0.8.0.
 i2_gomod_ok() {
   grep -qx 'go 1\.27' "$1" || return 1
   i2_req=$(awk '/^require[ \t]*\(/{b=1;next} b&&/^\)/{b=0;next} b{print;next} /^require[ \t]/{sub(/^require[ \t]+/,"");print}' "$1" | sed 's/^[ \t]*//;s/[ \t]*$//')
-  [ "$i2_req" = "github.com/fiberfx/ecd-id/go v0.7.0" ]
+  [ "$i2_req" = "github.com/fiberfx/ecd-id/go v0.8.0" ]
 }
 
 if sel I2-06 i2 || sel I2-06p i2; then
   i2_pd=$(mktemp -d /tmp/rows/plant.XXXXXX)
   if sel I2-06 i2; then
-    i2_what="go.mod: go 1.27 and only ecd-id v0.7.0; go.sum: its two lines; go version go1.27; a go.mod with another require is refused"
+    i2_what="go.mod: go 1.27 and only ecd-id v0.8.0; go.sum: its two lines; go version go1.27; a go.mod with another require is refused"
     if [ $HAVE_GO -eq 0 ]; then say I2-06 "$i2_what" "go not on PATH" CNM
     else
       i2_obs=""
-      i2_gomod_ok /w/go/go.mod || i2_obs="$i2_obs go.mod is not go 1.27 with only ecd-id v0.7.0;"
+      i2_gomod_ok /w/go/go.mod || i2_obs="$i2_obs go.mod is not go 1.27 with only ecd-id v0.8.0;"
       cp /w/go/go.mod "$i2_pd/other.mod" && printf '\nrequire example.com/other v1.0.0\n' >>"$i2_pd/other.mod"
       ! i2_gomod_ok "$i2_pd/other.mod" || i2_obs="$i2_obs a go.mod with another require line was accepted;"
-      i2_sum=$(printf '%s\n%s\n' 'github.com/fiberfx/ecd-id/go v0.7.0 h1:qT/YiI/XeahGzEJYVUlKnwt0hOh8WTVsg27uxlKw1DU=' 'github.com/fiberfx/ecd-id/go v0.7.0/go.mod h1:M5YOPf1cdIPU87e2ZFpmC9OdYXCGRRl24BgWeRGrdOY=')
+      i2_sum=$(printf '%s\n%s\n' 'github.com/fiberfx/ecd-id/go v0.8.0 h1:UMGwZFL0VQ7eJm+3GqUEaL/X7dHJl9UpFRyWjpRO2dI=' 'github.com/fiberfx/ecd-id/go v0.8.0/go.mod h1:M5YOPf1cdIPU87e2ZFpmC9OdYXCGRRl24BgWeRGrdOY=')
       [ "$(cat /w/go/go.sum)" = "$i2_sum" ] || i2_obs="$i2_obs go.sum is not the two ecd-id lines;"
       i2_gv=$(go version 2>&1)
       case $i2_gv in *' go1.27'*) ;; *) i2_obs="$i2_obs go version reads: $i2_gv;" ;; esac
@@ -138,7 +138,7 @@ PROBE
 }
 
 if sel L06 i2; then
-  i2_what="the probe fails with six cannot-convert errors; eid.ParseString refuses 32 and 16 hex characters; ParseTraceID and ParseSpanID refuse an eid text"
+  i2_what="the probe fails with six cannot-convert errors; eid.ParseString refuses 32 and 16 hex characters; ParseTraceID and ParseSpanID refuse an eid text; the zero eid refuses MarshalText and Value"
   if [ $HAVE_GO -eq 0 ]; then say L06 "$i2_what" "go not on PATH" CNM
   else
     i2_pd=$(mktemp -d /tmp/rows/plant.XXXXXX)
@@ -148,11 +148,11 @@ if sel L06 i2; then
     i2_pobs=$i2_obs
     rm -rf "$i2_pd"
     i2_tlog=/tmp/rows/L06.log
-    (cd /w/go && go test -count=1 -v -run '^TestTextFormsRefuseEachOther$' ./ecd/ >"$i2_tlog" 2>&1); i2_trc=$?
+    (cd /w/go && go test -count=1 -v -run '^(TestTextFormsRefuseEachOther|TestZeroIDEncodingRefused)$' ./ecd/ >"$i2_tlog" 2>&1); i2_trc=$?
     if [ $i2_prc -eq 2 ] || offline "$i2_tlog"; then say L06 "$i2_what" "measured nothing: $i2_pobs" CNM
     elif [ $i2_prc -ne 0 ]; then say L06 "$i2_what" "$i2_pobs" FAIL; head_of /tmp/rows/L06.probe.log 12
-    elif [ $i2_trc -ne 0 ] || ! grep -q '^--- PASS: TestTextFormsRefuseEachOther' "$i2_tlog"; then say L06 "$i2_what" "$i2_pobs; the text refusals did not pass (rc=$i2_trc)" FAIL; head_of "$i2_tlog" 12
-    else say L06 "$i2_what" "$i2_pobs; the text refusals PASS" PASS; fi
+    elif [ $i2_trc -ne 0 ] || ! grep -q '^--- PASS: TestTextFormsRefuseEachOther' "$i2_tlog" || ! grep -q '^--- PASS: TestZeroIDEncodingRefused' "$i2_tlog"; then say L06 "$i2_what" "$i2_pobs; the text refusals or the zero eid refusals did not pass (rc=$i2_trc)" FAIL; head_of "$i2_tlog" 12
+    else say L06 "$i2_what" "$i2_pobs; the text refusals and the zero eid refusals PASS" PASS; fi
   fi
 fi
 
