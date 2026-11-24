@@ -1,5 +1,5 @@
 // Derived from Ark (github.com/mlange-42/ark) at commit 723f2ac. Copyright (c) 2025 Martin Lange. MIT License.
-// Port of ecs/table.go of the cut in go/third_party/ark/.
+// Port of ecs/table.go.
 
 package jacquard
 

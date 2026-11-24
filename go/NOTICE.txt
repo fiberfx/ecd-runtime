@@ -1,0 +1,103 @@
+Ecd Runtime: parts taken from other projects
+
+This file lists every part of Ecd Runtime that is taken from another project, and the projects whose design Ecd
+Runtime follows without taking code. It has two sections. Parts taken: each entry names the project, its source
+repository and commit, its licence and copyright line, what is taken, and the files that hold it. Each such file
+begins with the entry's attribution line, and the licence text that the project's licence requires follows the entry.
+Foundational references: each entry names a project, its source repository and commit, its licence and copyright
+line, and the design ideas that Ecd Runtime follows from it. No code is taken from these projects.
+
+Parts taken
+
+1. Ark
+
+Project:     Ark
+Source:      https://github.com/mlange-42/ark
+Commit:      723f2ac3186a79f12830c1d9fee773a8151dec89 (v0.8.3-10-g723f2ac)
+Licence:     MIT License or Apache License 2.0, at the licensee's option. Ecd Runtime takes Ark under the MIT
+             License.
+Copyright:   Copyright (c) 2025 Martin Lange
+Attribution: Derived from Ark (github.com/mlange-42/ark) at commit 723f2ac. Copyright (c) 2025 Martin Lange. MIT License.
+
+Taken: the archetype table with entity identity in the first column, the component mask, the archetype graph with
+transition edges, the entity pool, the mask test and node list of a registered query, and the exchange of components
+on an entity. Each is adapted to eids, sealed kinds, chunked columns and deeds.
+
+Files, relative to the module root, with the Ark source file of each:
+
+  engine/jacquard/archetype.go  ecs/archetype.go
+  engine/jacquard/column.go     ecs/column.go
+  engine/jacquard/engine.go     ecs/storage.go and the exchange in ecs/world_internal.go
+  engine/jacquard/entity.go     ecs/entity.go
+  engine/jacquard/graph.go      ecs/graph.go
+  engine/jacquard/mask.go       ecs/mask256.go
+  engine/jacquard/mask_w4.go    ecs/mask_notiny.go
+  engine/jacquard/mask_w8.go    ecs/mask_tiny.go
+  engine/jacquard/move.go       ecs/storage.go and the exchange in ecs/world_internal.go
+  engine/jacquard/pool.go       ecs/pool.go
+  engine/jacquard/query.go      ecs/filter.go and ecs/cache.go
+  engine/jacquard/table.go      ecs/table.go
+
+Licence text, as Ark's LICENSE-MIT states it at the commit:
+
+MIT License
+
+Copyright (c) 2025 Martin Lange
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Foundational references
+
+2. GOKe
+
+Project:     GOKe
+Source:      https://github.com/kjkrol/goke
+Commit:      aa6f5bd
+Licence:     MIT License
+Copyright:   Copyright (c) 2024 kjkrol
+
+Ecd Runtime follows GOKe's design for stages under a plan, a command buffer per system with a flush at explicit sync
+points, a scheduler that reaches storage only through an interface, readers on several goroutines that each hold a
+cursor over one matcher, a monotonic structural version per table, one spare chunk kept on shrink, and compaction
+strategies for bulk moves. No code is taken.
+
+3. donburi
+
+Project:     donburi
+Source:      https://github.com/yohamta/donburi
+Commit:      24e87dc
+Licence:     MIT License
+Copyright:   Copyright (c) 2022 Yota Hamada
+
+Ecd Runtime follows donburi's API shapes: typed component handles as package-level values, value accessors, a handle
+that doubles as a one-component query, filter terms as composable values (All, None, Any, Exact), range-over-func
+iteration, presence checks for optional components, data-less tags, typed events and lifecycle hooks, and
+per-archetype counts. No code is taken.
+
+4. Volt
+
+Project:     Volt
+Source:      https://github.com/akmonengine/volt
+Commit:      d6236fe
+Licence:     Apache License 2.0
+Copyright:   Copyright 2024, Agoune Ramine
+
+Ecd Runtime follows Volt's design ideas and test cases: liveness from the generation and a live marker, checks before
+placement, the generation step tested at its limit, a dead-handle soak, empty-archetype placement cases, two-way edge
+linking, column lookup by a dense index, and benchmark scenarios in a nested module. No code is taken.

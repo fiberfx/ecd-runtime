@@ -11,12 +11,11 @@ holds the implementation.
 | Path | Content |
 |---|---|
 | `go/` | The Go module `github.com/fiberfx/ecd-runtime/go`. |
-| `go/engine/jacquard/` | Jacquard, the archetype engine. Its files that port Ark files name their source file in their header; the cut in `go/third_party/ark/` is the source. |
-| `go/third_party/ark/` | Ark, the `ark` reference engine, copied byte for byte. It is a nested Go module and is not a dependency of the Ecd Runtime module. `SOURCE.txt` names the commit. |
-| `go/NOTICE` | The attribution for the code derived from Ark. |
+| `go/engine/jacquard/` | Jacquard, the archetype engine. Its files that port Ark files name their source file in their header. |
+| `go/NOTICE.txt` | Every part taken from another project: the project, its source, commit, licence and copyright line, what is taken and the files that hold it, with the licence text that the project's licence requires, and the projects whose design Ecd Runtime follows. |
 | `rows/loom.rows.sh` | The rows script. |
 
-`git diff --no-index` between a ported file in `go/engine/jacquard/` and its source file in `go/third_party/ark/ecs/` records the adaptation.
+`git diff --no-index` between a ported file in `go/engine/jacquard/` and its source file in a checkout of Ark at commit 723f2ac records the adaptation.
 
 ## Rows
 
@@ -32,6 +31,6 @@ nothing, and it is never a PASS. The exit status is 0 when every row is as expec
 SURVIVED, and 3 when any row is CNM and none is FAIL. The header of the script lists every row and the command that runs
 it.
 
-## Licence
+## Attribution
 
-Code derived from Ark is licensed under MIT or Apache-2.0, as `go/NOTICE` states.
+Code taken from other projects is listed in `go/NOTICE.txt` with each project's licence text.
