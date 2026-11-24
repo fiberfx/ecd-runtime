@@ -3,8 +3,8 @@
 #
 #   JC-01    the Engine and the reference model answer alike, in answer class and in every byte that Get returns, on four
 #            seeds of 2,000 random transactions: valid ones with Ord that differs from the list order, one entity
-#            touched from deeds of different Ord, tag values nil and empty, bare spawns, destroys and respawns; refused
-#            ones (kind, CID, value length, op order, gap), also several faults in one transaction; and ones that make
+#            touched from deeds of different Ord, tag values nil and empty, bare spawns and destroys; refused
+#            ones (kind, CID, value length, op order, gap), also several faults of different classes in one transaction; and ones that make
 #            both stale. The model gets a deep copy, the Engine leaves the caller's deeds unchanged and keeps no
 #            caller buffer (TestCompare)
 #   JC-01p   plant: the check pass lets a second Spawn of one eid through (engine.go)

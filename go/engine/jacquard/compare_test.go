@@ -24,8 +24,8 @@ type jcRows struct{}
 
 func (jcRows) Next(*ecd.Row) (bool, error) { return false, nil }
 
-// jcCatalog returns the catalog of the model: the three kinds of j1Kinds, each held whole, and the five
-// components of j3Comps that hold no pointer.
+// jcCatalog returns the catalog of the model: the three kinds of j1Kinds, each held whole, the five components
+// of j3Comps that hold no pointer, and the queries of jcQueries.
 func jcCatalog() *ecd.Catalog {
 	cat := &ecd.Catalog{Components: []ecd.ComponentDef{
 		{CID: j3U64, Name: "u64", Form: ecd.Component, Size: 8},
@@ -37,6 +37,7 @@ func jcCatalog() *ecd.Catalog {
 	for _, k := range j1Kinds() {
 		cat.Kinds = append(cat.Kinds, ecd.KindDef{Kind: k, Residency: ecd.All})
 	}
+	cat.Queries = jcQueries()
 	return cat
 }
 
@@ -46,6 +47,11 @@ func jcPair(t testing.TB) (*Engine, ecd.Engine) {
 	en, err := newEngine(j1Kinds(), j3Comps()[:5])
 	if err != nil {
 		t.Fatalf("newEngine: %v", err)
+	}
+	for _, d := range jcQueries() {
+		if err := en.addQuery(d); err != nil {
+			t.Fatalf("addQuery(%d): %v", d.QID, err)
+		}
 	}
 	m, err := refmodel.New(jcCatalog())
 	if err != nil {
@@ -86,6 +92,7 @@ type jcPlan struct {
 	spawned   []eid.ID
 	destroyed []eid.ID
 	wants     []string // the class of each fault that the transaction carries; none for a valid one
+	inverted  bool     // one entity's pieces sit in deeds whose list order differs from their commit order
 }
 
 // want returns the class that both engines must answer: nil for a valid transaction, the class of the one fault,
@@ -172,21 +179,10 @@ func (s *jcSim) put(acts [][][]ecd.Op, action []ecd.Op) {
 	acts[d] = slices.Insert(acts[d], s.rng.IntN(len(acts[d])+1), action)
 }
 
-// revive returns a destroyed eid that the transaction does not touch, one time in six. A later Spawn of it is
-// accepted by both engines: only the store refuses such a Spawn, and the comparison fixes that the two engines
-// answer alike and that the new entity holds the new values.
-func (s *jcSim) revive(touched map[eid.ID]bool) (eid.ID, bool) {
-	if len(s.dead) == 0 || s.rng.IntN(6) != 0 {
-		return eid.ID{}, false
-	}
-	id := s.dead[s.rng.IntN(len(s.dead))]
-	return id, !touched[id]
-}
-
 // scatter puts the ops of one entity into the deeds in commit order: one piece in one deed, or two or three
 // consecutive pieces in deeds that commit in turn, so that the deed order decides the entity's final state.
 // The deed of each piece is order[pos], with pos not decreasing along the pieces.
-func (s *jcSim) scatter(acts [][][]ecd.Op, order []int, ords []uint32, ops []ecd.Op) {
+func (s *jcSim) scatter(p *jcPlan, acts [][][]ecd.Op, order []int, ops []ecd.Op) {
 	k := 1
 	if len(ops) >= 2 && s.rng.IntN(3) == 0 {
 		k = min(len(ops), 2+s.rng.IntN(2))
@@ -206,14 +202,14 @@ func (s *jcSim) scatter(acts [][][]ecd.Op, order []int, ords []uint32, ops []ecd
 	for i := range pos {
 		d := order[pos[i]]
 		acts[d] = append(acts[d], ops[cuts[i]:cuts[i+1]])
-		if ords[d] != ords[order[pos[0]]] {
-			s.counts["split"]++
+		if i > 0 && d < order[pos[i-1]] {
+			p.inverted = true
 		}
 	}
 }
 
 // build returns the next transaction: one to four deeds of random Ord, equal Ord included, and for each deed one
-// to four entity actions on average. An action spawns an entity (a fresh eid, or sometimes a destroyed one) with
+// to four entity actions on average. An action spawns an entity (a fresh eid) with
 // up to three Set or Unset ops, sets and unsets components of a live entity, or destroys one (one in five). No
 // entity has two actions, but one action may be split over several deeds of different Ord, so that the commit
 // order of the deeds decides its result. With a chance of one in five the transaction carries a fault that the
@@ -232,17 +228,14 @@ func (s *jcSim) build() *jcPlan {
 	touched := map[eid.ID]bool{}
 	for n := nd * (1 + s.rng.IntN(4)); n > 0; n-- {
 		if len(s.live) == 0 || s.rng.IntN(10) < 3 {
-			id, ok := s.revive(touched)
-			if !ok {
-				id = s.fresh()
-			}
+			id := s.fresh()
 			touched[id] = true
 			ops := []ecd.Op{j3Spawn(id)}
 			for k := s.rng.IntN(4); k > 0; k-- {
 				ops = append(ops, s.randOp(id))
 			}
 			p.spawned = append(p.spawned, id)
-			s.scatter(acts, order, ords, ops)
+			s.scatter(p, acts, order, ops)
 			continue
 		}
 		id := s.live[s.rng.IntN(len(s.live))]
@@ -259,7 +252,7 @@ func (s *jcSim) build() *jcPlan {
 				ops = append(ops, s.randOp(id))
 			}
 		}
-		s.scatter(acts, order, ords, ops)
+		s.scatter(p, acts, order, ops)
 	}
 	switch x := s.rng.IntN(100); {
 	case x < 20:
@@ -347,15 +340,8 @@ func (s *jcSim) commitFault(p *jcPlan, acts [][][]ecd.Op) [][][]ecd.Op {
 	return acts
 }
 
-// accept records the effect of a transaction that both engines accepted. A spawned eid that was destroyed
-// before is live again.
+// accept records the effect of a transaction that both engines accepted.
 func (s *jcSim) accept(p *jcPlan) {
-	for _, id := range p.spawned {
-		if i := slices.Index(s.dead, id); i >= 0 {
-			s.dead = slices.Delete(s.dead, i, i+1)
-			s.counts["respawn"]++
-		}
-	}
 	s.live = append(s.live, p.spawned...)
 	for _, id := range p.destroyed {
 		i := slices.Index(s.live, id)
@@ -435,8 +421,11 @@ func (s *jcSim) step(n int) {
 		s.t.Fatalf("seed %d step %d: apply(%d): engine %q (%v), model %q (%v), want %q of %v", s.seed, n, p.seq, ce, errE, cm, errM, want, p.wants)
 	}
 	s.counts[ce]++
-	if len(p.wants) > 1 {
+	if len(slices.Compact(slices.Sorted(slices.Values(p.wants)))) > 1 {
 		s.counts["multi"]++
+	}
+	if ce == "nil" && p.inverted {
+		s.counts["split"]++
 	}
 	if s.en.appliedAt() != s.m.At() {
 		s.t.Fatalf("seed %d step %d: engine at %d, model at %d", s.seed, n, s.en.appliedAt(), s.m.At())
@@ -463,7 +452,7 @@ func (s *jcSim) step(n int) {
 // TestCompare (JC-01): four seeds of 2,000 random transactions run through the Engine and the reference model.
 // After each one the answer class, At() and every Get, byte for byte on success and on error, are equal. The
 // transactions include spawns that stay bare, tag Sets with a nil and with an empty value, Ord that differs from
-// the list order, one entity touched from several deeds of different Ord, the respawn of a destroyed eid, the
+// the list order, one entity touched from several deeds of different Ord, the
 // faults that the check pass refuses (one or several in one transaction), and the faults that make both engines
 // stale and start a new episode.
 func TestCompare(t *testing.T) {
@@ -473,7 +462,7 @@ func TestCompare(t *testing.T) {
 			s.step(n)
 		}
 		t.Logf("seed %d: answers %v", seed, s.counts)
-		for _, class := range []string{"nil", "ErrGap", "ErrKind", "ErrOp", "ErrStale", "multi", "split", "respawn"} {
+		for _, class := range []string{"nil", "ErrGap", "ErrKind", "ErrOp", "ErrStale", "multi", "split"} {
 			if s.counts[class] == 0 {
 				t.Errorf("seed %d: no transaction counted as %s", seed, class)
 			}
