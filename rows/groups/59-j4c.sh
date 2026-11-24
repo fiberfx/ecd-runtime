@@ -1,5 +1,6 @@
 # Group j4c of Ecd Runtime: the node list of a declared query in the Engine of package jacquard.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   J03     the node list of every declared query equals a fresh match over the nodes that hold a table after each step of
 #           four seeds of 2,000 random transactions: a node created after the declaration is announced, and a declaration
@@ -26,7 +27,8 @@ j4c_plant() {
     j4c_log=/tmp/rows/$j4c_id.log
     (cd "$j4c_pd/go" && go test -count=1 -v $j4c_flags -run "^$j4c_test\$" ./engine/jacquard/ >"$j4c_log" 2>&1); j4c_rc=$?
     if offline "$j4c_log"; then say "$j4c_id" "$j4c_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $j4c_test" "$j4c_log"; then say "$j4c_id" "$j4c_ex" "rc=$j4c_rc, $j4c_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $j4c_test" "$j4c_log"; then
+      say "$j4c_id" "$j4c_ex" "rc=$j4c_rc, $j4c_test FAIL: $(why_of "$j4c_log")" KILLED
     elif [ $j4c_rc -eq 0 ] && grep -q "^--- PASS: $j4c_test" "$j4c_log"; then say "$j4c_id" "$j4c_ex" "rc=0, $j4c_test PASS" SURVIVED
     else say "$j4c_id" "$j4c_ex" "rc=$j4c_rc, the test did not run" CNM; head_of "$j4c_log" 8; fi
   fi

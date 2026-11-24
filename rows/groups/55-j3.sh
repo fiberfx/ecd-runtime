@@ -1,5 +1,6 @@
 # Group j3 of Ecd Runtime: the Engine of package jacquard, its two-pass apply and its moves.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   J01     after 10,000 random deeds, column 0 of every row equals the eid that the row's record index maps to (TestJ01)
 #   J01p    plant: a move pushes the zero eid instead of the entity's eid
@@ -56,7 +57,8 @@ j3_plant() {
     j3_log=/tmp/rows/$j3_id.log
     (cd "$j3_pd/go" && go test -count=1 -v $j3_flags -run "^$j3_test\$" ./engine/jacquard/ >"$j3_log" 2>&1); j3_rc=$?
     if offline "$j3_log"; then say "$j3_id" "$j3_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $j3_test" "$j3_log"; then say "$j3_id" "$j3_ex" "rc=$j3_rc, $j3_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $j3_test" "$j3_log"; then
+      say "$j3_id" "$j3_ex" "rc=$j3_rc, $j3_test FAIL: $(why_of "$j3_log")" KILLED
     elif [ $j3_rc -eq 0 ] && grep -q "^--- PASS: $j3_test" "$j3_log"; then say "$j3_id" "$j3_ex" "rc=0, $j3_test PASS" SURVIVED
     else say "$j3_id" "$j3_ex" "rc=$j3_rc, the test did not run" CNM; head_of "$j3_log" 8; fi
   fi

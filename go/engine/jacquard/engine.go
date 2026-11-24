@@ -49,6 +49,7 @@ type compDef struct {
 //	queries the declared queries by QID; nil until addQuery
 //	res     the residency of each kind by kind index; nil: every kind is All and Warm
 //	allKinds the indexes of the All kinds, in kind order
+//	hydrated a hydration has succeeded; the seq rule of hydrate reads it
 //
 // Mutation happens on one goroutine; get writes nothing.
 type Engine struct {

@@ -1,5 +1,6 @@
 # Group j2a of Ecd Runtime: masks, chunk geometry and vocabulary of package jacquard.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   J13      chunkShift gives the largest power-of-two row count, 64 to 4096, that fits 16 KiB
 #   J13p     plant: chunkShift returns 6 for every row width; TestChunkShift must fail
@@ -27,7 +28,8 @@ j2a_plant() {
     plog=/tmp/rows/$pid.log
     (cd "$pd/go" && go test -count=1 -v $pflags -run "^$ptest\$" ./engine/jacquard/ >"$plog" 2>&1); prc=$?
     if offline "$plog"; then say "$pid" "$pex" "module not found" CNM
-    elif grep -q "^--- FAIL: $ptest" "$plog"; then say "$pid" "$pex" "rc=$prc, $ptest FAIL" KILLED
+    elif grep -q "^--- FAIL: $ptest" "$plog"; then
+      say "$pid" "$pex" "rc=$prc, $ptest FAIL: $(why_of "$plog")" KILLED
     elif [ $prc -eq 0 ] && grep -q "^--- PASS: $ptest" "$plog"; then say "$pid" "$pex" "rc=0, $ptest PASS" SURVIVED
     else say "$pid" "$pex" "rc=$prc, the test did not run" CNM; head_of "$plog" 8; fi
   fi

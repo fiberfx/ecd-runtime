@@ -1,5 +1,6 @@
 # Group j2c of Ecd Runtime: tables, chunks, typed columns and change stamps of package jacquard.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   J09      pointer columns survive the collector: a string and a slice in a component stay intact across pushes, copies
 #            and swap-removes with two collections between operations, and an object that only a resident
@@ -44,7 +45,8 @@ j2c_plant() {
     j2c_log=/tmp/rows/$j2c_id.log
     (cd "$j2c_pd/go" && go test -count=1 -v $j2c_flags -run "^$j2c_test\$" ./engine/jacquard/ >"$j2c_log" 2>&1); j2c_rc=$?
     if offline "$j2c_log"; then say "$j2c_id" "$j2c_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $j2c_test" "$j2c_log"; then say "$j2c_id" "$j2c_ex" "rc=$j2c_rc, $j2c_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $j2c_test" "$j2c_log"; then
+      say "$j2c_id" "$j2c_ex" "rc=$j2c_rc, $j2c_test FAIL: $(why_of "$j2c_log")" KILLED
     elif [ $j2c_rc -eq 0 ] && grep -q "^--- PASS: $j2c_test" "$j2c_log"; then say "$j2c_id" "$j2c_ex" "rc=0, $j2c_test PASS" SURVIVED
     else say "$j2c_id" "$j2c_ex" "rc=$j2c_rc, the test did not run" CNM; head_of "$j2c_log" 8; fi
   fi

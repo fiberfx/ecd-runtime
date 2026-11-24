@@ -1,5 +1,6 @@
 # Group j1 of Ecd Runtime: the identity core of package jacquard (J1-01 to J1-10 and their plants, the rows ending in p).
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 # Entity (8 B handle), record (16 B), the record pool with its free list, and the index that maps eid <-> Entity.
 #
 #   J1-01   the declared kinds spawn; an eid of an undeclared kind answers ecd.ErrKind and changes nothing; newIndex
@@ -47,7 +48,8 @@ j1_plant() {
     j1_log=/tmp/rows/$j1_id.log
     (cd "$j1_pd/go" && go test -count=1 -v -run "^$j1_test\$" ./engine/jacquard/ >"$j1_log" 2>&1); j1_rc=$?
     if offline "$j1_log"; then say "$j1_id" "$j1_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $j1_test" "$j1_log"; then say "$j1_id" "$j1_ex" "rc=$j1_rc, $j1_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $j1_test" "$j1_log"; then
+      say "$j1_id" "$j1_ex" "rc=$j1_rc, $j1_test FAIL: $(why_of "$j1_log")" KILLED
     elif [ $j1_rc -eq 0 ] && grep -q "^--- PASS: $j1_test" "$j1_log"; then say "$j1_id" "$j1_ex" "rc=0, $j1_test PASS" SURVIVED
     else say "$j1_id" "$j1_ex" "rc=$j1_rc, the test did not run" CNM; head_of "$j1_log" 8; fi
   fi

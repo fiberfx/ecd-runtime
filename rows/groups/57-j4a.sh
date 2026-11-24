@@ -1,5 +1,6 @@
 # Group j4a of Ecd Runtime: queries in the Engine of package jacquard.
-# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, tree_of, go_row and HAVE_GO.
+# Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
+# HAVE_GO.
 #
 #   J4A-01    All, None, Any and Exact select the hand-written eids on an engine with entities of seven component sets over
 #             two kinds, tags included, and Kinds restricts the kinds; the answers follow a later transaction that moves
@@ -36,7 +37,8 @@ j4a_plant() {
     j4a_log=/tmp/rows/$j4a_id.log
     (cd "$j4a_pd/go" && go test -count=1 -v $j4a_flags -run "^$j4a_test\$" ./engine/jacquard/ >"$j4a_log" 2>&1); j4a_rc=$?
     if offline "$j4a_log"; then say "$j4a_id" "$j4a_ex" "module not found" CNM
-    elif grep -q "^--- FAIL: $j4a_test" "$j4a_log"; then say "$j4a_id" "$j4a_ex" "rc=$j4a_rc, $j4a_test FAIL" KILLED
+    elif grep -q "^--- FAIL: $j4a_test" "$j4a_log"; then
+      say "$j4a_id" "$j4a_ex" "rc=$j4a_rc, $j4a_test FAIL: $(why_of "$j4a_log")" KILLED
     elif [ $j4a_rc -eq 0 ] && grep -q "^--- PASS: $j4a_test" "$j4a_log"; then say "$j4a_id" "$j4a_ex" "rc=0, $j4a_test PASS" SURVIVED
     else say "$j4a_id" "$j4a_ex" "rc=$j4a_rc, the test did not run" CNM; head_of "$j4a_log" 8; fi
   fi
