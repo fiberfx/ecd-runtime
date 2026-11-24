@@ -178,7 +178,7 @@ func (s rowSource) Next(r *ecd.Row) (bool, error) {
 }
 
 // Log calls f with each committed deed whose seq is above after, in seq order, then ord order, from one read
-// transaction on the reader. f runs inside that transaction, so it must not call Hydrate or Log. An error of f
+// transaction on the reader. f runs inside that transaction, so it must not call Hydrate, Log or Rows. An error of f
 // stops and is returned unchanged; a malformed deed is an error that matches ErrSchema.
 func (s *Store) Log(after uint64, f func(seq uint64, d ecd.Deed) error) error {
 	if after >= math.MaxInt64 {

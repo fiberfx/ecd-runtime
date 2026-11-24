@@ -199,11 +199,14 @@ func TestRowsHydrateMiss(t *testing.T) {
 	}
 }
 
+// hydrateStart begins the error of Hydrate when e.Start refuses the store's seq.
+const hydrateStart = "sqlite: hydrate: start: "
+
 // TestHydrateAllOnly holds that a host whose catalog holds only All kinds starts on Hydrate with a catalog without
 // them. After a history of two commits and a reopen, Hydrate of a new engine of each case with a catalog of no kind
 // returns the store's seq, the engine's At() equals it, every All kind of the engine's catalog stays Cold, and the
 // next commit applies at the seq plus one. Violating case: on an engine already at seq 1, Hydrate answers an error
-// that matches ErrGap and names start, and the engine's At() stays 1.
+// that matches ErrGap and begins with hydrateStart, and the engine's At() stays 1.
 func TestHydrateAllOnly(t *testing.T) {
 	cat := &ecd.Catalog{
 		Components: storeCatalog().Components,
@@ -250,9 +253,9 @@ func TestHydrateAllOnly(t *testing.T) {
 			t.Fatalf("%s: Hydrate(aaa, 1) of the engine: At() %d, %v; want 1, nil", ec.name, en.At(), err)
 		}
 		_, err := s.Hydrate(en, none)
-		if !errors.Is(err, ecd.ErrGap) || !strings.Contains(err.Error(), "start") || en.At() != 1 {
+		if !errors.Is(err, ecd.ErrGap) || !strings.HasPrefix(err.Error(), hydrateStart) || en.At() != 1 {
 			t.Fatalf("%s: Hydrate of an engine at seq 1, store at 3: %v, At() %d; want an error that matches ErrGap "+
-				"and names start, At() 1", ec.name, err, en.At())
+				"and begins with %q, At() 1", ec.name, err, en.At(), hydrateStart)
 		}
 	}
 }

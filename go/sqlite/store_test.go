@@ -1006,11 +1006,22 @@ func TestRefusedAtomic(t *testing.T) {
 	commitWant(t, s, "spawn Q", deedsOf(t, m, ops(spawnOp(q), setOp(q, cidOne, vq))), []rt.Outcome{rt.Committed}, 4)
 }
 
+// TestCommitEmptyDeed holds that a deed with no op commits: its body is of length 0 and not nil, so it does not bind
+// NULL in the body column, which refuses NULL. Commit answers Committed at seq 1, and Log yields the deed with its
+// eid, its Ord and no op.
+func TestCommitEmptyDeed(t *testing.T) {
+	_, s := newStore(t)
+	m := &countMinter{}
+	deeds := deedsOf(t, m, ops())
+	commitWant(t, s, "a deed with no op", deeds, []rt.Outcome{rt.Committed}, 1)
+	sameLog(t, "Log of a deed with no op", readLog(t, s, 0), []logged{{seq: 1, deed: deeds[0]}})
+}
+
 // TestHydrateTouchedOnly holds that Hydrate brings a new engine to the store's seq when the catalog declares no All
 // kind. After two committed transactions, a fresh engine over a catalog of one Touched kind is at seq 2 and Hydrate
 // returns 2; a third commit then returns seq 3, and its Apply at 3 succeeds and makes the spawned entity resident,
 // on the reference model and on Jacquard. An engine already at seq 1 is refused: Hydrate returns an error that
-// matches ecd.ErrGap and names start, the step that opens the engine.
+// matches ecd.ErrGap and begins with hydrateStart, the wrap that Hydrate gives an error of e.Start.
 func TestHydrateTouchedOnly(t *testing.T) {
 	cat := &ecd.Catalog{
 		Components: storeCatalog().Components,
@@ -1051,9 +1062,9 @@ func TestHydrateTouchedOnly(t *testing.T) {
 			t.Fatalf("%s: Hydrate(bbb, 1) of the engine: At() %d, %v; want 1, nil", ec.name, en.At(), err)
 		}
 		_, err := s.Hydrate(en, cat)
-		if !errors.Is(err, ecd.ErrGap) || !strings.Contains(err.Error(), "start") {
+		if !errors.Is(err, ecd.ErrGap) || !strings.HasPrefix(err.Error(), hydrateStart) {
 			t.Fatalf("%s: Hydrate of an engine at seq 1, store at 3: %v; want an error that matches ErrGap and "+
-				"names start", ec.name, err)
+				"begins with %q", ec.name, err, hydrateStart)
 		}
 	}
 }
