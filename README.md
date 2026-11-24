@@ -1,8 +1,9 @@
 # Ecd Runtime
 
 Ecd Runtime is the entity store and runtime of an owner process. Callers change state only through deeds, which are
-committed through the `Committer` interface of package `rt`, and engines answer reads from memory. The owner store, such
-as the SQLite store that the contract specifies, is not in this repository. Jacquard is the archetype engine.
+committed through the `Committer` interface of package `rt`, and engines answer reads from memory. The owner store is
+the nested module `go/sqlite`, an SQLite file that a host passes in through `rt.Config.Committer`. Jacquard is the
+archetype engine.
 
 The contract is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`. This repository holds the implementation.
 
@@ -13,6 +14,7 @@ The contract is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`. This re
 | `go/` | The Go module `github.com/fiberfx/ecd-runtime/go`. |
 | `go/engine/jacquard/` | Jacquard, the archetype engine. Its files that port Ark files name their source file in their header. |
 | `go/rt/` | The package `rt`: a command buffer per system and the flush that commits and applies their deeds. |
+| `go/sqlite/` | The nested Go module `github.com/fiberfx/ecd-runtime/go/sqlite`: the owner store in one SQLite file, an implementation of `rt.Committer` that also hydrates an engine. |
 | `go/enginecmp/gj/` | Benchmarks of Jacquard against Ark in module `go/enginecmp`; `rows/gj.bench.sh` runs them. |
 | `go/NOTICE.txt` | Every part taken from another project: the project, its source, commit, licence and copyright line, what is taken and the files that hold it, with the licence text that the project's licence requires, and the projects whose design Ecd Runtime follows. |
 | `rows/loom.rows.sh` | The rows script. |
@@ -96,8 +98,8 @@ func tick(cfg rt.Config, mover ecd.Kind, pos ecd.CID, known eid.ID) (rt.Result, 
 
 ### Limits
 
-- The store is the interface `Committer`. The repository holds no owner store; the only implementation of `Committer`
-  is the fake of the tests.
+- The store is the interface `Committer`. Package `rt` holds no owner store: the module `go/sqlite` implements
+  `Committer`, and the tests of package `rt` use a fake.
 - A record names an entity by its eid or by a placeholder of its own buffer. No hot handle for an entity exists.
 - The package runs no scheduler, no parallel stage and no observer. The host calls `Flush` at its sync points.
 - The eid of a spawned entity is not handed back to the system after the flush. It is found in the deeds that the
