@@ -11,6 +11,11 @@
 # inputs is optional: a GOPROXY file tree that /w/inputs provides for modules the repository requires. Without it
 # GOPROXY is off, and the module has no requirements.
 #
+# Rows live in group files, rows/groups/NN-<group>.sh, which the script sources in name order between R0 and the
+# final line. A group file is POSIX sh sourced from /w. It owns its row ids and its group name, calls "sel ID GROUP"
+# before each row, may use the helpers (say, sel, offline, head_of, count, tree_of, go_row, HAVE_GO), and never
+# exits. A later group is added as a file named NN-<group>.sh with NN above the files present.
+#
 # ROWS is a comma-separated list of row ids and group names. The default is every row. R0 always runs.
 #
 # Output: ROW id | expect X | observed Y | VERDICT. Verdicts: PASS, FAIL, KILLED and SURVIVED (a plant), CNM (could not
@@ -29,6 +34,7 @@
 #
 # A plant is KILLED when its row turns red and SURVIVED when it stays green. A plant that cannot be applied, or in
 # which no test ran, is CNM.
+# Group files: 10-repo.sh (RP1, RP2), 20-cut.sh (AK1, AK2, AK2p), 30-jacquard.sh (JQ1, JQ1p).
 # Exit: 0 every selected row as expected, 1 a row FAIL or a plant SURVIVED, 3 any CNM (and no FAIL or SURVIVED).
 set -u
 cd /w || exit 3
@@ -108,57 +114,10 @@ echo "TOOL $GITV"
 if [ $HAVE_GO -eq 1 ] && [ $HAVE_GIT -eq 1 ]; then say R0 "go and git on PATH" "$GOV; $GITV" PASS
 else say R0 "go and git on PATH" "go: $([ $HAVE_GO -eq 1 ] && echo found || echo absent); git: $([ $HAVE_GIT -eq 1 ] && echo found || echo absent)" CNM; fi
 
-# group repo
-go_row RP1 repo "go vet ./... rc=0" /w/go vet ./...
-go_row RP2 repo "go build ./... rc=0" /w/go build ./...
-
-# group cut
-go_row AK1 cut "go test ./... rc=0 in third_party/ark" /w/go/third_party/ark test ./...
-if sel AK2 cut || sel AK2p cut; then
-  want=$(sed -n 's/^Tree of ecs\/: *\([0-9a-f]\{40\}\).*/\1/p' /w/go/third_party/ark/SOURCE.txt)
-  if [ -z "$want" ]; then
-    sel AK2 cut && say AK2 "the tree hash of ecs/ from SOURCE.txt" "no hash in third_party/ark/SOURCE.txt" CNM
-    sel AK2p cut && say AK2p "the hash comparison turns red on a changed file" "no hash in third_party/ark/SOURCE.txt" CNM
-  else
-    if sel AK2 cut; then
-      got=$(tree_of /w/go/third_party/ark/ecs 2>/tmp/rows/AK2.err)
-      if [ -z "$got" ]; then say AK2 "tree hash of third_party/ark/ecs = $want" "git could not compute the hash" CNM; head_of /tmp/rows/AK2.err 6
-      elif [ "$got" = "$want" ]; then say AK2 "tree hash of third_party/ark/ecs = $want (SOURCE.txt)" "$got" PASS
-      else say AK2 "tree hash of third_party/ark/ecs = $want (SOURCE.txt)" "$got" FAIL; fi
-    fi
-    if sel AK2p cut; then
-      pd=$(mktemp -d /tmp/rows/plant.XXXXXX)
-      cp -a /w/go/third_party/ark/ecs "$pd/ecs" && printf 'x' >>"$pd/ecs/entity.go"
-      got=$(tree_of "$pd/ecs" 2>/tmp/rows/AK2p.err)
-      rm -rf "$pd"
-      if [ -z "$got" ]; then say AK2p "a byte appended to ecs/entity.go changes the hash" "git could not compute the hash" CNM
-      elif [ "$got" = "$want" ]; then say AK2p "a byte appended to ecs/entity.go changes the hash" "hash unchanged: $got" SURVIVED
-      else say AK2p "a byte appended to ecs/entity.go changes the hash" "hash $got differs from $want" KILLED; fi
-    fi
-  fi
-fi
-
-# group jacquard
-go_row JQ1 jacquard "go test ./engine/jacquard/... rc=0" /w/go test ./engine/jacquard/...
-if sel JQ1p jacquard; then
-  if [ $HAVE_GO -eq 0 ]; then say JQ1p "TestReservedEntities fails on the plant" "go not on PATH" CNM
-  else
-    pd=$(mktemp -d /tmp/rows/plant.XXXXXX)
-    cp -a /w/go "$pd/go" && cp "$pd/go/engine/jacquard/entity.go" "$pd/entity.go.orig" &&
-      sed -i 's/return e\.id == 0$/return e.id == 1/' "$pd/go/engine/jacquard/entity.go"
-    if cmp -s "$pd/entity.go.orig" "$pd/go/engine/jacquard/entity.go"; then
-      say JQ1p "the plant changes entity.go" "entity.go unchanged after sed" CNM
-    else
-      log=/tmp/rows/JQ1p.log
-      (cd "$pd/go" && go test -count=1 -v -run '^TestReservedEntities$' ./engine/jacquard/ >"$log" 2>&1); rc=$?
-      if offline "$log"; then say JQ1p "TestReservedEntities fails on the plant" "module not found" CNM
-      elif grep -q '^--- FAIL: TestReservedEntities' "$log"; then say JQ1p "TestReservedEntities fails on the plant" "rc=$rc, TestReservedEntities FAIL" KILLED
-      elif [ $rc -eq 0 ] && grep -q '^--- PASS: TestReservedEntities' "$log"; then say JQ1p "TestReservedEntities fails on the plant" "rc=0, TestReservedEntities PASS" SURVIVED
-      else say JQ1p "TestReservedEntities fails on the plant" "rc=$rc, the test did not run" CNM; head_of "$log" 8; fi
-    fi
-    rm -rf "$pd"
-  fi
-fi
+# groups
+for f in /w/rows/groups/*.sh; do
+  [ -f "$f" ] && . "$f"
+done
 
 if [ $RAN -le 1 ] && [ -n "$SEL" ] && [ "$SEL" != R0 ]; then echo "NOTE ROWS=$SEL selected no row besides R0"; CNM=1; fi
 echo "END $(date -u +%Y-%m-%dT%H:%M:%SZ) rows $RAN bad $BAD cnm $CNM"
