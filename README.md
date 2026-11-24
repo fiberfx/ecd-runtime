@@ -1,5 +1,343 @@
 # Ecd Runtime
 
+Ecd Runtime is an entity store and runtime for one owner process. Your code never changes state directly: each
+system records its writes in a buffer, and a flush turns the buffers into deeds, commits them to an SQLite file and
+then applies the committed ones to an in-memory engine, Jacquard, which answers reads. After a restart the engine is
+brought back to the store's last commit. It is for a Go service, the host, that owns its entities in one process;
+the contract it implements is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`.
+
+## Install
+
+```sh
+go get github.com/fiberfx/ecd-runtime/go/ecr@v0.6.0
+```
+
+Go 1.27.4 or later. A host imports one package, `github.com/fiberfx/ecd-runtime/go/ecr`, and requires one module:
+
+    require github.com/fiberfx/ecd-runtime/go/ecr v0.6.0
+
+The facade brings in the main module, the SQLite store and the id package at the versions it was released with.
+
+## Quick start
+
+This program defines a catalog with one kind and one component, opens a new store, writes one entity through a
+system's buffer, flushes, and reads the value back from the engine.
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+
+	"github.com/fiberfx/ecd-runtime/go/ecr"
+)
+
+// The names of the examples: system app, its kind usr (a user) and component handle, 8 bytes. Deeds are of kind ded.
+var (
+	appSys  = ecr.MustCode("app")
+	user    = ecr.Kind{System: appSys, Kind: ecr.MustCode("usr")}
+	appDeed = ecr.MustCode("ded")
+)
+
+const handle ecr.CID = 1
+
+// appCatalog declares kind usr, whose entities the engine keeps resident once written, and component handle.
+func appCatalog() *ecr.Catalog {
+	return &ecr.Catalog{
+		Components: []ecr.ComponentDef{{CID: handle, Name: "handle", Form: ecr.Component, Size: 8}},
+		Kinds:      []ecr.KindDef{{Kind: user, Residency: ecr.Touched, Budget: 1 << 20}},
+	}
+}
+
+// appMinter stands in for the host's Minter: it mints the eids of system app, writer 1, at one fixed time. A real
+// host holds one *eid.Minter of its lease, from github.com/fiberfx/ecd-id/go, and passes it in.
+type appMinter struct{ count uint32 }
+
+func (m *appMinter) Mint(kind ecr.Code) (ecr.ID, error) {
+	m.count++
+	return ecr.FromParts(appSys, kind, 1795271400000, 1, m.count)
+}
+
+func main() {
+	dir, err := os.MkdirTemp("", "ecr-quickstart") // a real host keeps its store at a fixed path
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	h, err := ecr.Open(ecr.Options{
+		Path:     filepath.Join(dir, "app.db"),
+		Create:   true, // make the file; a later start leaves Create false
+		Catalog:  appCatalog(),
+		Minter:   &appMinter{},
+		DeedKind: appDeed,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer h.Close()
+
+	// A system records its writes in its own buffer.
+	signup, err := h.Register(0, "signup")
+	if err != nil {
+		log.Fatal(err)
+	}
+	u := signup.Spawn(user) // a placeholder for the new entity
+	signup.Set(u, handle, []byte("ada-lace"))
+
+	// Flush commits the buffers to the store, then applies what committed to the engine.
+	res, err := h.Flush()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("seq", res.Seq, "committed", res.Outcomes[0] == ecr.Committed)
+
+	// The eid of the new entity is in the committed deed. Read its value back from the engine.
+	var id ecr.ID
+	err = h.Store.Log(res.Seq-1, func(seq uint64, d ecr.Deed) error {
+		id = d.Ops[0].Entity // the spawn comes first
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	v, err := h.Engine.Get(id, handle, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s %s\n", ecr.KindOf(id).Kind, v)
+}
+```
+
+It prints:
+
+    seq 1 committed true
+    usr ada-lace
+
+What a real host does differently:
+
+- **The Minter.** `appMinter` mints eids at one fixed time and is not safe across restarts. A real host holds one
+  `*eid.Minter` for its lease, from `github.com/fiberfx/ecd-id/go` (`eid.NewMinter(lease, eid.SystemClock{},
+  eid.ProcessPid{})`), and passes it in as `Options.Minter`. ecr does not build a Minter and reads no environment.
+- **The path.** The store lives at a fixed path. `Create: true` makes the file and refuses a path at which anything
+  exists, so pass it only on the first start (see "Upgrading a store" below for a start function that decides).
+- **The goroutine.** A `Host` is used on the owner goroutine only. Call `Flush` at your sync points, with no system
+  running.
+
+Every Go block in this README is code from [`go/ecr/example_test.go`](go/ecr/example_test.go), so `go test ./...` in
+`go/ecr` (row FC-01) runs it and checks its output. The quick start is `Example` with `main` renamed; the blocks
+below are the bodies of the Examples they name, one tab less, or a function of that file.
+
+## Common tasks
+
+### Upgrading a store from v0.5.x
+
+A store written by `go/sqlite` v0.4.0 to v0.5.1 has user version 1, and `Open` refuses it with `ErrSchema`. Call
+`Migrate` before `Open`. It leaves a current store unchanged and returns nil, so a host may call it on every start.
+`Migrate` never creates a file, and no `Store` may be open on the path while it runs.
+
+> **Warning: `Migrate` is one-way.** A migrated store cannot be opened by `go/sqlite` v0.5.x again, and there is no
+> rollback. Copy the file first if you may need to go back.
+
+```go
+// start opens the store at path. The first run makes the file; every later run first calls Migrate, which brings a
+// store written by go/sqlite v0.5.x or earlier to the current schema and leaves a current store as it is.
+func start(path string, m ecr.Minter) (*ecr.Host, error) {
+	_, err := os.Stat(path)
+	create := errors.Is(err, fs.ErrNotExist)
+	if !create {
+		if err := ecr.Migrate(path); err != nil {
+			return nil, err // matches ecr.ErrSchema when the file is not an owner store
+		}
+	}
+	return ecr.Open(ecr.Options{Path: path, Create: create, Catalog: appCatalog(), Minter: m, DeedKind: appDeed})
+}
+```
+
+`ExampleMigrate` runs `start` twice with one Minter: the first run makes the store and commits a deed, the second
+migrates and opens it with the engine at seq 1.
+
+### Attaching trace and span ids
+
+`Buffer.Span(trace, span)` sets the W3C ids that the buffer's next deed carries, and the store keeps them with the
+deed. The zero values mean no trace and no span. The flush that empties the buffer resets them, but a buffer that
+records nothing keeps them until its next deed, so a host that traces only some units of work calls `Span` with the
+zero values for the others. From `Example_span`:
+
+```go
+dir, err := os.MkdirTemp("", "ecr-span")
+if err != nil {
+	log.Fatal(err)
+}
+defer os.RemoveAll(dir)
+h, err := ecr.Open(ecr.Options{Path: filepath.Join(dir, "app.db"), Create: true, Catalog: appCatalog(),
+	Minter: &appMinter{}, DeedKind: appDeed})
+if err != nil {
+	log.Fatal(err)
+}
+defer h.Close()
+signup, err := h.Register(0, "signup")
+if err != nil {
+	log.Fatal(err)
+}
+
+// The W3C ids of the request that caused the write, as in its traceparent header.
+trace, err := ecr.ParseTraceID("4bf92f3577b34da6a3ce929d0e0e4736")
+if err != nil {
+	log.Fatal(err)
+}
+span, err := ecr.ParseSpanID("00f067aa0ba902b7")
+if err != nil {
+	log.Fatal(err)
+}
+signup.Span(trace, span) // the next deed of this buffer carries these ids
+signup.Set(signup.Spawn(user), handle, []byte("ada-lace"))
+if _, err := h.Flush(); err != nil {
+	log.Fatal(err)
+}
+
+// The flush reset the ids, so this deed carries none.
+signup.Set(signup.Spawn(user), handle, []byte("bob-byte"))
+if _, err := h.Flush(); err != nil {
+	log.Fatal(err)
+}
+
+// The store keeps each deed's ids with it; the zero values mean none.
+err = h.Store.Log(0, func(seq uint64, d ecr.Deed) error {
+	fmt.Println(seq, d.TraceID, d.SpanID)
+	return nil
+})
+if err != nil {
+	log.Fatal(err)
+}
+```
+
+It prints:
+
+    1 4bf92f3577b34da6a3ce929d0e0e4736 00f067aa0ba902b7
+    2 00000000000000000000000000000000 0000000000000000
+
+### Testing a host
+
+Package `ecrtest` gives a host's tests the reference engine, the model: pass `ecrtest.NewModel` as `Options.Engine`.
+A host never runs the model in production; `Open` builds Jacquard when `Options.Engine` is nil. In a test use
+`t.TempDir()` for the directory. From `Example_model`, which prints `model at seq 1`:
+
+```go
+dir, err := os.MkdirTemp("", "ecr-model") // in a test, t.TempDir()
+if err != nil {
+	log.Fatal(err)
+}
+defer os.RemoveAll(dir)
+h, err := ecr.Open(ecr.Options{Path: filepath.Join(dir, "app.db"), Create: true, Catalog: appCatalog(),
+	Minter: &appMinter{}, DeedKind: appDeed, Engine: ecrtest.NewModel})
+if err != nil {
+	log.Fatal(err)
+}
+defer h.Close()
+signup, err := h.Register(0, "signup")
+if err != nil {
+	log.Fatal(err)
+}
+signup.Set(signup.Spawn(user), handle, []byte("ada-lace"))
+if _, err := h.Flush(); err != nil {
+	log.Fatal(err)
+}
+fmt.Println(h.Engine.Name(), "at seq", h.Engine.At())
+```
+
+### Checking errors
+
+Every sentinel of ecr holds the error of the package that defines it, so `errors.Is` matches either name.
+
+| Error or outcome | When |
+|---|---|
+| `ErrConfig` | `Open` with no `Path`, `Catalog` or `Minter`, a `DeedKind` that is not a kind, or an `Engine` func that returns no engine; `Register` with an empty or repeated name. Nothing is made. |
+| `ErrExist` | `Open` with `Create` at a path where anything exists. |
+| `ErrSchema` | `Open` of a file that is not an owner store of the current schema (a v0.5.x store needs `Migrate`). |
+| `ErrRef` | `Flush` of a record that names no entity of its buffer. Every collected buffer's records are dropped. |
+| `Refused`, `Conflict`, `Unknown` | Not errors: `Flush` returns nil and `Result.Outcomes` names each deed's outcome. `Refused`: the store's state does not allow the deed. `Conflict`: the deed's eid is already committed (a retry). `Unknown`: the store transaction failed. Only `Committed` deeds reach the engine. |
+
+From `Example_errors`:
+
+```go
+dir, err := os.MkdirTemp("", "ecr-errors")
+if err != nil {
+	log.Fatal(err)
+}
+defer os.RemoveAll(dir)
+path := filepath.Join(dir, "app.db")
+o := ecr.Options{Path: path, Create: true, Catalog: appCatalog(), Minter: &appMinter{}, DeedKind: appDeed}
+
+// Options that miss a required field are refused before any file is made.
+bad := o
+bad.Minter = nil
+_, err = ecr.Open(bad)
+fmt.Println("no Minter:", errors.Is(err, ecr.ErrConfig))
+
+h, err := ecr.Open(o)
+if err != nil {
+	log.Fatal(err)
+}
+defer h.Close()
+
+// Create refuses a path at which anything exists.
+_, err = ecr.Open(o)
+fmt.Println("exists:", errors.Is(err, ecr.ErrExist))
+
+// Open refuses a file that is not an owner store of the current schema.
+empty := filepath.Join(dir, "empty.db")
+if err := os.WriteFile(empty, nil, 0o600); err != nil {
+	log.Fatal(err)
+}
+_, err = ecr.Open(ecr.Options{Path: empty, Catalog: appCatalog(), Minter: &appMinter{}, DeedKind: appDeed})
+fmt.Println("not a store:", errors.Is(err, ecr.ErrSchema))
+
+// A deed that the store does not allow is not an error: its Outcome says so, and nothing is committed.
+rename, err := h.Register(0, "rename")
+if err != nil {
+	log.Fatal(err)
+}
+nobody, err := ecr.FromParts(appSys, user.Kind, 1795271400000, 2, 1) // an eid of no entity
+if err != nil {
+	log.Fatal(err)
+}
+rename.Set(ecr.Of(nobody), handle, []byte("nobody.."))
+res, err := h.Flush()
+fmt.Println("refused:", err == nil && res.Outcomes[0] == ecr.Refused, "seq", res.Seq)
+
+// A record that names no entity refuses the whole flush.
+rename.Set(ecr.Of(ecr.ID{}), handle, []byte("nobody.."))
+_, err = h.Flush()
+fmt.Println("no entity:", errors.Is(err, ecr.ErrRef))
+```
+
+It prints:
+
+    no Minter: true
+    exists: true
+    not a store: true
+    refused: true seq 0
+    no entity: true
+
+## Modules and versions
+
+| Module | Directory | What it is | Require it when |
+|---|---|---|---|
+| `github.com/fiberfx/ecd-runtime/go/ecr` | `go/ecr/` | The facade: ids, seam types, Runtime, store and engine behind one import, plus `ecrtest`. | You write a host. This is the one module you need. |
+| `github.com/fiberfx/ecd-runtime/go` | `go/` | The seam package `ecd`, the runtime `rt` and the engine Jacquard. No SQLite driver. | You build a Runtime over your own `Committer`, or an engine, without the store. |
+| `github.com/fiberfx/ecd-runtime/go/sqlite` | `go/sqlite/` | The owner store in one SQLite file (pure-Go driver `modernc.org/sqlite`). | You wire `rt` and the store yourself. |
+
+The current release is v0.6.0 of all three (tags `go/v0.6.0`, `go/sqlite/v0.6.0`, `go/ecr/v0.6.0`). If you do not use
+`ecr`, upgrade `go` and `go/sqlite` together: `go/sqlite` v0.6.0 requires `go` v0.6.0.
+
+## Reference
+
+The sections below are the detailed rules of each package, as before this README was reorganised.
+
 Ecd Runtime is the entity store and runtime of an owner process. Callers change state only through deeds, which are
 committed through the `Committer` interface of package `rt`, and engines answer reads from memory. The owner store is
 the nested module `go/sqlite`, an SQLite file that a host passes in through `rt.Config.Committer`. Jacquard is the
@@ -7,7 +345,7 @@ archetype engine.
 
 The contract is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`. This repository holds the implementation.
 
-## Layout
+### Layout
 
 | Path | Content |
 |---|---|
@@ -22,14 +360,14 @@ The contract is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`. This re
 
 `git diff --no-index` between a ported file in `go/engine/jacquard/` and its source file in a checkout of Ark at commit 723f2ac records the adaptation.
 
-## Runtime
+### Runtime
 
 The package `rt`, import path `github.com/fiberfx/ecd-runtime/go/rt`, is the write side of the owner process. A system
 records its writes in a buffer and does not touch an engine. The host registers the systems and calls `Flush`, which
 turns the buffers into deeds, commits them in the owner store and applies the committed ones to the engine. The package
 imports the standard library, `github.com/fiberfx/ecd-id/go` and `github.com/fiberfx/ecd-runtime/go/ecd` only.
 
-### What the package gives
+#### What the package gives
 
 - `New(Config)` returns the `Runtime`. `Config` holds `Catalog`, `Engine`, `Minter`, `Committer` and `DeedKind`, and
   every field is required. `New` refuses a nil `Catalog`, `Engine`, `Minter` or `Committer`, and a `DeedKind` for which
@@ -52,7 +390,7 @@ imports the standard library, `github.com/fiberfx/ecd-id/go` and `github.com/fib
 - `ErrConfig` is matched by every error of `New` and `Register`. `ErrRef` is matched by a flush refused because a
   record names no entity of its buffer.
 
-### The order of a flush
+#### The order of a flush
 
 `Flush` runs on the owner goroutine with no system running, and takes these steps in this order.
 
@@ -79,7 +417,7 @@ A buffer with a record is one deed. A spawn and every record that names its plac
 share one outcome, and no deed names an entity spawned by another deed of the same flush. The order of a flush depends
 only on the stages, the registration order and the record order.
 
-### Example
+#### Example
 
 ```go
 // tick registers one system, records three writes and flushes them. cfg is built by the host. The component pos is
@@ -100,7 +438,7 @@ func tick(cfg rt.Config, mover ecd.Kind, pos ecd.CID, known eid.ID) (rt.Result, 
 }
 ```
 
-### Limits
+#### Limits
 
 - The store is the interface `Committer`. Package `rt` holds no owner store: the module `go/sqlite` implements
   `Committer`, and the tests of package `rt` use a fake.
@@ -112,7 +450,7 @@ func tick(cfg rt.Config, mover ecd.Kind, pos ecd.CID, known eid.ID) (rt.Result, 
 - A deed answered `Conflict`, `Refused` or `Unknown` returns no error, and its records are not listed by stage;
   `Result.Outcomes` names the deed by its ord.
 
-## SQLite store
+### SQLite store
 
 The module `github.com/fiberfx/ecd-runtime/go/sqlite`, in `go/sqlite/`, package `sqlite`, is an owner store in one
 SQLite file. A host passes it to the Runtime as `rt.Config.Committer`, and after a restart it brings a fresh engine to
@@ -121,7 +459,7 @@ requires `github.com/fiberfx/ecd-runtime/go` v0.6.0, `github.com/fiberfx/ecd-id/
 `modernc.org/sqlite` v1.37.0. Inside this repository a `replace` directive points the requirement on the main module at
 the parent directory. The main module `go/` does not require the driver.
 
-### What the store gives
+#### What the store gives
 
 - `Create(path)` makes the store file. It refuses a path at which anything exists, with an error that matches
   `ErrExist`, and changes nothing. It sets the page size to 4096 bytes and auto-vacuum to incremental before the first
@@ -161,7 +499,7 @@ advances it. The store is at user version 2, whose `deed` also holds each deed's
 zero values; `Open` refuses a store of user version 1, written by `go/sqlite/v0.4.0` to `go/sqlite/v0.5.1`, and never
 migrates; `Migrate` brings it to user version 2 in one transaction.
 
-### Starting a host
+#### Starting a host
 
 ```go
 // start opens the store at path, creating the file when it is absent and migrating a store of an earlier release,
@@ -200,7 +538,7 @@ kinds, and reads their entities with `Rows`. The engine then takes the seq of th
 kinds `Cold`. A miss on a Touched entity is served the same way: `f` passes its seq and source to the engine's
 `Hydrate`, which answers `ErrGap` when the store has committed a transaction that the engine has not applied.
 
-### The order of a commit
+#### The order of a commit
 
 `Commit` runs on the owner goroutine and takes these steps in this order.
 
@@ -230,7 +568,7 @@ The outcomes are those of package `rt`. `Committed` is a deed written to the log
 already committed, which is a retry. `Refused` is a deed that the state of the store does not allow. `Unknown` is a
 deed whose transaction failed. Only a deed answered `Committed` reaches the engine.
 
-### Limits of the store
+#### Limits of the store
 
 - The store holds no outbox, no intents, no `_feed` or `_store` tables, no lineage and no replication, and it projects
   nothing to a lake. `wal_autocheckpoint` keeps the default of SQLite.
@@ -254,7 +592,7 @@ plants SQ-22q and SQ-22r, in `rows/groups/80-fx51.sh`, SP-03 to SP-06 with the p
 in `rows/groups/86-sp60.sh`, L12-model, in `rows/groups/50-j0m.sh`, and MQ-01, in `rows/groups/85-mq60.sh`, measure
 the module. They load the driver and its modules from the offline module inputs.
 
-## One import for a host
+### One import for a host
 
 The module `github.com/fiberfx/ecd-runtime/go/ecr`, in `go/ecr/`, package `ecr`, is the facade of Ecd Runtime. A host
 imports this one package and requires this one module. Every type of `ecr` is an alias of the type of the package that
@@ -327,7 +665,7 @@ a leaf whose packages import only the standard library, `eid` and the packages `
 of a copy; FC-01y to FC-01zb are the plants of `Migrate`, of the refusal of an empty `Path`, of the refusal of an
 `Engine` func that returns no engine, and of the order in which `Close` closes the engine and the store.
 
-## Rows
+### Rows
 
 `rows/loom.rows.sh` is a POSIX shell script that runs the checks of the repository. Each check is a row with an id.
 Rows sit in groups. The `ROWS` environment variable selects rows by a comma-separated list of row ids and group names.
@@ -341,7 +679,7 @@ nothing, and it is never a PASS. The exit status is 0 when every row is as expec
 SURVIVED, and 3 when any row is CNM and none is FAIL. The header of the script lists every row and the command that runs
 it.
 
-## Attribution
+### Attribution
 
 Ecd Runtime's own code is under the MIT License, in `LICENSE` and `go/LICENSE`. Code taken from other projects is
 listed in `go/NOTICE.txt` with each project's licence text.
