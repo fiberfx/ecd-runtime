@@ -297,6 +297,13 @@ var j5sFaults = []struct {
 	{"unknown residency", func(c *ecd.Catalog) { c.Kinds[0].Residency = 9 }},
 	{"residency 0", func(c *ecd.Catalog) { c.Kinds[2].Residency = 0 }},
 	{"duplicate QID", func(c *ecd.Catalog) { c.Queries = append(c.Queries, c.Queries[0]) }},
+	{"Budget below 0", func(c *ecd.Catalog) { c.Kinds[0].Budget = -1 }},
+	{"Exact query that repeats a CID", func(c *ecd.Catalog) {
+		c.Queries = append(c.Queries, ecd.QueryDef{QID: 20, All: []ecd.CID{j3U64, j3U64}, Exact: true})
+	}},
+	{"query that repeats a kind", func(c *ecd.Catalog) {
+		c.Queries = append(c.Queries, ecd.QueryDef{QID: 20, Kinds: []ecd.Kind{j1Kinds()[0], j1Kinds()[0]}})
+	}},
 }
 
 // TestJ5SCatalog requires the catalog constructor to refuse, with an error that wraps errCatalog and without an
@@ -372,4 +379,36 @@ func TestJ5SCatalog(t *testing.T) {
 			t.Fatalf("Set of an edge of the wrong length = %v, At %d, want ErrOp, At 1", err, en.At())
 		}
 	})
+}
+
+// TestJ5SBudget (J5S-03) requires build, New and the reference model to refuse a catalog with a kind whose Budget is
+// below 0, for an All and a Touched kind, with an error that matches ecd.ErrOp and without an engine, build and New
+// with an error that also wraps errCatalog, and all three to build the catalog with a Budget of 0 and of 1.
+func TestJ5SBudget(t *testing.T) {
+	for _, ki := range []int{0, 2} {
+		for _, b := range []int64{-1, -1 << 40, 0, 1} {
+			cat := j5rCatalog()
+			cat.Kinds[ki].Budget = b
+			en, errB := build(cat)
+			p, errN := New(cat)
+			m, errM := refmodel.New(cat)
+			if b >= 0 {
+				if errB != nil || errN != nil || errM != nil {
+					t.Fatalf("kind %d, Budget %d: build %v, New %v, model %v; want each to build", ki, b, errB, errN, errM)
+				}
+				continue
+			}
+			for name, err := range map[string]error{"build": errB, "New": errN, "model": errM} {
+				if !errors.Is(err, ecd.ErrOp) {
+					t.Errorf("kind %d, Budget %d: %s answers %v, want an error that matches ErrOp", ki, b, name, err)
+				}
+			}
+			if !errors.Is(errB, errCatalog) || !errors.Is(errN, errCatalog) {
+				t.Errorf("kind %d, Budget %d: build %v, New %v, want errors that wrap errCatalog", ki, b, errB, errN)
+			}
+			if en != nil || p != nil || m != nil {
+				t.Errorf("kind %d, Budget %d: an engine was built", ki, b)
+			}
+		}
+	}
 }

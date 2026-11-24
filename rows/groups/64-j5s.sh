@@ -8,7 +8,9 @@
 #   J5S-02   the catalog constructor refuses each catalog that the reference model refuses, one fault per case, with an
 #            error that wraps the catalog error and without an Engine: a duplicate CID, CID 0, a duplicate kind, a tag
 #            with a Size, a Component or an Edge with a Size of 0 or less, an unknown form, an unknown residency and a
-#            duplicate QID; it builds the Edge and pointer-holding forms and refuses a Set of the latter (TestJ5SCatalog)
+#            duplicate QID, a kind whose Budget is below 0, an Exact query whose All repeats a CID and a query whose
+#            Kinds repeat a kind; it builds the Edge and pointer-holding forms and refuses a Set of the latter
+#            (TestJ5SCatalog)
 #   J5S-01p  plant: Close does not mark the Engine closed (seam.go)
 #   J5S-02p  plant: a duplicate CID is not refused (engine.go)
 #

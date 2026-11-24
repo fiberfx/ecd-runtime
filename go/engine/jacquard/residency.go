@@ -20,9 +20,9 @@ type kindRes struct {
 // setResidency declares the residency of every kind. defs lists one definition per kind, in the order of the kind
 // list that newEngine received. An All kind starts Cold and a Touched kind starts Warm and empty. It answers
 // errCatalog, wrapped, for a list whose length or order differs from the kinds' and for a residency that is
-// neither All nor Touched, and it then changes nothing. The node list of every declared query is matched again,
-// since a query with no kinds does not run on a Touched kind. An engine that never receives a declaration holds
-// every kind as All and Warm.
+// neither All nor Touched, and an error that wraps errCatalog and ecd.ErrOp for a Budget below 0, and it then
+// changes nothing. The node list of every declared query is matched again, since a query with no kinds does not
+// run on a Touched kind. An engine that never receives a declaration holds every kind as All and Warm.
 func (en *Engine) setResidency(defs []ecd.KindDef) error {
 	if len(defs) != len(en.idx.kinds) {
 		return fmt.Errorf("%w: %d kind definitions, %d kinds declared", errCatalog, len(defs), len(en.idx.kinds))
@@ -32,6 +32,9 @@ func (en *Engine) setResidency(defs []ecd.KindDef) error {
 	for i, d := range defs {
 		if ki, ok := en.idx.kinds[d.Kind]; !ok || int(ki) != i {
 			return fmt.Errorf("%w: kind definition %d names %v, which is not the kind at that position", errCatalog, i, d.Kind)
+		}
+		if d.Budget < 0 {
+			return fmt.Errorf("%w: %w: kind %v has Budget %d, below 0", errCatalog, ecd.ErrOp, d.Kind, d.Budget)
 		}
 		switch d.Residency {
 		case ecd.All:

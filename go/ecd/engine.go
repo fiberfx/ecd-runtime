@@ -46,7 +46,8 @@ type KindDef struct {
 	Residency Residency
 	Budget    int64 // bytes, for both residencies: a Hydrate of an All kind over it answers ErrBudget and leaves
 	// the kind as it was, and 0 means no limit; a Touched kind keeps its resident bytes within it, or holds no
-	// entity, and 0 keeps none resident
+	// entity, and 0 keeps none resident;
+	// an engine's New refuses a Budget below 0 with an error that matches ErrOp
 }
 
 type QueryDef struct {
@@ -163,6 +164,8 @@ type Engine interface {
 	// Query runs a declared query. arg holds its parameters in the Ecd Runtime codec (empty for none).
 	// An entity matches a QueryDef when it holds every CID of All, none of None and, when Any is not empty, one
 	// of Any; with Exact, its components equal All.
+	// An unknown QID, a non-empty arg for a query that takes none, and a query that names a Touched or an
+	// undeclared kind answer ErrQuery.
 	Query(q QID, arg []byte, out *Answer) error
 
 	// Stats reports the numbers of every kind. On a Stale engine a Touched kind's Bytes may exceed its Budget.
@@ -186,6 +189,6 @@ var (
 	ErrKind   = errors.New("ecd: kind not in catalog")          // an op on an entity whose kind the catalog does not declare
 	ErrOp     = errors.New("ecd: op refused")                   // Apply's check pass, or a Hydrate row: an undeclared CID, a value of the wrong length or an op out of order
 	ErrBudget = errors.New("ecd: over budget")                  // an All kind exceeds its budget at hydration
-	ErrQuery  = errors.New("ecd: query refused")                // an unknown QID, or a query on a Touched kind
+	ErrQuery  = errors.New("ecd: query refused")                // a refusal that the Query comment lists
 	ErrOwner  = errors.New("ecd: call off the owner goroutine") // debug builds
 )

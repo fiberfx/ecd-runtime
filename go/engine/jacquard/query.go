@@ -39,11 +39,18 @@ type query struct {
 // addQuery declares def, compiled against the catalog. A CID in All that is not declared makes the query match
 // nothing; one in None is ignored; Any matches nothing when it lists only undeclared CIDs and ignores them
 // otherwise. A kind that is not declared makes the query answer ecd.ErrQuery at the call. A QID that is
-// declared twice answers errCatalog, wrapped, and keeps the first definition. The query's node list starts as a
-// fresh match over the nodes that hold a table.
+// declared twice answers errCatalog, wrapped, and keeps the first definition. An Exact query whose All repeats a
+// CID, and a query whose Kinds repeat a kind, answer errCatalog, wrapped, and are not declared. The query's node
+// list starts as a fresh match over the nodes that hold a table.
 func (en *Engine) addQuery(def ecd.QueryDef) error {
 	if _, dup := en.queries[def.QID]; dup {
 		return fmt.Errorf("%w: query %d declared twice", errCatalog, def.QID)
+	}
+	if def.Exact && repeats(def.All) {
+		return fmt.Errorf("%w: query %d is Exact and its All repeats a CID", errCatalog, def.QID)
+	}
+	if repeats(def.Kinds) {
+		return fmt.Errorf("%w: query %d repeats a kind in Kinds", errCatalog, def.QID)
 	}
 	q := &query{exact: def.Exact}
 	for _, c := range def.All {
@@ -81,6 +88,18 @@ func (en *Engine) addQuery(def ecd.QueryDef) error {
 	}
 	en.queries[def.QID] = q
 	return nil
+}
+
+// repeats reports whether list holds a value twice.
+func repeats[T comparable](list []T) bool {
+	seen := make(map[T]bool, len(list))
+	for _, v := range list {
+		if seen[v] {
+			return true
+		}
+		seen[v] = true
+	}
+	return false
 }
 
 // has reports whether the query runs on kind: its kind list is empty or holds kind.

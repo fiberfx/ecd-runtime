@@ -14,8 +14,10 @@ const engineName = "jacquard"
 // build returns an empty Engine for the catalog. It refuses, with an error that wraps errCatalog and without an
 // Engine, what the reference model refuses: a nil catalog, a CID 0, a CID declared twice, a kind declared twice, a
 // form other than Component, Tag and Edge, a tag with a nonzero Size, a Component or an Edge whose Size is 0 or
-// less, a residency other than All and Touched, and a QID declared twice. It also refuses what newEngine refuses,
-// such as more components than a mask holds. Nothing is built when the catalog is refused.
+// less, a residency other than All and Touched, a kind whose Budget is below 0 (with an error that also matches
+// ecd.ErrOp), a QID declared twice, an Exact query whose All repeats a CID and a query whose Kinds repeat a kind. It
+// also refuses what newEngine refuses, such as more components than a mask holds. Nothing is built when the catalog
+// is refused.
 //
 // A Tag is a component with no column. A Component and an Edge are one column of Size bytes, and a Pointers flag
 // is kept on the column, so a Set of such a component is refused at the check pass. The kinds keep the order of the
