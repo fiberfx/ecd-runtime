@@ -1,0 +1,10 @@
+# Deeds apply in Ord order, not in list order.
+hydrate	aaa	0	ok
+apply	1	ok
+deed	2
+set	aaa:1	1	1112131415161718
+deed	1
+spawn	aaa:1
+set	aaa:1	1	0102030405060708
+get	aaa:1	1	=1112131415161718
+at	1

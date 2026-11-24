@@ -1,0 +1,26 @@
+# Spawn with two components and a second entity with one, read through Get and the queries.
+hydrate	aaa	0	ok
+apply	1	ok
+deed	0
+spawn	aaa:1
+set	aaa:1	1	0102030405060708
+set	aaa:1	2	1112131415161718
+get	aaa:1	1	=0102030405060708
+get	aaa:1	2	=1112131415161718
+get	aaa:1	3	absent
+get	aaa:2	1	absent
+at	1
+query	0	ok	aaa:1
+query	1	ok
+query	2	ok
+apply	2	ok
+deed	0
+spawn	aaa:2
+set	aaa:2	1	2122232425262728
+get	aaa:2	1	=2122232425262728
+at	2
+query	0	ok	aaa:1	aaa:2
+query	1	ok	aaa:2
+query	2	ok	aaa:2
+query	3	ok	aaa:1	aaa:2
+query	4	ok	aaa:1	aaa:2

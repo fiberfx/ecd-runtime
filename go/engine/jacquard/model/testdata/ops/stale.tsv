@@ -1,0 +1,22 @@
+# An error in the commit pass makes the model stale: every kind, read, query and call answers stale, At() is unchanged.
+hydrate	aaa	0	ok
+apply	1	ok
+deed	0
+spawn	aaa:1
+set	aaa:1	1	0102030405060708
+apply	2	stale
+deed	0
+spawn	aaa:2
+deed	1
+set	aaa:3	1	1112131415161718
+at	1
+state	aaa	stale
+state	bbb	stale
+get	aaa:1	1	stale
+get	bbb:1	1	stale
+query	0	stale
+apply	2	stale
+deed	0
+spawn	aaa:4
+evict	bbb	stale	bbb:1
+hydrate	aaa	1	stale	aaa:1/1=0102030405060708

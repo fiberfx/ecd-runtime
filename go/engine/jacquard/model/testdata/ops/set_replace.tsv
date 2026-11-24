@@ -1,0 +1,22 @@
+# Set of a present component replaces its value; Set of an absent component adds it; the last Set of a deed wins.
+hydrate	aaa	0	ok
+apply	1	ok
+deed	0
+spawn	aaa:1
+set	aaa:1	1	0102030405060708
+apply	2	ok
+deed	0
+set	aaa:1	1	1112131415161718
+get	aaa:1	1	=1112131415161718
+apply	3	ok
+deed	0
+set	aaa:1	2	2122232425262728
+get	aaa:1	1	=1112131415161718
+get	aaa:1	2	=2122232425262728
+apply	4	ok
+deed	0
+set	aaa:1	1	3132333435363738
+set	aaa:1	1	0102030405060708
+get	aaa:1	1	=0102030405060708
+at	4
+query	4	ok	aaa:1

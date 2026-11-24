@@ -1,0 +1,19 @@
+# A tag is present without a value: Get answers no bytes, query 6 finds it, and Unset removes it.
+hydrate	aaa	0	ok
+apply	1	ok
+deed	0
+spawn	aaa:1
+set	aaa:1	3	-
+set	aaa:1	1	0102030405060708
+spawn	aaa:2
+set	aaa:2	1	1112131415161718
+get	aaa:1	3	=
+get	aaa:2	3	absent
+query	6	ok	aaa:1
+query	2	ok	aaa:2
+apply	2	ok
+deed	0
+unset	aaa:1	3
+get	aaa:1	3	absent
+query	6	ok
+query	2	ok	aaa:1	aaa:2
