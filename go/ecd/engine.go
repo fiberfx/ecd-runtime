@@ -128,7 +128,7 @@ type KindStats struct {
 }
 
 type Engine interface {
-	Name() string // "rows", "ark" or "jacquard"
+	Name() string // "rows", "ark" or "jacquard"; "model" for the reference engine of tests
 	At() uint64   // the seq of the last transaction applied in full
 	State(k Kind) State
 
