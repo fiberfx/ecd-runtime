@@ -101,16 +101,15 @@ func typedmemclr(typ unsafe.Pointer, dst unsafe.Pointer)
 func typedmemmove(typ unsafe.Pointer, dst, src unsafe.Pointer)
 
 type ifaceWords struct {
-	typ  uintptr
-	data uintptr
+	typ  unsafe.Pointer
+	data unsafe.Pointer
 }
 
-//nolint:staticcheck,govet
+// rtypePtr returns the data word of the reflect.Type interface value, the address of the runtime type,
+// without converting a uintptr (engine rule E4: no uintptr into memory is kept).
 func rtypePtr(t reflect.Type) unsafe.Pointer {
-	// reflect.Type is interface (type word, data word) in current runtime.
-	// We need the data word, i.e. pointer to runtime type info.
 	w := *(*ifaceWords)(unsafe.Pointer(&t))
-	return unsafe.Pointer(w.data)
+	return w.data
 }
 
 // isRelation determines whether a type is a relation component.
