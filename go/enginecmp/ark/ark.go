@@ -13,9 +13,9 @@
 // seam and the reference model are both silent, the adapter answers as the reference model does; each place is named
 // in the doc comment of the method that holds it.
 //
-// Ark's queries lock their world while they run. Calls that change the engine (Apply, Hydrate, Evict and Close) and
-// every read come from one goroutine at a time: Get, Query and Stats are not safe in parallel, and the adapter does
-// not claim the parallel reads of rule E2.
+// Ark's queries lock their world while they run. Calls that change the engine (Apply, Hydrate, Start, Evict and
+// Close) and every read come from one goroutine at a time: Get, Query and Stats are not safe in parallel, and the
+// adapter does not claim the parallel reads of rule E2.
 package ark
 
 import (
@@ -38,7 +38,7 @@ type Engine struct {
 	korder  []ecd.Kind // the declared kinds in catalog order
 	queries map[ecd.QID]ecd.QueryDef
 	at      uint64
-	loaded  bool // a Hydrate has succeeded
+	loaded  bool // a Hydrate or a Start has succeeded
 	stale   bool
 	closed  bool
 }
@@ -198,8 +198,27 @@ func (e *Engine) newKind() (ks *kindState, err error) {
 // Name returns "ark".
 func (e *Engine) Name() string { return "ark" }
 
-// At returns the seq of the last transaction applied in full, or the seq of the first hydration of a new engine.
+// At returns the seq of the last transaction applied in full, or the seq of the first hydration or Start of a new
+// engine.
 func (e *Engine) At() uint64 { return e.at }
+
+// Start brings a new engine, with no applied transaction, no hydration and no Start, to the seq at without loading a
+// kind: At() becomes at, every kind stays Cold, and a later Hydrate must name at. On any other engine a call with at
+// equal to At() changes nothing, and any other at answers ecd.ErrGap. A stale or closed engine answers ecd.ErrStale,
+// as the reference model does.
+func (e *Engine) Start(at uint64) error {
+	if err := e.gate(); err != nil {
+		return err
+	}
+	if e.at != 0 || e.loaded { // start: not new
+		if at == e.at {
+			return nil
+		}
+		return fmt.Errorf("ark: start at %d, engine at %d: %w", at, e.at, ecd.ErrGap)
+	}
+	e.at, e.loaded = at, true
+	return nil
+}
 
 // State returns the state of a kind: Stale for every kind once the engine is stale or closed, and Cold for a kind
 // the catalog does not declare, as the reference model does.

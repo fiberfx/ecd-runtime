@@ -19,6 +19,24 @@ func (en *Engine) Hydrate(k ecd.Kind, at uint64, src ecd.RowSource) error {
 	return en.hydrate(k, at, src)
 }
 
+// Start brings a new engine, which has applied no transaction and has had no successful hydration or Start, to the
+// seq at without loading a kind: appliedAt becomes at, no kind changes state, and the engine counts as hydrated, so
+// a later hydration must name at. On any other engine a call with at equal to appliedAt changes nothing, and any
+// other at answers ecd.ErrGap. A stale engine answers ecd.ErrStale.
+func (en *Engine) Start(at uint64) error {
+	if en.stale {
+		return ecd.ErrStale
+	}
+	if en.applied != 0 || en.loaded() { // start: not new
+		if at == en.applied {
+			return nil
+		}
+		return fmt.Errorf("%w: start at %d, engine at %d", ecd.ErrGap, at, en.applied)
+	}
+	en.applied, en.hydrated = at, true
+	return nil
+}
+
 // Evict drops the listed resident entities of the Touched kind k; see evict.
 func (en *Engine) Evict(k ecd.Kind, ids []eid.ID) error {
 	return en.evict(k, ids)
@@ -26,7 +44,7 @@ func (en *Engine) Evict(k ecd.Kind, ids []eid.ID) error {
 
 // hydrate loads the rows of src, read at seq at, into kind k. A stale engine answers ecd.ErrStale; a kind that is not
 // declared, ecd.ErrKind; a seq other than appliedAt, ecd.ErrGap. A new engine, which has applied no transaction
-// and has had no successful hydration of any kind, takes the seq of the hydration as its appliedAt.
+// and has had no successful hydration of any kind or Start, takes the seq of the hydration as its appliedAt.
 //
 // Every row is read and checked before any change: a row of another kind answers ecd.ErrKind; a row with a CID
 // that is not declared, a row of a pointer-holding component, and a row whose value is not exactly the
@@ -157,8 +175,8 @@ func (en *Engine) stage(k ecd.Kind, limit int64, src ecd.RowSource) ([]hydEntity
 	}
 }
 
-// loaded reports whether a hydration of any kind has succeeded. A later unload does not clear it, and a refused or
-// failed hydration does not set it.
+// loaded reports whether a hydration of any kind, or a Start, has succeeded. A later unload does not clear it, and a
+// refused or failed hydration does not set it.
 func (en *Engine) loaded() bool { return en.hydrated }
 
 // evict frees the listed entities of the Touched kind k that are resident, and adds their number to the

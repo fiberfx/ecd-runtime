@@ -22,6 +22,7 @@ func (s *stub) Name() string                                           { return 
 func (s *stub) At() uint64                                             { return s.at }
 func (s *stub) State(k ecd.Kind) ecd.State                             { return ecd.Cold }
 func (s *stub) Hydrate(k ecd.Kind, at uint64, src ecd.RowSource) error { return ecd.ErrCold }
+func (s *stub) Start(at uint64) error                                  { return ecd.ErrCold }
 func (s *stub) Evict(k ecd.Kind, ids []eid.ID) error                   { return ecd.ErrMiss }
 func (s *stub) Stats() ecd.Stats                                       { return ecd.Stats{} }
 func (s *stub) Close() error                                           { return nil }
