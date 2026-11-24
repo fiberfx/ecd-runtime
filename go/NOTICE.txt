@@ -98,6 +98,6 @@ Commit:      d6236fe
 Licence:     Apache License 2.0
 Copyright:   Copyright 2024, Agoune Ramine
 
-Ecd Runtime follows Volt's design ideas and test cases: liveness from the generation and a live marker, checks before
-placement, the generation step tested at its limit, a dead-handle soak, empty-archetype placement cases, two-way edge
-linking, column lookup by a dense index, and benchmark scenarios in a nested module. No code is taken.
+Ecd Runtime follows Volt's design ideas and test cases: checks before placement, the generation step tested at its
+limit, a dead-handle soak, empty-archetype placement cases, and benchmark scenarios in a nested module. No code is
+taken.
