@@ -2,8 +2,10 @@
 
 Ecd Runtime is an entity store and runtime for one owner process. Your code never changes state directly: each
 system records its writes in a buffer, and a flush turns the buffers into deeds, commits them to an SQLite file and
-then applies the committed ones to an in-memory engine, Jacquard, which answers reads. After a restart the engine is
-brought back to the store's last commit. It is for a Go service, the host, that owns its entities in one process;
+then applies the committed ones to an in-memory engine, Jacquard, which answers reads. Each entity has an eid (its
+id, which names its system and kind). After a restart `Open` brings the engine to the store's seq (the number of the
+last committed transaction) but loads no entity, so a read answers `ErrMiss` or `ErrCold` until the host reads the
+store (see "Reading after a restart" below). It is for a Go service, the host, that owns its entities in one process;
 the contract it implements is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`.
 
 ## Install
@@ -22,6 +24,10 @@ The facade brings in the main module, the SQLite store and the id package at the
 
 This program defines a catalog with one kind and one component, opens a new store, writes one entity through a
 system's buffer, flushes, and reads the value back from the engine.
+
+A few words it uses: a Minter mints eids for one lease (the system and writer number that one process mints for);
+the 0 in `Register(0, "signup")` is the system's stage (stages flush in ascending order, and the systems of one stage
+in registration order); a kind's `Budget` is the bytes its entities may hold in the engine.
 
 ```go
 package main
@@ -127,9 +133,9 @@ What a real host does differently:
 - **The goroutine.** A `Host` is used on the owner goroutine only. Call `Flush` at your sync points, with no system
   running.
 
-Every Go block in this README is code from [`go/ecr/example_test.go`](go/ecr/example_test.go), so `go test ./...` in
-`go/ecr` (row FC-01) runs it and checks its output. The quick start is `Example` with `main` renamed; the blocks
-below are the bodies of the Examples they name, one tab less, or a function of that file.
+Every Go block before `## Reference` is code from [`go/ecr/example_test.go`](go/ecr/example_test.go), so `go test ./...`
+in `go/ecr` (row FC-01) runs it and checks its output. The quick start is `Example` with `main` renamed; the blocks
+below, up to Reference, are the bodies of the Examples they name, one tab less, or a function of that file.
 
 ## Common tasks
 
@@ -158,7 +164,19 @@ func start(path string, m ecr.Minter) (*ecr.Host, error) {
 ```
 
 `ExampleMigrate` runs `start` twice with one Minter: the first run makes the store and commits a deed, the second
-migrates and opens it with the engine at seq 1.
+calls `Migrate`, which leaves the current store (user version 2) as it is, and opens it with the engine at seq 1.
+The example does not run the upgrade from user version 1 itself.
+
+### Reading after a restart
+
+`Open` of an existing store brings the engine to the store's seq and loads no entity: Touched kinds start empty and
+All kinds start cold. So the first read of an entity after a restart answers `ErrMiss` (a Touched kind) or `ErrCold`
+(an All kind). On `ErrMiss`, read the entity from the store with `h.Store.Rows(kind, ids, f)`: it calls `f` once
+with the store's seq and a source of the stored rows of those eids, and `f` passes both to
+`h.Engine.Hydrate(kind, seq, src)`, after which `Get` answers from the engine. `Hydrate` answers `ErrGap` when the
+store has committed a transaction that the engine has not applied. An All kind's
+entities are read with `Rows` and served from them directly until an engine is admitted to serve All kinds. The rules
+are in Reference, under "Starting a host".
 
 ### Attaching trace and span ids
 
@@ -259,7 +277,12 @@ Every sentinel of ecr holds the error of the package that defines it, so `errors
 | `ErrExist` | `Open` with `Create` at a path where anything exists. |
 | `ErrSchema` | `Open` of a file that is not an owner store of the current schema (a v0.5.x store needs `Migrate`). |
 | `ErrRef` | `Flush` of a record that names no entity of its buffer. Every collected buffer's records are dropped. |
-| `Refused`, `Conflict`, `Unknown` | Not errors: `Flush` returns nil and `Result.Outcomes` names each deed's outcome. `Refused`: the store's state does not allow the deed. `Conflict`: the deed's eid is already committed (a retry). `Unknown`: the store transaction failed. Only `Committed` deeds reach the engine. |
+| `ErrKind` | `Flush` of an op on an entity whose kind the catalog does not declare, or a spawn eid of another kind than the spawn's. Nothing is committed, and every collected buffer's records are dropped. |
+| `ErrOp` | `Flush` of an op the catalog does not allow: an unknown op code, an undeclared CID, a value of the wrong length (a component's value is exactly its `Size`, a tag's is empty), or ops out of order (an op before the spawn, after the destroy, or a spawn and destroy of one eid in one flush). Nothing is committed, and every collected buffer's records are dropped. The engine's `Hydrate` answers it for such a stored row. |
+| `ErrMiss` | `Engine.Get` of an entity of a Touched kind that is not resident, as after a restart. Read it from the store (see "Reading after a restart"). |
+| `ErrCold` | `Engine.Get` of an entity of an All kind that is not hydrated; `Open` leaves All kinds cold. Read the store. |
+| `Refused`, `Conflict` | Not errors: `Flush` returns nil and `Result.Outcomes` names each deed's outcome. `Refused`: the store's state does not allow the deed. `Conflict`: the deed's eid is already committed (a retry). Only `Committed` deeds reach the engine. |
+| An error of the store's transaction | `Flush` returns an error that wraps `rt: commit:` and the zero `Result`; every collected buffer's records are dropped and nothing reaches the engine. The outcome `Unknown` is answered only by a `Committer` that reports per deed; on the SQLite store a failed transaction is this error instead. |
 
 From `Example_errors`:
 

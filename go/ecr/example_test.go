@@ -108,7 +108,7 @@ func start(path string, m ecr.Minter) (*ecr.Host, error) {
 	return ecr.Open(ecr.Options{Path: path, Create: create, Catalog: appCatalog(), Minter: m, DeedKind: appDeed})
 }
 
-// ExampleMigrate runs start twice: the first run makes the store and commits a deed, the second migrates and opens it.
+// ExampleMigrate runs start twice: the first run makes the store and commits a deed, the second calls Migrate, which leaves the current store as it is, and opens it.
 func ExampleMigrate() {
 	dir, err := os.MkdirTemp("", "ecr-migrate")
 	if err != nil {
