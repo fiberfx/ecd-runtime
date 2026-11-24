@@ -36,5 +36,5 @@ j4c_plant() {
 go_row J03 j4c "TestJ03 rc=0" /w/go test -run '^TestJ03$' ./engine/jacquard/
 j4c_plant J03p  "TestJ03 fails on the plant"          TestJ03          move.go  's/^\t\ten\.announce(node)$/\t\t_ = node/'
 j4c_plant J03pq "TestCompareQuery fails on the plant" TestCompareQuery move.go  's/^\t\ten\.announce(node)$/\t\t_ = node/'
-j4c_plant J03p1 "TestJ03 fails on the plant"          TestJ03          query.go 's/if q\.wants(a) {/if q.wants(a) \&\& node != 2 {/'
+j4c_plant J03p1 "TestJ03 fails on the plant"          TestJ03          query.go 's/if en\.runs(q, a) {/if en.runs(q, a) \&\& node != 2 {/'
 j4c_plant J03ps "TestJ03 fails on the plant"          TestJ03          query.go 's/^\tq\.nodes = en\.scan(q)$/\tq.nodes = nil/'

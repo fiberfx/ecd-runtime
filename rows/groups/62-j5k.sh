@@ -35,4 +35,4 @@ j5k_plant() {
 go_row J5K-01 j5k "TestJ5KSweep rc=0" /w/go test -run '^TestJ5KSweep$' ./engine/jacquard/
 go_row J5K-02 j5k "TestJ5KSecondChance rc=0" /w/go test -run '^TestJ5KSecondChance$' ./engine/jacquard/
 j5k_plant J5K-01p "TestJ5KSweep fails on the plant"        TestJ5KSweep        clock.go 's/c\.bits\[w\]\.And(^bit)/_ = bit/'
-j5k_plant J5K-02p "TestJ5KSecondChance fails on the plant" TestJ5KSecondChance clock.go 's/c\.bits\[w\]\.Or(bit)/c.bits[w].Or(0)/'
+j5k_plant J5K-02p "TestJ5KSecondChance fails on the plant" TestJ5KSecondChance clock.go 's/c\.bits\[w\]\.Or(bit)/c.bits[w].Or(bit \& 0)/'

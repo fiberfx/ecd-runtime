@@ -36,5 +36,5 @@ j5b_plant() {
 
 go_row J5B-01 j5b "TestJ5BStats rc=0" /w/go test -run '^TestJ5BStats$' ./engine/jacquard/
 go_row J5B-02 j5b "TestJ5BStatsKinds rc=0" /w/go test -run '^TestJ5BStatsKinds$' ./engine/jacquard/
-j5b_plant J5B-01p "TestJ5BStatsKinds fails on the plant" TestJ5BStatsKinds bytes.go 's/if a\.kind != ki {/if false {/'
+j5b_plant J5B-01p "TestJ5BStatsKinds fails on the plant" TestJ5BStatsKinds bytes.go 's/if a\.kind != ki {/if a.kind != ki \&\& false {/'
 j5b_plant J5B-02p "TestJ5BStatsKinds fails on the plant" TestJ5BStatsKinds bytes.go 's/if t\.len() > 0 {/if t != nil {/'
