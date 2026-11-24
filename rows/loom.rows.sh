@@ -10,8 +10,9 @@
 #     --param image=mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2 \
 #     --param inputs=DIR \
 #     --param cpus=2 --param memory=4g --param timeout=1800
-# inputs is required: a GOPROXY file tree that /w/inputs provides for the module's one requirement,
-# github.com/fiberfx/ecd-id/go v0.8.0. Without it GOPROXY is off, and every row that loads the module is CNM.
+# inputs is required: a GOPROXY file tree that /w/inputs provides for github.com/fiberfx/ecd-id/go v0.8.0, the one
+# requirement of go/, and for github.com/mlange-42/ark v0.8.4-0.20261110114945-723f2ac3186a, which go/enginecmp also
+# requires. Without it GOPROXY is off, and every row that loads a module is CNM.
 #
 # Rows live in group files, rows/groups/NN-<group>.sh, which the script sources in name order between R0 and the
 # final line. A group file is POSIX sh sourced from /w. It owns its row ids and its group name, calls "sel ID GROUP"
