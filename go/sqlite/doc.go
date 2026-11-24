@@ -43,8 +43,9 @@
 //
 // Hydrate reads the store's seq and then, for each All kind of the catalog in catalog order, the values in the
 // kind's eid range in eid order, all in one read transaction; the engine loads each kind at that seq. The values
-// of Touched kinds are written by Commit and not read back. Log yields the deeds above a seq, in seq order, then
-// Ord order, from one read transaction.
+// of Touched kinds are written by Commit and not read back. When the catalog has no All kind and the seq is above
+// 0, Hydrate loads the first Touched kind with no row, so that a new engine takes the seq. Log yields the deeds
+// above a seq, in seq order, then Ord order, from one read transaction.
 //
 // # Settings
 //
