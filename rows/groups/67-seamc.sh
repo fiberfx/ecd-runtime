@@ -2,8 +2,8 @@
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, go_row and HAVE_GO.
 #
 # TestSeamDecidedText reads engine.go and requires the words of the KindDef Budget comment, of the Op comment on
-# committed deeds, of the Hydrate comment, of the Query comment, of the ErrOp comment and of the Stats comment. The
-# plants of this group edit one line of engine.go each and run that test.
+# committed deeds, of the Hydrate comment, of the Query comment and its ErrQuery rule, of the ErrOp comment and of the
+# Stats comment. The plants of this group edit one line of engine.go each and run that test.
 #
 #   SC-01    TestSeamDecidedText passes on engine.go
 #   SC-01p   plant: the Budget comment ends "and 0 means no residency", not "and 0 keeps none resident" (engine.go)
@@ -13,6 +13,8 @@
 #   SC-01t   plant: the Query comment drops the rule for a non-empty Any (engine.go)
 #   SC-01u   plant: the Budget comment drops the empty-kind case (engine.go)
 #   SC-01v   plant: the Stats comment drops the Stale case (engine.go)
+#   SC-01w   plant: the Budget comment says New accepts a Budget below 0 (engine.go)
+#   SC-01x   plant: the Query comment drops the refusal of a non-empty arg for a query that takes none (engine.go)
 #
 # seamc_plant id expect sedexpr: copies /w/go to a temporary directory, applies the one-line sed to ecd/engine.go and
 # runs only TestSeamDecidedText there. KILLED: the test failed. SURVIVED: it passed.
@@ -50,3 +52,7 @@ seamc_plant SC-01s "TestSeamDecidedText fails on the plant" \
 seamc_plant SC-01t "TestSeamDecidedText fails on the plant" 's/and, when Any is not empty, one$/and one/'
 seamc_plant SC-01u "TestSeamDecidedText fails on the plant" 's/within it, or holds no$/within it, and holds no/'
 seamc_plant SC-01v "TestSeamDecidedText fails on the plant" 's/ On a Stale engine a Touched kind.s Bytes may exceed its Budget\.$//'
+seamc_plant SC-01w "TestSeamDecidedText fails on the plant" \
+  's/and New refuses a Budget below 0/and New accepts a Budget below 0/'
+seamc_plant SC-01x "TestSeamDecidedText fails on the plant" \
+  's/, a non-empty arg for a query that takes none, and/, and/'
