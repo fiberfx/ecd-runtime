@@ -288,7 +288,7 @@ func TestApplyCatchUp(t *testing.T) {
 		t.Fatalf("At() = %d, want 2000", m.At())
 	}
 
-	skipped := entityID("aaa", 999999)
+	skipped := entityID("aaa", 200000)
 	for _, seq := range []uint64{m.At() + 2, m.At()} {
 		err := m.Apply(seq, []ecd.Deed{deed(0, spawn(skipped))})
 		if !errors.Is(err, ecd.ErrGap) || errors.Is(err, ecd.ErrStale) {
