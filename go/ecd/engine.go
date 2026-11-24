@@ -87,11 +87,14 @@ type Op struct {
 	Value  []byte
 }
 
-// Deed is one committed deed as an engine applies it.
+// Deed is one committed deed as an engine applies it. TraceID and SpanID are the W3C ids of the span in which the
+// deed was made, and the store keeps them with it; the zero values mean no trace and no span. No engine reads them.
 type Deed struct {
-	ID  eid.ID
-	Ord uint32
-	Ops []Op
+	ID      eid.ID
+	Ord     uint32
+	TraceID TraceID
+	SpanID  SpanID
+	Ops     []Op
 }
 
 // Row is one stored component value, as hydration reads it.
