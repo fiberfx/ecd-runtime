@@ -23,10 +23,11 @@ func userVersion(t *testing.T, path string) int {
 }
 
 // TestMigrate holds that Migrate brings a store of user version 1 to user version 2: its committed deed reads back
-// with the zero ids and a new deed commits its ids; that a store of user version 2 is left unchanged; and that a
-// file of user version 0, a store of user version 1 with a rollback journal and a file of user version 1 without
-// the deed table are refused with an error that matches ErrSchema and keep their user version, and a missing path is
-// an error that makes no file.
+// with the zero ids and a new deed commits its ids; that the trace id and span id columns it adds keep the length
+// checks of the schema, so a row with a trace id of 15 bytes or a span id of 7 bytes is refused; that a store of user
+// version 2 is left unchanged; and that a file of user version 0, a store of user version 1 with a rollback journal
+// and a file of user version 1 without the deed table are refused with an error that matches ErrSchema and keep
+// their user version, and a missing path is an error that makes no file.
 func TestMigrate(t *testing.T) {
 	t1, s1 := spanIDs(t, "4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7")
 
@@ -55,6 +56,36 @@ func TestMigrate(t *testing.T) {
 		commitWant(t, s, "a deed with ids after Migrate", deeds, []rt.Outcome{rt.Committed}, 2)
 		if got := readLog(t, s, 1); len(got) != 1 || got[0].deed.TraceID != t1 || got[0].deed.SpanID != s1 {
 			t.Errorf("Log(1) after Migrate: %+v; want one deed with trace %q span %q", got, t1, s1)
+		}
+	})
+
+	// The columns that Migrate adds keep the checks of the schema: a row whose ids have the lengths 16 and 8 is stored,
+	// and a trace id of 15 bytes or a span id of 7 bytes is refused. Each row has a seq of its own, so only a check
+	// can refuse it.
+	t.Run("checks", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "checks.db")
+		makeFile(t, path, true, schemaV1, "PRAGMA user_version = 1")
+		if err := sqlite.Migrate(path); err != nil {
+			t.Fatalf("Migrate of a store of user version 1: %v", err)
+		}
+		db := rawDB(t, path)
+		for i, c := range []struct {
+			name, trace, span string
+			stored            bool
+		}{
+			{"trace id of 16 bytes and span id of 8 bytes", "randomblob(16)", "randomblob(8)", true},
+			{"trace id of 15 bytes", "randomblob(15)", "randomblob(8)", false},
+			{"span id of 7 bytes", "randomblob(16)", "randomblob(7)", false},
+		} {
+			q := fmt.Sprintf("INSERT INTO deed (id, seq, ord, at, trace_id, span_id) "+
+				"VALUES (randomblob(16), %d, 0, 0, %s, %s)", i+1, c.trace, c.span)
+			_, err := db.Exec(q)
+			switch {
+			case c.stored && err != nil:
+				t.Errorf("a deed row with a %s: %v; want it stored", c.name, err)
+			case !c.stored && err == nil:
+				t.Errorf("a deed row with a %s: no error; want the check of the schema to refuse it", c.name)
+			}
 		}
 	})
 

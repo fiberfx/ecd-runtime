@@ -132,6 +132,12 @@ the parent directory. The main module `go/` does not require the driver.
   connection and one reader connection, and each holds a connection before `Open` returns.
 - The writer opens an immediate transaction, with `busy_timeout` of 2000 ms, foreign keys on and `synchronous` FULL.
   The reader has `busy_timeout` of 2000 ms and `query_only` on.
+- `Migrate(path)` brings the store at `path` to the user version that `Open` accepts, in one transaction of its own
+  writer. A store of user version 1 gains the `trace_id` and `span_id` columns of `deed`, with the length checks of the
+  schema and NULL in every committed row, which `Log` returns as the zero values; a store of user version 2 is left
+  unchanged. `Migrate` never creates a file, so a missing path is an error. A file whose journal mode is not WAL, whose
+  `user_version` is neither 1 nor 2, or that is of user version 1 without the `deed` table is refused with an error
+  that matches `ErrSchema`, and nothing changes. No `Store` may be open on `path` while it runs.
 - `Store.Commit(deeds, out)` is the `rt.Committer`. It commits the deeds of one flush in one SQLite transaction and
   writes one `rt.Outcome` per deed into `out`.
 - `Store.Hydrate(e, cat)` loads every kind of residency `All` of the catalog into a fresh engine and returns the seq.
@@ -158,11 +164,14 @@ migrates; `Migrate` brings it to user version 2 in one transaction.
 ### Starting a host
 
 ```go
-// start opens the store at path, creating the file when it is absent, brings the fresh engine of cfg to the seq of the
-// store and returns the Runtime that commits into it. cfg holds the Catalog, a fresh Engine, the Minter and the
-// DeedKind of the host.
+// start opens the store at path, creating the file when it is absent and migrating a store of an earlier release,
+// brings the fresh engine of cfg to the seq of the store and returns the Runtime that commits into it. cfg holds the
+// Catalog, a fresh Engine, the Minter and the DeedKind of the host.
 func start(path string, cfg rt.Config) (*rt.Runtime, *sqlite.Store, error) {
 	if err := sqlite.Create(path); err != nil && !errors.Is(err, sqlite.ErrExist) {
+		return nil, nil, err
+	}
+	if err := sqlite.Migrate(path); err != nil { // brings a store of an earlier release, user version 1, to 2
 		return nil, nil, err
 	}
 	s, err := sqlite.Open(path) // matches sqlite.ErrSchema when the file is not an owner store
@@ -183,7 +192,8 @@ func start(path string, cfg rt.Config) (*rt.Runtime, *sqlite.Store, error) {
 }
 ```
 
-After `Hydrate` the engine is at the seq of the store, and the next flush commits at that seq plus one.
+`Migrate` leaves a store of user version 2 unchanged and returns nil, so the host may call it at every start. After
+`Hydrate` the engine is at the seq of the store, and the next flush commits at that seq plus one.
 
 A host whose catalog holds All kinds passes `Hydrate` a catalog without them until an engine is admitted to serve All
 kinds, and reads their entities with `Rows`. The engine then takes the seq of the store through `Start`, with its All
@@ -240,9 +250,9 @@ deed whose transaction failed. Only a deed answered `Committed` reaches the engi
 - On macOS the writer also sets `fullfsync` and `checkpoint_fullfsync`. The rows run on Linux and do not measure them.
 
 Rows SQ-01 to SQ-14, in `rows/groups/78-sq40.sh`, SQ-20 to SQ-22, in `rows/groups/79-sq50.sh`, SQ-30 with the
-plants SQ-22q and SQ-22r, in `rows/groups/80-fx51.sh`, SP-03 to SP-06, in `rows/groups/86-sp60.sh`, L12-model, in
-`rows/groups/50-j0m.sh`, and MQ-01, in `rows/groups/85-mq60.sh`, measure the module. They load the driver and its
-modules from the offline module inputs.
+plants SQ-22q and SQ-22r, in `rows/groups/80-fx51.sh`, SP-03 to SP-06 with the plants SP-05p to SP-05s of `Migrate`,
+in `rows/groups/86-sp60.sh`, L12-model, in `rows/groups/50-j0m.sh`, and MQ-01, in `rows/groups/85-mq60.sh`, measure
+the module. They load the driver and its modules from the offline module inputs.
 
 ## One import for a host
 

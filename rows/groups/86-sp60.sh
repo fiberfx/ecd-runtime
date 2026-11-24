@@ -28,11 +28,13 @@
 #   SP-04    Create writes user version 2, and Open refuses a store of user version 1 (TestCreate)
 #   SP-04p   plant: Open admits user version 1 (sqlite/store.go; TestCreate)
 #   SP-04q   plant: Create writes user version 1 (sqlite/store.go; TestCreate)
-#   SP-05    Migrate brings a store of user version 1 to 2 with its deed intact, leaves a store of version 2 unchanged
-#            and refuses other files with ErrSchema and no change (TestMigrate)
+#   SP-05    Migrate brings a store of user version 1 to 2 with its deed intact and the length checks of its trace_id
+#            and span_id columns, leaves a store of version 2 unchanged and refuses other files with ErrSchema and no
+#            change (TestMigrate)
 #   SP-05p   plant: Migrate sets user version 1 (sqlite/migrate.go; TestMigrate, case v1)
 #   SP-05q   plant: Migrate alters a store of user version 2 (sqlite/migrate.go; TestMigrate, case current)
 #   SP-05r   plant: Migrate skips the journal mode check (sqlite/migrate.go; TestMigrate, case refused)
+#   SP-05s   plant: Migrate adds trace_id without its length check (sqlite/migrate.go; TestMigrate, case checks)
 #   SP-06    go/sqlite/go.mod requires github.com/fiberfx/ecd-runtime/go v0.6.0 and replaces it by ../
 #
 # Rows SP-03, SP-04 and SP-05 and their plants load the driver and its modules from the module inputs, as the rows of
@@ -163,6 +165,8 @@ sp60_plant SP-05q "TestMigrate/current fails on the plant" sqlite . TestMigrate 
   's/^\tcase v == 2:$/\tcase v == 3:/'
 sp60_plant SP-05r "TestMigrate/refused fails on the plant" sqlite . TestMigrate refused sqlite/migrate.go \
   's/^\tcase mode != "wal" || v < 1 || v > 2:$/\tcase v < 1 || v > 2:/'
+sp60_plant SP-05s "TestMigrate/checks fails on the plant" sqlite . TestMigrate checks sqlite/migrate.go \
+  's/ADD COLUMN trace_id BLOB CHECK (trace_id IS NULL OR length(trace_id) = 16);$/ADD COLUMN trace_id BLOB;/'
 
 if sel SP-06 sp60; then
   sp60_req=$(grep -cE '^[[:space:]]+github\.com/fiberfx/ecd-runtime/go v0\.6\.0$' /w/go/sqlite/go.mod)
