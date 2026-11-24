@@ -46,8 +46,8 @@ type KindDef struct {
 	Residency Residency
 	Budget    int64 // bytes, for both residencies: a Hydrate of an All kind over it answers ErrBudget and leaves
 	// the kind as it was, and 0 means no limit; a Touched kind keeps its resident bytes within it, or holds no
-	// entity, and 0 keeps none resident
-	// and New refuses a Budget below 0 with an error that matches ErrOp
+	// entity, and 0 keeps none resident;
+	// an engine's New refuses a Budget below 0 with an error that matches ErrOp
 }
 
 type QueryDef struct {

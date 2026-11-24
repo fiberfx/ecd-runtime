@@ -44,7 +44,7 @@ seamc_plant() {
 }
 
 go_row SC-01 seamc "TestSeamDecidedText rc=0" /w/go test -run '^TestSeamDecidedText$' ./ecd/
-seamc_plant SC-01p "TestSeamDecidedText fails on the plant" 's/, and 0 keeps none resident$/, and 0 means no residency/'
+seamc_plant SC-01p "TestSeamDecidedText fails on the plant" 's/, and 0 keeps none resident;$/, and 0 means no residency;/'
 seamc_plant SC-01q "TestSeamDecidedText fails on the plant" 's/ (E1)\.$/./'
 seamc_plant SC-01r "TestSeamDecidedText fails on the plant" 's/Hydrate is all or nothing per call:/Hydrate loads rows:/'
 seamc_plant SC-01s "TestSeamDecidedText fails on the plant" \
@@ -53,6 +53,6 @@ seamc_plant SC-01t "TestSeamDecidedText fails on the plant" 's/and, when Any is 
 seamc_plant SC-01u "TestSeamDecidedText fails on the plant" 's/within it, or holds no$/within it, and holds no/'
 seamc_plant SC-01v "TestSeamDecidedText fails on the plant" 's/ On a Stale engine a Touched kind.s Bytes may exceed its Budget\.$//'
 seamc_plant SC-01w "TestSeamDecidedText fails on the plant" \
-  's/and New refuses a Budget below 0/and New accepts a Budget below 0/'
+  's/New refuses a Budget below 0/New accepts a Budget below 0/'
 seamc_plant SC-01x "TestSeamDecidedText fails on the plant" \
   's/, a non-empty arg for a query that takes none, and/, and/'
