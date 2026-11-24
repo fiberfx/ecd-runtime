@@ -84,7 +84,7 @@ func (r *Runtime) Flush() (Result, error) {
 			}
 			ops[i] = ecd.Op{Code: rec.code, Entity: e, CID: rec.cid, Value: rec.val}
 		}
-		deeds[ord] = ecd.Deed{ID: deedID, Ord: uint32(ord), Ops: ops}
+		deeds[ord] = ecd.Deed{ID: deedID, Ord: uint32(ord), TraceID: b.trace, SpanID: b.span, Ops: ops}
 	}
 
 	if err := r.index.check(deeds); err != nil {

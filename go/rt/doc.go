@@ -15,6 +15,7 @@
 //     per spawn in record order. A spawn eid of another kind than the spawn's refuses the flush with ecd.ErrKind.
 //  4. Build one ecd.Deed per buffer: Ord is the buffer's index among the collected buffers, and the ops follow
 //     record order. A spawn is one OpSpawn, and the Set records that name its placeholder follow as OpSet ops.
+//     TraceID and SpanID are the ids that the buffer's last Span call set, or the zero values without one.
 //  5. Check the deeds against the catalog. A refusal matches ecd.ErrKind or ecd.ErrOp, and nothing is committed.
 //  6. Commit the deeds in one store transaction through the Committer, which answers one Outcome per deed.
 //  7. Apply the deeds answered Committed, with their Ord unchanged, in one Apply at the transaction's seq. With

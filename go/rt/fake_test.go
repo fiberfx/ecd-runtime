@@ -135,7 +135,7 @@ func copyDeeds(deeds []ecd.Deed) []ecd.Deed {
 			}
 			ops[j] = op
 		}
-		cp[i] = ecd.Deed{ID: d.ID, Ord: d.Ord, Ops: ops}
+		cp[i] = ecd.Deed{ID: d.ID, Ord: d.Ord, TraceID: d.TraceID, SpanID: d.SpanID, Ops: ops}
 	}
 	return cp
 }

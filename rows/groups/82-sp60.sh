@@ -11,6 +11,10 @@
 #            zero values and that no engine reads them (TestDeedSpanFields in go/ecd)
 #   SP-01p   plant: Deed.TraceID is of type SpanID (ecd/engine.go; TestDeedSpanFields, case types)
 #   SP-01q   plant: the Deed comment drops "No engine reads them." (ecd/engine.go; TestDeedSpanFields, case comment)
+#   SP-02    a deed carries its buffer's last Span ids, the zero values without one, and a flush that empties the
+#            buffer, committed or refused, resets them; a buffer with no record keeps them (TestBufferSpan in go/rt)
+#   SP-02p   plant: the flush builds the deed without the buffer's ids (rt/flush.go; TestBufferSpan, case carried)
+#   SP-02q   plant: emptying a buffer keeps its ids (rt/buffer.go; TestBufferSpan, case reset)
 #
 # sp60_plant id expect mod pkg test case file sedexpr: copies /w/go to a temporary directory, applies the one-line sed
 # to go/<file> there and runs only the named test of package pkg in module directory go/<mod> of the copy. The copy is
@@ -60,3 +64,9 @@ sp60_plant SP-01p "TestDeedSpanFields/types fails on the plant" . ./ecd/ TestDee
   's/^\tTraceID TraceID$/\tTraceID SpanID/'
 sp60_plant SP-01q "TestDeedSpanFields/comment fails on the plant" . ./ecd/ TestDeedSpanFields comment ecd/engine.go \
   's/ No engine reads them\.$//'
+
+go_row SP-02 sp60 "TestBufferSpan rc=0" /w/go test -run '^TestBufferSpan$' ./rt/
+sp60_plant SP-02p "TestBufferSpan/carried fails on the plant" . ./rt/ TestBufferSpan carried rt/flush.go \
+  's/TraceID: b\.trace, SpanID: b\.span, //'
+sp60_plant SP-02q "TestBufferSpan/reset fails on the plant" . ./rt/ TestBufferSpan reset rt/buffer.go \
+  's/^\tb\.trace, b\.span = ecd\.TraceID{}, ecd\.SpanID{}$/\t\/\/ the reset of the ids is dropped/'
