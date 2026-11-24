@@ -1,11 +1,13 @@
 package sqlite
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 
 	eid "github.com/fiberfx/ecd-id/go"
 	"github.com/fiberfx/ecd-runtime/go/ecd"
@@ -13,14 +15,18 @@ import (
 
 const sqlRows = `SELECT id, cid, value FROM state WHERE id >= ?1 AND id < ?2 ORDER BY id, cid`
 
+const sqlEntity = `SELECT id, cid, value FROM state WHERE id = ?1 ORDER BY cid`
+
 const sqlLog = `SELECT d.seq, d.ord, d.id, b.body FROM deed d JOIN deed_body b ON b.id = d.id WHERE d.seq > ?1
 ORDER BY d.seq, d.ord`
 
 // Hydrate loads every All kind of cat into e from one read transaction on the reader: it reads the store's seq,
 // then, for each All kind in catalog order, the stored values of the kind's eid range in eid order, which
-// e.Hydrate loads at that seq. Touched kinds are skipped. When the catalog has no All kind and the seq is above
-// 0, the first Touched kind in catalog order is hydrated with no row, so that a new engine takes the seq. An error
-// stops, rolls the transaction back and is returned wrapped with its kind. Hydrate returns the seq.
+// e.Hydrate loads at that seq. Touched kinds are skipped. When no All kind was loaded and the seq is above 0,
+// Hydrate calls e.Start with the seq, so that a new engine takes it with no kind loaded. Hydrating an All kind makes
+// the engine serve it from memory; until an engine is admitted to serve All kinds, a product passes a catalog
+// without All kinds and reads their entities with Rows. An error stops, rolls the transaction back and is returned
+// wrapped with its kind, or with "start" for e.Start. Hydrate returns the seq.
 func (s *Store) Hydrate(e ecd.Engine, cat *ecd.Catalog) (seq uint64, err error) {
 	if cat == nil {
 		return 0, errors.New("sqlite: hydrate: catalog is nil")
@@ -46,22 +52,96 @@ func (s *Store) Hydrate(e ecd.Engine, cat *ecd.Catalog) (seq uint64, err error) 
 	if all > 0 || seq == 0 {
 		return seq, nil
 	}
-	for _, k := range cat.Kinds {
-		if k.Residency != ecd.Touched {
-			continue
-		}
-		if err := e.Hydrate(k.Kind, seq, noRows{}); err != nil {
-			return 0, fmt.Errorf("sqlite: hydrate kind %v: %w", k.Kind, err)
-		}
-		break
+	if err := e.Start(seq); err != nil {
+		return 0, fmt.Errorf("sqlite: hydrate: start: %w", err)
 	}
 	return seq, nil
 }
 
-// noRows is a RowSource of no rows.
-type noRows struct{}
+// Rows calls f once, inside one read transaction on the reader, with the store's seq and a RowSource of the stored
+// values of the entities ids of kind k, in eid order, then CID order. ids may be in any order and may repeat. An
+// eid of another kind than k is an error before f is called. An entity that is not alive in the store, or alive with
+// no component value, yields no row. f runs inside the transaction, so it must not call Hydrate, Log or Rows; the
+// source is valid only until f returns. An error of f is returned unchanged.
+func (s *Store) Rows(k ecd.Kind, ids []eid.ID, f func(at uint64, src ecd.RowSource) error) error {
+	for _, id := range ids {
+		if ecd.KindOf(id) != k {
+			return fmt.Errorf("sqlite: rows: eid %v is of kind %v, not %v", id, ecd.KindOf(id), k)
+		}
+	}
+	ids = slices.Clone(ids)
+	slices.SortFunc(ids, func(a, b eid.ID) int { return bytes.Compare(a[:], b[:]) })
+	ids = slices.Compact(ids)
+	tx, err := s.r.Begin()
+	if err != nil {
+		return fmt.Errorf("sqlite: rows: %w", err)
+	}
+	defer tx.Rollback() // the reader writes nothing
+	var seq uint64
+	if err := tx.QueryRow(sqlSeq).Scan(&seq); err != nil {
+		return fmt.Errorf("sqlite: rows: %w", err)
+	}
+	stmt, err := tx.Prepare(sqlEntity)
+	if err != nil {
+		return fmt.Errorf("sqlite: rows: %w", err)
+	}
+	defer stmt.Close()
+	src := &entitySource{stmt: stmt, ids: ids}
+	defer src.end()
+	return f(seq, src)
+}
 
-func (noRows) Next(*ecd.Row) (bool, error) { return false, nil }
+// entitySource yields the rows of sqlEntity for each of its ids in turn. It holds at most one open rows, which it
+// closes before it queries the next id. An error is kept and answered by every later call.
+type entitySource struct {
+	stmt *sql.Stmt
+	ids  []eid.ID
+	cur  *sql.Rows
+	err  error
+}
+
+func (s *entitySource) Next(r *ecd.Row) (bool, error) {
+	for s.err == nil {
+		if s.cur == nil {
+			if len(s.ids) == 0 {
+				return false, nil
+			}
+			id := s.ids[0]
+			s.ids = s.ids[1:]
+			rows, err := s.stmt.Query(id[:])
+			if err != nil {
+				s.err = fmt.Errorf("sqlite: rows: %w", err)
+				break
+			}
+			s.cur = rows
+		}
+		ok, err := rowSource{s.cur}.Next(r)
+		if err != nil {
+			s.err = fmt.Errorf("sqlite: rows: %w", err)
+			break
+		}
+		if ok {
+			return true, nil
+		}
+		s.close()
+	}
+	s.close()
+	return false, s.err
+}
+
+// close closes the open rows, if any.
+func (s *entitySource) close() {
+	if s.cur != nil {
+		s.cur.Close()
+		s.cur = nil
+	}
+}
+
+// end closes the open rows and drops the ids left, so that a call after f returns yields no row.
+func (s *entitySource) end() {
+	s.close()
+	s.ids = nil
+}
 
 // hydrate loads the rows of kind k into e at seq. The rows are closed however far e reads them.
 func hydrate(tx *sql.Tx, e ecd.Engine, k ecd.Kind, seq uint64) error {
@@ -74,7 +154,7 @@ func hydrate(tx *sql.Tx, e ecd.Engine, k ecd.Kind, seq uint64) error {
 	return e.Hydrate(k, seq, rowSource{rows})
 }
 
-// rowSource yields the rows of one query of sqlRows. A NULL value yields a nil Value.
+// rowSource yields the rows of one query of sqlRows or sqlEntity. A NULL value yields a nil Value.
 type rowSource struct{ rows *sql.Rows }
 
 func (s rowSource) Next(r *ecd.Row) (bool, error) {
