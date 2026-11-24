@@ -57,6 +57,11 @@ func (m *countMinter) Mint(kind ecr.Code) (ecr.ID, error) {
 	return ecr.FromParts(sysTst, kind, ms, 1, n)
 }
 
+// nopCommitter is a Committer that commits nothing: it answers every call with 0 and no error.
+type nopCommitter struct{}
+
+func (nopCommitter) Commit([]ecr.Deed, []ecr.Outcome) (uint64, error) { return 0, nil }
+
 // options returns the Options of a store file in a new temporary directory, with Create set and the default engine.
 func options(t *testing.T) ecr.Options {
 	t.Helper()
@@ -276,7 +281,19 @@ func TestAliases(t *testing.T) {
 		gs, err = ecr.SpanIDFromBytes(sp.Bytes())
 		check("SpanIDFromBytes", gs, err, sp)
 		check("Of", ecr.Of(id), nil, rt.Of(id))
+		en, err := jacquard.New(catalog())
+		if err != nil {
+			t.Fatalf("jacquard.New: %v", err)
+		}
+		cfg := ecr.Config{Catalog: catalog(), Engine: en, Minter: &countMinter{}, Committer: nopCommitter{},
+			DeedKind: deedKind}
+		if r, err := ecr.New(cfg); r == nil || err != nil {
+			t.Errorf("ecr.New of a full Config: %v, %v; want a Runtime", r, err)
+		}
 		// The violating half: each function refuses what the function it names refuses, with the same error.
+		if r, err := ecr.New(ecr.Config{}); r != nil || !errors.Is(err, ecr.ErrConfig) {
+			t.Errorf("ecr.New of the zero Config: %v, %v; want no Runtime and ErrConfig", r, err)
+		}
 		bad := text
 		bad[3] = '-'
 		if _, err := ecr.Parse(bad[:]); !errors.Is(err, eid.ErrSeparator) {

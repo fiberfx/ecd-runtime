@@ -259,6 +259,10 @@ error of either name, and each function calls the function of the same name. No 
 - `Host` embeds the `Runtime`, so `Register` and `Flush` are its methods, and holds the `Store` and the `Engine`.
 - `Host.Close` closes the engine, then the store, and returns `errors.Join` of their errors. The store is closed
   whatever the engine answers.
+- `New(Config)` is `rt.New`, for a host that builds its `Runtime` over an engine and a `Committer` of its own.
+- The package `ecrtest`, in `go/ecr/ecrtest/`, gives the tests of a host the reference engine: `NewModel(cat)`
+  returns the model of `go/engine/jacquard/model`, which a host never runs, and `ecrtest` is the one package of the
+  module that imports it.
 
 ```go
 import "github.com/fiberfx/ecd-runtime/go/ecr"
@@ -298,7 +302,8 @@ of package `eid` and its lease and minting types are not in `ecr`, which gives t
 (`Parse`, `ParseString`, `FromBytes`, `FromParts`, `ParseCode` and `MustCode`), and a `Minter` is passed in.
 
 Rows FC-01 to FC-03, in `rows/groups/87-fc60.sh`, measure the module: its tests, `go mod tidy` and the rule that it is
-a leaf that imports only the standard library, `eid` and the packages `ecd`, `rt`, `engine/jacquard` and `sqlite`.
+a leaf whose packages import only the standard library, `eid` and the packages `ecd`, `rt`, `engine/jacquard` and
+`sqlite`, with the model for `ecrtest` alone.
 
 ## Rows
 
