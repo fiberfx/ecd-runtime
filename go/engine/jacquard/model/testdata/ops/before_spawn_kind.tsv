@@ -1,0 +1,20 @@
+# An op before the Spawn of its eid is reported at the Spawn: an undeclared kind between them is reported first.
+hydrate	aaa	0	ok
+apply	1	ok
+deed	0
+spawn	aaa:1
+apply	2	kind
+deed	0
+set	aaa:2	1	0102030405060708
+deed	1
+spawn	ccc:1
+deed	2
+spawn	aaa:2
+get	aaa:2	1	absent
+apply	2	op
+deed	0
+set	aaa:2	1	0102030405060708
+deed	1
+spawn	aaa:2
+get	aaa:2	1	absent
+at	1

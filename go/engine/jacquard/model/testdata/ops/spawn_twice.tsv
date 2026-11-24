@@ -1,0 +1,24 @@
+# A second Spawn of one eid in the transaction is refused as op, in one deed or in two, and changes nothing.
+hydrate	aaa	0	ok
+apply	1	ok
+deed	0
+spawn	aaa:1
+set	aaa:1	1	0102030405060708
+apply	2	op
+deed	0
+spawn	aaa:2
+deed	1
+spawn	aaa:2
+get	aaa:2	1	absent
+apply	2	op
+deed	0
+spawn	aaa:2
+spawn	aaa:2
+get	aaa:2	1	absent
+query	4	ok	aaa:1
+at	1
+apply	2	ok
+deed	0
+spawn	aaa:2
+query	4	ok	aaa:1	aaa:2
+at	2
