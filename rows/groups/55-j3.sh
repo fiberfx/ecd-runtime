@@ -35,6 +35,7 @@
 #   J3-07   deeds commit in Ord order whatever their order in the list, and the check pass reads them in the same order
 #           (TestJ3Ord)
 #   J3-07p  plant: inOrder never sorts
+#   J3-07pc plant: the commit pass reads the deeds in list order; TestJ3Ord must fail
 #
 # j3_plant id expect test file sedexpr [flags]: copies /w/go to a temporary directory, applies the one-line sed to
 # engine/jacquard/<file> and runs only the named test there. KILLED: the test failed. SURVIVED: it passed.
@@ -95,3 +96,4 @@ j3_plant J3-06p "TestJ3_06 fails on the plant" TestJ3_06 engine.go 's/return fmt
 
 go_row J3-07 j3 "TestJ3Ord rc=0" /w/go test -run '^TestJ3Ord$' ./engine/jacquard/
 j3_plant J3-07p "TestJ3Ord fails on the plant" TestJ3Ord engine.go 's/if slices\.IsSortedFunc(deeds, cmp) {/if true {/'
+j3_plant J3-07pc "TestJ3Ord fails on the plant" TestJ3Ord engine.go '/en\.stamp = seq/,/inOrder/s/range inOrder(deeds) {/range deeds {/'
