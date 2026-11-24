@@ -38,6 +38,9 @@ imports the standard library, `github.com/fiberfx/ecd-id/go` and `github.com/fib
   before, with an error that matches `ErrConfig`. A stage is any `int`; stages flush in ascending order.
 - `Buffer.Spawn`, `Buffer.Set`, `Buffer.Unset` and `Buffer.Destroy` record a write, and `Buffer.Len` is the number of
   records. `Set` records a copy of its value. No record method returns an error, mints an eid or touches an engine.
+- `Buffer.Span(t, s)` sets the trace id and span id that the buffer's next deed carries, and the flush that empties the
+  buffer resets them; a buffer that records nothing keeps them until its next deed, so a host that traces only some
+  units of work calls `Span` with the zero values for the others.
 - `Ref` names the entity of a record. `Of(id)` is the `Ref` of an entity that exists, by its eid. `Spawn` returns a
   placeholder `Ref`, valid in the buffer that issued it until the next flush of that buffer.
 - `Runtime.Flush` runs the flush and returns a `Result`: `Seq`, the seq of the committed transaction, or 0 when no deed
@@ -148,8 +151,8 @@ A `Store` is used on the owner goroutine only. The tables are `entity` (one row 
 change and the seq of its destroy), `state` (one row per component value of an entity, whatever its kind), `deed` and
 `deed_body` (the log). The seq of the store is the highest `seq` of `deed`, so only a transaction that commits a deed
 advances it. The store is at user version 2, whose `deed` also holds each deed's trace id and span id, NULL for the
-zero values; `Open` refuses a store of user version 1, written by `go/v0.4.0` to `go/v0.5.1`, and never migrates;
-`Migrate` brings it to user version 2 in one transaction.
+zero values; `Open` refuses a store of user version 1, written by `go/sqlite/v0.4.0` to `go/sqlite/v0.5.1`, and never
+migrates; `Migrate` brings it to user version 2 in one transaction.
 
 ### Starting a host
 

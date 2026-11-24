@@ -11,7 +11,9 @@
 #            zero values and that no engine reads them (TestDeedSpanFields in go/ecd)
 #   SP-01p   plant: Deed.TraceID is of type SpanID (ecd/engine.go; TestDeedSpanFields, case types)
 #   SP-01q   plant: the Deed comment drops "No engine reads them." (ecd/engine.go; TestDeedSpanFields, case comment)
-#   SP-07    no non-test file of go/engine or go/enginecmp reads a field TraceID or SpanID
+#   SP-07    no non-test file of go/engine or go/enginecmp reads a field TraceID or SpanID; the type names ecd.TraceID
+#            and ecd.SpanID are not reads, and go/sqlite's reads are the positive control
+#   SP-07p   plant: a copy of engine/jacquard/engine.go whose deed order compares TraceID; the scan must find it
 #   SP-02    a deed carries its buffer's last Span ids, the zero values without one, and a flush that empties the
 #            buffer, committed or refused, resets them; a buffer with no record keeps them (TestBufferSpan in go/rt)
 #   SP-02p   plant: the flush builds the deed without the buffer's ids (rt/flush.go; TestBufferSpan, case carried)
@@ -22,6 +24,7 @@
 #   SP-03q   plant: decodeDeed skips the span id (sqlite/read.go; TestDeedSpan, case ids)
 #   SP-03r   plant: a refused stored trace id does not match ErrSchema (sqlite/read.go; TestDeedSpan, case malformed)
 #   SP-03s   plant: the span_id check admits 16 bytes (sqlite/store.go; TestDeedSpan, case length)
+#   SP-03t   plant: a refused span id does not match ErrSchema (sqlite/read.go; TestDeedSpan, case malformed_span)
 #   SP-04    Create writes user version 2, and Open refuses a store of user version 1 (TestCreate)
 #   SP-04p   plant: Open admits user version 1 (sqlite/store.go; TestCreate)
 #   SP-04q   plant: Create writes user version 1 (sqlite/store.go; TestCreate)
@@ -86,18 +89,47 @@ sp60_plant SP-01p "TestDeedSpanFields/types fails on the plant" . ./ecd/ TestDee
 sp60_plant SP-01q "TestDeedSpanFields/comment fails on the plant" . ./ecd/ TestDeedSpanFields comment ecd/engine.go \
   's/ No engine reads them\.$//'
 
+# sp60_reads dir...: the lines of the non-test Go files under the directories that name TraceID or SpanID after a dot,
+# once a use of the type names ecd.TraceID and ecd.SpanID is struck out, so that only a field read or write is left.
+sp60_reads() {
+  grep -rnE '\.(TraceID|SpanID)\b' --include='*.go' "$@" 2>/dev/null | grep -v '_test\.go:' |
+    sed -E 's/\becd\.(TraceID|SpanID)\b//g' | grep -E '\.(TraceID|SpanID)\b'
+}
+
 if sel SP-07 sp60; then
-  sp60_pat='\.(TraceID|SpanID)\b'
-  sp60_ctl=$(grep -rnE "$sp60_pat" --include='*.go' /w/go/sqlite 2>/dev/null | grep -vc '_test\.go:')
+  sp60_ctl=$(sp60_reads /w/go/sqlite | wc -l | tr -d ' ')
   if [ ! -d /w/go/engine ] || [ ! -d /w/go/enginecmp ]; then
     say SP-07 "no engine file reads TraceID or SpanID" "go/engine or go/enginecmp is absent" CNM
   elif [ "$sp60_ctl" -eq 0 ]; then
     say SP-07 "no engine file reads TraceID or SpanID" "the pattern finds no line of go/sqlite either" CNM
   else
-    sp60_n=$(grep -rnE "$sp60_pat" --include='*.go' /w/go/engine /w/go/enginecmp | grep -vc '_test\.go:')
+    sp60_n=$(sp60_reads /w/go/engine /w/go/enginecmp | wc -l | tr -d ' ')
     if [ "$sp60_n" -eq 0 ]; then say SP-07 "no engine file reads TraceID or SpanID" "0 lines; go/sqlite $sp60_ctl" PASS
     else say SP-07 "no engine file reads TraceID or SpanID" "$sp60_n lines" FAIL; fi
   fi
+fi
+
+# SP-07p copies /w/go, changes the line of go/engine/jacquard/engine.go that orders two deeds by Ord into one that
+# compares their TraceID, and scans the copy as SP-07 scans the tree. KILLED: the scan finds that line, so SP-07 would
+# turn red. SURVIVED: it finds none. CNM: the file is absent or the sed did not change exactly one line.
+if sel SP-07p sp60; then
+  sp60_want="the SP-07 scan finds the plant"
+  sp60_pd=$(mktemp -d /tmp/rows/plant.XXXXXX)
+  cp -a /w/go "$sp60_pd/go"
+  sp60_f=$sp60_pd/go/engine/jacquard/engine.go
+  if [ ! -f "$sp60_f" ]; then
+    say SP-07p "$sp60_want" "go/engine/jacquard/engine.go is absent" CNM
+  else
+    cp "$sp60_f" "$sp60_pd/orig.go"
+    sed -i 's/^\t\tcase a\.Ord < b\.Ord:$/\t\tcase a.TraceID == b.TraceID:/' "$sp60_f"
+    sp60_c=$(diff "$sp60_pd/orig.go" "$sp60_f" | grep -c '^>')
+    sp60_n=$(sp60_reads "$sp60_pd/go/engine" "$sp60_pd/go/enginecmp" | wc -l | tr -d ' ')
+    if [ "$sp60_c" -ne 1 ]; then
+      say SP-07p "$sp60_want" "the sed changed $sp60_c lines, want 1" CNM
+    elif [ "$sp60_n" -ge 1 ]; then say SP-07p "$sp60_want" "$sp60_n lines" KILLED
+    else say SP-07p "$sp60_want" "0 lines" SURVIVED; fi
+  fi
+  rm -rf "$sp60_pd"
 fi
 
 go_row SP-02 sp60 "TestBufferSpan rc=0" /w/go test -run '^TestBufferSpan$' ./rt/
@@ -115,6 +147,8 @@ sp60_plant SP-03r "TestDeedSpan/malformed fails on the plant" sqlite . TestDeedS
   's/"sqlite: trace id: %w: %w", err, ErrSchema/"sqlite: trace id: %w", err/'
 sp60_plant SP-03s "TestDeedSpan/length fails on the plant" sqlite . TestDeedSpan length sqlite/store.go \
   's/CHECK (span_id IS NULL OR length(span_id) = 8)/CHECK (span_id IS NULL OR length(span_id) >= 8)/'
+sp60_plant SP-03t "TestDeedSpan/malformed_span fails on the plant" sqlite . TestDeedSpan malformed_span sqlite/read.go \
+  's/"sqlite: span id: %w: %w", err, ErrSchema/"sqlite: span id: %w", err/'
 
 go_row SP-04 sp60 "TestCreate rc=0" /w/go/sqlite test -run '^TestCreate$' .
 sp60_plant SP-04p "TestCreate fails on the plant" sqlite . TestCreate '' sqlite/store.go \

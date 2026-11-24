@@ -66,7 +66,8 @@ func (b *Buffer) Destroy(e Ref) {
 
 // Span sets the W3C trace id and span id that the buffer's next deed carries; a later call replaces both. The
 // flush that empties the buffer resets them to the zero values, which mean no trace and no span. A flush collects
-// only a buffer that holds a record, so a buffer with no record keeps them.
+// only a buffer that holds a record, so a buffer with no record keeps them until its next deed. A host that traces
+// only some units of work calls Span with the zero values for the others.
 func (b *Buffer) Span(t ecd.TraceID, s ecd.SpanID) { b.trace, b.span = t, s }
 
 // Len is the number of records since the last flush.

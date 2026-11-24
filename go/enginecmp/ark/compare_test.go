@@ -715,7 +715,7 @@ func (s *acSim) step(n int) {
 func acClone(deeds []ecd.Deed) []ecd.Deed {
 	out := make([]ecd.Deed, len(deeds))
 	for i, d := range deeds {
-		out[i] = ecd.Deed{ID: d.ID, Ord: d.Ord, Ops: make([]ecd.Op, len(d.Ops))}
+		out[i] = ecd.Deed{ID: d.ID, Ord: d.Ord, TraceID: d.TraceID, SpanID: d.SpanID, Ops: make([]ecd.Op, len(d.Ops))}
 		for j, op := range d.Ops {
 			out[i].Ops[j] = op
 			if op.Value != nil {

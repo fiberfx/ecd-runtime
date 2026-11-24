@@ -119,4 +119,22 @@ func TestDeedSpan(t *testing.T) {
 			t.Errorf("Log over an all-zero trace id: %v; want an error that matches ErrSchema and ecd.ErrTraceID", err)
 		}
 	})
+
+	// The length check of the schema refuses a span id of another length (case length), so the span id that Log can
+	// meet and refuse is the all-zero one.
+	t.Run("malformed_span", func(t *testing.T) {
+		path, s := newStore(t)
+		m := &countMinter{}
+		commitWant(t, s, "one deed", deedsOf(t, m, ops(spawnOp(m.must(t, kindAll.Kind)))),
+			[]rt.Outcome{rt.Committed}, 1)
+		closeStore(t, s)
+		if _, err := rawDB(t, path).Exec("UPDATE deed SET span_id = zeroblob(8)"); err != nil {
+			t.Fatalf("storing an all-zero span id: %v", err)
+		}
+		s = openStore(t, path)
+		err := s.Log(0, func(uint64, ecd.Deed) error { return nil })
+		if !errors.Is(err, sqlite.ErrSchema) || !errors.Is(err, ecd.ErrSpanID) {
+			t.Errorf("Log over an all-zero span id: %v; want an error that matches ErrSchema and ecd.ErrSpanID", err)
+		}
+	})
 }
