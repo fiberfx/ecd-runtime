@@ -2,10 +2,11 @@
 # Rows of Ecd Loom: the checks of the repository, run offline from the root of the unpacked tree (/w).
 # The script needs the Go toolchain and git. Rows sit in groups, and ROWS selects them.
 #
-# Run command (flow:row-container, image mx-trafikist-toolchain:go1.27.4-rust1.100.0, whose /usr/local/go is go1.26.3):
+# Run command (flow:row-container, image mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2, whose /usr/local/go is
+# go1.27.4; the module's floor is go 1.27):
 #   kan flow run flow:row-container --param script=rows/loom.rows.sh \
 #     --param checkout=/Users/jonny/dev/ecd/ecd-loom --param revision=SHA --param paths='go rows' --param name=loom \
-#     --param image=mx-trafikist-toolchain:go1.27.4-rust1.100.0 \
+#     --param image=mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2 \
 #     [--param inputs=DIR] \
 #     --param cpus=2 --param memory=4g --param timeout=1800
 # inputs is optional: a GOPROXY file tree that /w/inputs provides for modules the repository requires. Without it
@@ -28,13 +29,11 @@
 #   cut       AK1   go test ./... in /w/go/third_party/ark: Ark's tests on the cut
 #   cut       AK2   the tree hash of /w/go/third_party/ark/ecs equals the hash in third_party/ark/SOURCE.txt
 #   cut       AK2p  plant: one byte appended to ecs/entity.go in a temporary copy, the hash comparison must turn red
-#   jacquard  JQ1   go test ./engine/jacquard/... in /w/go: Ark's tests on the copy
-#   jacquard  JQ1p  plant: in a temporary copy of the module, Entity.IsZero in engine/jacquard/entity.go tests
-#                   "e.id == 1" instead of "e.id == 0"; TestReservedEntities (the reserved zero entity) must fail
+#   other groups    each group file lists its own rows in its header
 #
 # A plant is KILLED when its row turns red and SURVIVED when it stays green. A plant that cannot be applied, or in
 # which no test ran, is CNM.
-# Group files: 10-repo.sh (RP1, RP2), 20-cut.sh (AK1, AK2, AK2p), 30-jacquard.sh (JQ1, JQ1p).
+# Group files: 10-repo.sh (RP1, RP2), 20-cut.sh (AK1, AK2, AK2p), and one NN-<group>.sh per later group.
 # Exit: 0 every selected row as expected, 1 a row FAIL or a plant SURVIVED, 3 any CNM (and no FAIL or SURVIVED).
 set -u
 cd /w || exit 3
