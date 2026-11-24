@@ -185,7 +185,7 @@ func TestSeamDecidedText(t *testing.T) {
 	text := string(src)
 	for _, want := range []string{
 		"for both residencies",
-		"0 means no limit",
+		"the kind as it was, and 0 means no limit",
 		"0 keeps none",
 		"committed deed (E1).",
 		"Hydrate is all or nothing per call",

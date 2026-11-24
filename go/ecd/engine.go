@@ -45,7 +45,7 @@ type KindDef struct {
 	Kind      Kind
 	Residency Residency
 	Budget    int64 // bytes, for both residencies: a Hydrate of an All kind over it answers ErrBudget and leaves
-	// the kind Cold, and 0 means no limit; a Touched kind keeps its resident bytes within it, and 0 keeps none
+	// the kind as it was, and 0 means no limit; a Touched kind keeps its resident bytes within it, and 0 keeps none
 	// resident
 }
 
