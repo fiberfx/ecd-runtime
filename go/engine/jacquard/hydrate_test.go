@@ -268,6 +268,36 @@ func TestJ5HHydrate(t *testing.T) {
 		j5hSame(p, "after the new engine")
 	})
 
+	t.Run("FirstTouched", func(t *testing.T) {
+		p := j5rNew(t)
+		mk := func(r ...ecd.Row) func() *j5hSource { return func() *j5hSource { return j5hRows(r...) } }
+		if got := j5hHydrate(p, k[2], 0, mk(row(log(1), j3U64, j3Num(1)))); got != "nil" {
+			t.Fatalf("the first hydration, of the Touched kind log at 0, answered %s", got)
+		}
+		j5hSame(p, "after the first hydration of a Touched kind")
+		for _, c := range []struct {
+			name string
+			kind ecd.Kind
+			rows []ecd.Row
+		}{
+			{"the Touched kind again", k[2], []ecd.Row{row(log(2), j3U64, j3Num(2))}},
+			{"a Cold All kind", k[1], []ecd.Row{row(evt(1), j3U64, j3Num(3))}},
+		} {
+			err := p.en.hydrate(c.kind, 5, j5hRows(c.rows...))
+			if !errors.Is(err, ecd.ErrGap) {
+				t.Fatalf("hydrate of %s at 5 answered %v, want an error that matches ecd.ErrGap", c.name, err)
+			}
+			if errM := p.m.Hydrate(c.kind, 5, j5hRows(c.rows...)); !errors.Is(errM, ecd.ErrGap) {
+				t.Fatalf("the model answered %v for %s at 5, want an error that matches ecd.ErrGap", errM, c.name)
+			}
+			j5hSame(p, "after the refusal of "+c.name)
+		}
+		if got := j5hHydrate(p, k[1], 0, mk(row(evt(1), j3U64, j3Num(3)))); got != "nil" {
+			t.Fatalf("hydrate evt at 0 answered %s", got)
+		}
+		j5hSame(p, "after a hydration at the seq of the engine")
+	})
+
 	t.Run("Unload", func(t *testing.T) {
 		p := j5rNew(t)
 		mk := func() *j5hSource { return j5hRows(row(job(1), j3U64, j3Num(1)), row(job(2), j3TagA, nil)) }

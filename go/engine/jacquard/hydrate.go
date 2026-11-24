@@ -26,7 +26,7 @@ func (en *Engine) Evict(k ecd.Kind, ids []eid.ID) error {
 
 // hydrate loads the rows of src, read at seq at, into kind k. A stale engine answers ecd.ErrStale; a kind that is not
 // declared, ecd.ErrKind; a seq other than appliedAt, ecd.ErrGap. A new engine, which has applied no transaction
-// and holds no hydrated All kind, takes the seq of the hydration as its appliedAt.
+// and has had no successful hydration of any kind, takes the seq of the hydration as its appliedAt.
 //
 // Every row is read and checked before any change: a row of another kind answers ecd.ErrKind; a row with a CID
 // that is not declared, a row of a pointer-holding component, and a row whose value is not exactly the
@@ -85,6 +85,7 @@ func (en *Engine) hydrate(k ecd.Kind, at uint64, src ecd.RowSource) (err error) 
 	}
 	en.setWarm(ki)
 	en.applied = at
+	en.hydrated = true
 	return nil
 }
 
@@ -128,19 +129,9 @@ func (en *Engine) stage(k ecd.Kind, src ecd.RowSource) ([]hydEntity, error) {
 	}
 }
 
-// loaded reports whether a hydration has made an All kind Warm. An engine without a residency declaration has no
-// hydration to report.
-func (en *Engine) loaded() bool {
-	if en.res == nil {
-		return false
-	}
-	for _, ki := range en.allKinds {
-		if !en.res[ki].cold {
-			return true
-		}
-	}
-	return false
-}
+// loaded reports whether a hydration of any kind has succeeded. A later unload does not clear it, and a refused or
+// failed hydration does not set it.
+func (en *Engine) loaded() bool { return en.hydrated }
 
 // evict frees the listed entities of the Touched kind k that are resident, and adds their number to the
 // evictions of the kind. An id that is not resident, or that is of another kind, is ignored, and an id listed twice
