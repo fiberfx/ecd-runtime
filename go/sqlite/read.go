@@ -18,8 +18,9 @@ ORDER BY d.seq, d.ord`
 
 // Hydrate loads every All kind of cat into e from one read transaction on the reader: it reads the store's seq,
 // then, for each All kind in catalog order, the stored values of the kind's eid range in eid order, which
-// e.Hydrate loads at that seq. Touched kinds are skipped. An error stops, rolls the transaction back and is
-// returned wrapped with its kind. Hydrate returns the seq.
+// e.Hydrate loads at that seq. Touched kinds are skipped. When the catalog has no All kind and the seq is above
+// 0, the first Touched kind in catalog order is hydrated with no row, so that a new engine takes the seq. An error
+// stops, rolls the transaction back and is returned wrapped with its kind. Hydrate returns the seq.
 func (s *Store) Hydrate(e ecd.Engine, cat *ecd.Catalog) (seq uint64, err error) {
 	if cat == nil {
 		return 0, errors.New("sqlite: hydrate: catalog is nil")
@@ -32,6 +33,7 @@ func (s *Store) Hydrate(e ecd.Engine, cat *ecd.Catalog) (seq uint64, err error) 
 	if err := tx.QueryRow(sqlSeq).Scan(&seq); err != nil {
 		return 0, fmt.Errorf("sqlite: hydrate: %w", err)
 	}
+	all := 0
 	for _, k := range cat.Kinds {
 		if k.Residency != ecd.All {
 			continue
@@ -39,9 +41,27 @@ func (s *Store) Hydrate(e ecd.Engine, cat *ecd.Catalog) (seq uint64, err error) 
 		if err := hydrate(tx, e, k.Kind, seq); err != nil {
 			return 0, fmt.Errorf("sqlite: hydrate kind %v: %w", k.Kind, err)
 		}
+		all++
+	}
+	if all > 0 || seq == 0 {
+		return seq, nil
+	}
+	for _, k := range cat.Kinds {
+		if k.Residency != ecd.Touched {
+			continue
+		}
+		if err := e.Hydrate(k.Kind, seq, noRows{}); err != nil {
+			return 0, fmt.Errorf("sqlite: hydrate kind %v: %w", k.Kind, err)
+		}
+		break
 	}
 	return seq, nil
 }
+
+// noRows is a RowSource of no rows.
+type noRows struct{}
+
+func (noRows) Next(*ecd.Row) (bool, error) { return false, nil }
 
 // hydrate loads the rows of kind k into e at seq. The rows are closed however far e reads them.
 func hydrate(tx *sql.Tx, e ecd.Engine, k ecd.Kind, seq uint64) error {
