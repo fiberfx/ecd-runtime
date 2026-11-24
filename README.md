@@ -15,6 +15,7 @@ The contract is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`. This re
 | `go/engine/jacquard/` | Jacquard, the archetype engine. Its files that port Ark files name their source file in their header. |
 | `go/rt/` | The package `rt`: a command buffer per system and the flush that commits and applies their deeds. |
 | `go/sqlite/` | The nested Go module `github.com/fiberfx/ecd-runtime/go/sqlite`: the owner store in one SQLite file, an implementation of `rt.Committer` that also hydrates an engine. |
+| `go/ecr/` | The nested Go module `github.com/fiberfx/ecd-runtime/go/ecr`: the facade package `ecr`, one import and one requirement for a host. |
 | `go/enginecmp/gj/` | Benchmarks of Jacquard against Ark in module `go/enginecmp`; `rows/gj.bench.rows.sh` runs them. |
 | `go/NOTICE.txt` | Every part taken from another project: the project, its source, commit, licence and copyright line, what is taken and the files that hold it, with the licence text that the project's licence requires, and the projects whose design Ecd Runtime follows. |
 | `rows/loom.rows.sh` | The rows script. |
@@ -242,6 +243,72 @@ Rows SQ-01 to SQ-14, in `rows/groups/78-sq40.sh`, SQ-20 to SQ-22, in `rows/group
 plants SQ-22q and SQ-22r, in `rows/groups/80-fx51.sh`, SP-03 to SP-06, in `rows/groups/86-sp60.sh`, L12-model, in
 `rows/groups/50-j0m.sh`, and MQ-01, in `rows/groups/85-mq60.sh`, measure the module. They load the driver and its
 modules from the offline module inputs.
+
+## One import for a host
+
+The module `github.com/fiberfx/ecd-runtime/go/ecr`, in `go/ecr/`, package `ecr`, is the facade of Ecd Runtime. A host
+imports this one package and requires this one module. Every type of `ecr` is an alias of the type of the package that
+defines it: the ids of `github.com/fiberfx/ecd-id/go`, the seam types of package `ecd`, the `Runtime`, `Buffer`,
+`Ref`, `Result`, `Outcome`, `Committer` and `Config` of package `rt`, and the `Store` of `go/sqlite`. The constants
+have the values of the constants they name, every sentinel holds the error of its package, so `errors.Is` matches an
+error of either name, and each function calls the function of the same name. No package of Ecd Runtime imports
+`ecr`.
+
+- `Open(Options)` returns a `Host`. `Options` holds `Path`, `Create`, `Catalog`, `Minter`, `DeedKind` and `Engine`,
+  a func that builds the engine from the catalog; a nil `Engine` builds Jacquard. `Open` refuses a nil `Catalog`, a
+  nil `Minter` and a `DeedKind` that is not a kind with an error that matches `ErrConfig`, before it builds an engine
+  or makes a file. It then builds the engine, makes the store file when `Create` is set (a path at which anything
+  exists matches `ErrExist`), opens the store, brings the engine to the seq of the store with `Hydrate` given the
+  catalog without its All kinds, as "Starting a host" states, and builds the `Runtime` with the store as its
+  `Committer`. An error closes what was opened, the engine first, and is wrapped with `ecr: open: `.
+- `Host` embeds the `Runtime`, so `Register` and `Flush` are its methods, and holds the `Store` and the `Engine`.
+- `Host.Close` closes the engine, then the store, and returns `errors.Join` of their errors. The store is closed
+  whatever the engine answers.
+- `New(Config)` is `rt.New`, for a host that builds its `Runtime` over an engine and a `Committer` of its own.
+- The package `ecrtest`, in `go/ecr/ecrtest/`, gives the tests of a host the reference engine: `NewModel(cat)`
+  returns the model of `go/engine/jacquard/model`, which a host never runs, and `ecrtest` is the one package of the
+  module that imports it.
+
+```go
+import "github.com/fiberfx/ecd-runtime/go/ecr"
+
+// run opens the store at path, creating the file when create is set, records one spawn with its value under the
+// span of the caller and flushes it. cat declares kind with component pos of Size 2.
+func run(path string, create bool, cat *ecr.Catalog, m ecr.Minter, deedKind ecr.Code, kind ecr.Kind, pos ecr.CID,
+	trace ecr.TraceID, span ecr.SpanID) (ecr.Result, error) {
+	h, err := ecr.Open(ecr.Options{Path: path, Create: create, Catalog: cat, Minter: m, DeedKind: deedKind})
+	if err != nil {
+		return ecr.Result{}, err // matches ecr.ErrConfig, ecr.ErrExist or ecr.ErrSchema, among others
+	}
+	defer h.Close()
+	buf, err := h.Register(0, "tx-0001")
+	if err != nil {
+		return ecr.Result{}, err // matches ecr.ErrConfig
+	}
+	e := buf.Spawn(kind)
+	buf.Set(e, pos, []byte{1, 2})
+	buf.Span(trace, span) // the ids of the buffer's next deed
+	res, err := h.Flush()
+	if errors.Is(err, ecr.ErrRef) {
+		return res, fmt.Errorf("tx-0001 named no entity of its buffer: %w", err)
+	}
+	return res, err // Result.Outcomes names each deed's Outcome, for example ecr.Committed
+}
+```
+
+A host requires the one module:
+
+    require github.com/fiberfx/ecd-runtime/go/ecr v0.6.0
+
+The module requires `github.com/fiberfx/ecd-id/go` v0.8.0, `github.com/fiberfx/ecd-runtime/go` v0.6.0 and
+`github.com/fiberfx/ecd-runtime/go/sqlite` v0.6.0, and its build graph is that of `go/sqlite`. Inside this repository
+`replace` directives point the requirements on the main module and on `go/sqlite` at their directories. The refusals
+of package `eid` and its lease and minting types are not in `ecr`, which gives the parse and build functions of an eid
+(`Parse`, `ParseString`, `FromBytes`, `FromParts`, `ParseCode` and `MustCode`), and a `Minter` is passed in.
+
+Rows FC-01 to FC-03, in `rows/groups/87-fc60.sh`, measure the module: its tests, `go mod tidy` and the rule that it is
+a leaf whose packages import only the standard library, `eid` and the packages `ecd`, `rt`, `engine/jacquard` and
+`sqlite`, with the model for `ecrtest` alone.
 
 ## Rows
 
