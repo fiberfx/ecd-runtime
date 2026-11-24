@@ -9,6 +9,8 @@
 #   JC-02pq  plant: the engine refuses a query whose All repeats a CID without Exact (query.go; TestCompareQuery)
 #   JC-02pm  plant: the reference model refuses a query whose All repeats a CID without Exact (model/model.go;
 #            TestCompareQuery)
+#   JC-02pd  plant: query 12's All names an undeclared CID, so it answers an eid in fewer steps than query 0
+#            (compare_query_test.go; TestCompareQuery)
 #
 # fx19a_plant id expect test file sedexpr: copies /w/go to a temporary directory, applies the one-line sed to
 # engine/jacquard/<file> and runs only the named test there. KILLED: the test failed, and the observed text names its
@@ -42,3 +44,5 @@ fx19a_plant JC-02pq "TestCompareQuery fails on the plant" TestCompareQuery query
   's/if def\.Exact && repeats(def\.All) {/if repeats(def.All) {/'
 fx19a_plant JC-02pm "TestCompareQuery fails on the plant" TestCompareQuery model/model.go \
   's/if q\.Exact && repeats(q\.All) {/if repeats(q.All) {/'
+fx19a_plant JC-02pd "TestCompareQuery fails on the plant" TestCompareQuery compare_query_test.go \
+  's/All: \[\]ecd\.CID{j3U64, j3U64}}/All: []ecd.CID{j3U64, 99}}/'
