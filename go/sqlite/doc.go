@@ -43,9 +43,9 @@
 // # Hydration and replay
 //
 // Hydrate reads the store's seq and then, for each All kind of the catalog in catalog order, the values in the
-// kind's eid range in eid order, all in one read transaction; the engine loads each kind at that seq. The values
-// of Touched kinds are written by Commit and not read back. Log yields the deeds above a seq, in seq order, then Ord
-// order, from one read transaction.
+// kind's eid range in eid order, all in one read transaction; the engine loads each kind at that seq. Hydrate reads
+// no value of a Touched kind; Rows reads such values back for given entities. Log yields the deeds above a seq, in
+// seq order, then Ord order, from one read transaction.
 //
 // When no All kind was loaded and the seq is above 0, Hydrate calls the engine's Start at the seq, so that a new
 // engine takes it with no kind loaded. Hydrating an All kind makes the engine serve it from memory; until an engine
