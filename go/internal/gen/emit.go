@@ -166,7 +166,9 @@ func (p *printer) catalog() {
 		p.w("\t\t\t{Kind: ", kind, ", Residency: ", p.q("ecd", upperFirst(k.Residency)), ", Budget: ",
 			strconv.FormatInt(k.Budget, 10), "},\n")
 	}
-	p.w("\t\t},\n\t}\n}\n")
+	p.w("\t\t},\n")
+	p.catalogQueries()
+	p.w("\t}\n}\n")
 }
 
 // textType writes the type TextN: a text of at most n bytes, its constructor and its codec.

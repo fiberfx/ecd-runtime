@@ -58,6 +58,9 @@ func (p *printer) handle(k *comp) {
 	}
 	p.cm("CID returns " + cid + ".")
 	p.w("func (", h, ") CID() ", p.q("ecd", "CID"), " { return ", cid, " }\n")
+	if k.c.Query {
+		p.iterHandle(k)
+	}
 }
 
 // getters writes decoder and getValue, when a component has a value to read, and has.
