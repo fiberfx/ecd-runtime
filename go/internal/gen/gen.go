@@ -118,6 +118,7 @@ type field struct {
 type needs struct {
 	binary, math bool // the imports encoding/binary and math
 	component    bool // a component with a value: fmt, errLength, decoder and getValue
+	query        bool // a marked handle or a declared query: iter, fmt, the QIDs and the helpers of Iter
 	anyText      bool // decodeText
 	text         [MaxTextN + 1]bool
 	hasBool      bool // appendBool and decodeBool
@@ -150,7 +151,9 @@ type printer struct {
 	buf   bytes.Buffer
 	comps []comp // components and tags in CID order
 	texts []int  // the N of every text[N], ascending
-	need  needs
+	// queries are the marked handles in CID order, then the declared queries in file order; the QID is the index.
+	queries []query
+	need    needs
 }
 
 // newPrinter derives the order, the layout and the needs of the catalog c, which Parse has accepted.
@@ -192,6 +195,16 @@ func newPrinter(c *Catalog, name string, mode Mode) (*printer, error) {
 			p.texts = append(p.texts, n)
 		}
 	}
+	for i := range p.comps {
+		if k := &p.comps[i]; k.c.Query {
+			p.queries = append(p.queries, query{g: k.g, name: k.c.Name, mark: k})
+		}
+	}
+	for i := range c.Queries {
+		d := &c.Queries[i]
+		p.queries = append(p.queries, query{g: GoName(d.Name), name: d.Name, decl: d})
+	}
+	p.need.query = len(p.queries) > 0
 	return p, nil
 }
 
@@ -204,6 +217,7 @@ func (p *printer) emit() {
 	p.kinds()
 	p.cids()
 	p.sizes()
+	p.qids()
 	p.catalog()
 	for _, n := range p.texts {
 		p.textType(n)
@@ -217,7 +231,13 @@ func (p *printer) emit() {
 	for i := range p.comps {
 		p.handle(&p.comps[i])
 	}
+	for i := range p.queries {
+		if p.queries[i].decl != nil {
+			p.query(&p.queries[i])
+		}
+	}
 	p.getters()
+	p.iterHelpers()
 }
 
 // w writes the parts of s to the file as they stand.
@@ -243,8 +263,11 @@ func (p *printer) imports() {
 		p.w("\t\"encoding/binary\"\n")
 	}
 	p.w("\t\"errors\"\n")
-	if p.need.component {
+	if p.need.component || p.need.query {
 		p.w("\t\"fmt\"\n")
+	}
+	if p.need.query {
+		p.w("\t\"iter\"\n")
 	}
 	if p.need.math {
 		p.w("\t\"math\"\n")
