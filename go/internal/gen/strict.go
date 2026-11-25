@@ -21,6 +21,8 @@ const (
 	wantName                    // a string that is not empty
 	wantTrue                    // the literal true
 	wantArray                   // an array of objects of one shape
+	wantFlag                    // the literal true; leave the key out for false
+	wantNames                   // an array of strings that are not empty
 )
 
 // keyDef is one key of an object shape.
@@ -51,6 +53,16 @@ var (
 		{"form", wantName, true, nil},
 		{"type", wantName, false, nil},
 		{"fields", wantArray, false, &fieldShape},
+		{"query", wantFlag, false, nil},
+		{"doc", wantString, false, nil},
+	}
+	queryShape = shape{
+		{"name", wantName, true, nil},
+		{"kinds", wantNames, false, nil},
+		{"all", wantNames, false, nil},
+		{"none", wantNames, false, nil},
+		{"any", wantNames, false, nil},
+		{"exact", wantFlag, false, nil},
 		{"doc", wantString, false, nil},
 	}
 	topShape = shape{
@@ -60,6 +72,7 @@ var (
 		{"detached", wantTrue, false, nil},
 		{"kinds", wantArray, true, &kindShape},
 		{"components", wantArray, true, &componentShape},
+		{"queries", wantArray, false, &queryShape},
 	}
 )
 
@@ -198,6 +211,21 @@ func (p *parser) value(path string, d keyDef) {
 			p.refuse(path, "want true; leave the key out for a registered system")
 			p.skip(t)
 		}
+	case wantFlag:
+		if b, ok := t.(bool); !ok || !b {
+			p.refuse(path, "want true; leave the key out for false")
+			p.skip(t)
+		}
+	case wantNames:
+		if !isDelim(t, '[') {
+			p.refuse(path, "want an array of strings")
+			p.skip(t)
+			break
+		}
+		for i := 0; p.dec.More(); i++ {
+			p.value(path+"["+strconv.Itoa(i)+"]", keyDef{want: wantName})
+		}
+		p.tok() // the closing bracket
 	case wantArray:
 		if isDelim(t, '[') {
 			p.array(path, d.elem)
