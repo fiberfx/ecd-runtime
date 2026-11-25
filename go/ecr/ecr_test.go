@@ -187,6 +187,7 @@ func TestAliases(t *testing.T) {
 			{"ErrBudget", ecr.ErrBudget, ecd.ErrBudget},
 			{"ErrQuery", ecr.ErrQuery, ecd.ErrQuery},
 			{"ErrOwner", ecr.ErrOwner, ecd.ErrOwner},
+			{"ErrValue", ecr.ErrValue, ecd.ErrValue},
 			{"ErrConfig", ecr.ErrConfig, rt.ErrConfig},
 			{"ErrRef", ecr.ErrRef, rt.ErrRef},
 			{"ErrExist", ecr.ErrExist, sqlite.ErrExist},
