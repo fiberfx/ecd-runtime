@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "package": "dtc",
+  "detached": true,
+  "kinds": [
+    {"code": "job", "residency": "touched", "budget": 65536}
+  ],
+  "components": [
+    {"cid": 1, "name": "state", "form": "component", "type": "u8"},
+    {"cid": 2, "name": "label", "form": "component", "type": "text[64]"},
+    {"cid": 3, "name": "ref", "form": "component", "type": "eid"},
+    {"cid": 4, "name": "done", "form": "tag"}
+  ]
+}
