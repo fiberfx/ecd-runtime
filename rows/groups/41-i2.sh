@@ -13,7 +13,7 @@
 #   I2-03  Day at 0, 86,399,999 and 86,400,000 ms
 #   I2-04  trace and span id: parse, String, Bytes, IsZero, Value, Scan; uppercase, 0x, UUID text, all zero, wrong length and a Scan of a string refused
 #   I2-05  the seam: a stub satisfies ecd.Engine, the constant values, the error texts, the sentinels never match each other
-#   I2-06  go/go.mod says go 1.27.4 and requires only ecd-id v0.8.0, go/go.sum holds its two lines, go version reads go1.27; a go.mod with another require is refused
+#   I2-06  go/go.mod says go 1.27.4 and requires only ecd-id v0.11.0, go/go.sum holds its two lines, go version reads go1.27; a go.mod with another require is refused
 #
 # Each plant is a one-line sed on a temporary copy of /w/go that re-runs only the tests of its row. A plant is KILLED
 # when a test fails and SURVIVED when every test passes; a plant that does not change exactly one line, or in which no
@@ -64,24 +64,24 @@ i2_plant I2-04p trace.go 's/parseHex(t\.b\[:\], s, ErrTraceID)/parseHex(t.b[:], 
 go_row I2-05 i2 "a stub satisfies ecd.Engine, constants, error texts, distinct sentinels" /w/go test -run '^TestSeam' ./ecd/
 i2_plant I2-05p engine.go 's/^\tOpSet$/\tOpSet OpCode = iota + 2/' '^TestSeam' "OpSet takes the value 3 and the I2-05 tests fail"
 
-# i2_gomod_ok file: 0 when the file says "go 1.27.4" and its only requirement is ecd-id v0.8.0.
+# i2_gomod_ok file: 0 when the file says "go 1.27.4" and its only requirement is ecd-id v0.11.0.
 i2_gomod_ok() {
   grep -qx 'go 1\.27\.4' "$1" || return 1
   i2_req=$(awk '/^require[ \t]*\(/{b=1;next} b&&/^\)/{b=0;next} b{print;next} /^require[ \t]/{sub(/^require[ \t]+/,"");print}' "$1" | sed 's/^[ \t]*//;s/[ \t]*$//')
-  [ "$i2_req" = "github.com/fiberfx/ecd-id/go v0.8.0" ]
+  [ "$i2_req" = "github.com/fiberfx/ecd-id/go v0.11.0" ]
 }
 
 if sel I2-06 i2 || sel I2-06p i2; then
   i2_pd=$(mktemp -d /tmp/rows/plant.XXXXXX)
   if sel I2-06 i2; then
-    i2_what="go.mod: go 1.27.4 and only ecd-id v0.8.0; go.sum: its two lines; go version go1.27; a go.mod with another require is refused"
+    i2_what="go.mod: go 1.27.4 and only ecd-id v0.11.0; go.sum: its two lines; go version go1.27; a go.mod with another require is refused"
     if [ $HAVE_GO -eq 0 ]; then say I2-06 "$i2_what" "go not on PATH" CNM
     else
       i2_obs=""
-      i2_gomod_ok /w/go/go.mod || i2_obs="$i2_obs go.mod is not go 1.27.4 with only ecd-id v0.8.0;"
+      i2_gomod_ok /w/go/go.mod || i2_obs="$i2_obs go.mod is not go 1.27.4 with only ecd-id v0.11.0;"
       cp /w/go/go.mod "$i2_pd/other.mod" && printf '\nrequire example.com/other v1.0.0\n' >>"$i2_pd/other.mod"
       ! i2_gomod_ok "$i2_pd/other.mod" || i2_obs="$i2_obs a go.mod with another require line was accepted;"
-      i2_sum=$(printf '%s\n%s\n' 'github.com/fiberfx/ecd-id/go v0.8.0 h1:UMGwZFL0VQ7eJm+3GqUEaL/X7dHJl9UpFRyWjpRO2dI=' 'github.com/fiberfx/ecd-id/go v0.8.0/go.mod h1:M5YOPf1cdIPU87e2ZFpmC9OdYXCGRRl24BgWeRGrdOY=')
+      i2_sum=$(printf '%s\n%s\n' 'github.com/fiberfx/ecd-id/go v0.11.0 h1:M8D12NQ8ARnQDZanpFV23/uwC7r7mzzfFNxtRLDl+oE=' 'github.com/fiberfx/ecd-id/go v0.11.0/go.mod h1:M5YOPf1cdIPU87e2ZFpmC9OdYXCGRRl24BgWeRGrdOY=')
       [ "$(cat /w/go/go.sum)" = "$i2_sum" ] || i2_obs="$i2_obs go.sum is not the two ecd-id lines;"
       i2_gv=$(go version 2>&1)
       case $i2_gv in *' go1.27'*) ;; *) i2_obs="$i2_obs go version reads: $i2_gv;" ;; esac

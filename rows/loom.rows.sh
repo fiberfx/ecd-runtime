@@ -11,7 +11,7 @@
 #     --param inputs=DIR \
 #     --param cpus=2 --param memory=8g --param timeout=1800
 # CHECKOUT is the directory of a checkout of this repository on the machine that starts the run.
-# inputs is required: a GOPROXY file tree that /w/inputs provides for github.com/fiberfx/ecd-id/go v0.8.0, the one
+# inputs is required: a GOPROXY file tree that /w/inputs provides for github.com/fiberfx/ecd-id/go v0.11.0, the one
 # requirement of go/; for github.com/mlange-42/ark v0.8.4-0.20261110114945-723f2ac3186a, which go/enginecmp also
 # requires; and for every module of go/sqlite/go.mod with the modules its tests import (go mod tidy reads them), such
 # as github.com/google/pprof. Without it GOPROXY is off, and every row that loads a module is CNM. memory=8g leaves

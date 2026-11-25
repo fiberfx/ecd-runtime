@@ -97,7 +97,7 @@ if sel EC-01p ecm19; then
   elif ! ecm19_copy; then say EC-01p "$ecm19_ex" "the copy failed" CNM
   else
     ecm19_apply go.mod \
-      "s|^require github\.com/fiberfx/ecd-id/go v0\.8\.0\$|require github.com/mlange-42/ark $ecm19_v|"
+      "s|^require github\.com/fiberfx/ecd-id/go v0\.11\.0\$|require github.com/mlange-42/ark $ecm19_v|"
     if [ "$ecm19_n" -ne 1 ]; then
       say EC-01p "$ecm19_ex" "the sed changed $ecm19_n lines of go.mod, want 1" CNM
     else
@@ -177,7 +177,7 @@ if sel EC-03p ecm19; then
   elif ! ecm19_gofile; then say EC-03p "$ecm19_ex" "$ecm19_nogo" CNM; rm -rf "$ecm19_pd"
   else
     ecm19_apply enginecmp/go.mod \
-      's|^\tgithub\.com/fiberfx/ecd-id/go v0\.8\.0$|\tgithub.com/fiberfx/ecd-id/go v0.8.0 // indirect|'
+      's|^\tgithub\.com/fiberfx/ecd-id/go v0\.11\.0$|\tgithub.com/fiberfx/ecd-id/go v0.11.0 // indirect|'
     if [ "$ecm19_n" -ne 1 ]; then
       say EC-03p "$ecm19_ex" "the sed changed $ecm19_n lines of go.mod, want 1" CNM
     else
