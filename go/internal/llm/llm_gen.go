@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"iter"
 	"math"
 
 	eid "github.com/fiberfx/ecd-id/go"
@@ -54,6 +55,12 @@ const (
 	SizeScore   = 4
 )
 
+// The QIDs of the queries of the catalog: the marked handles in CID order, then the declared queries in file order.
+const (
+	QIDTurn   ecd.QID = 0
+	QIDBilled ecd.QID = 1
+)
+
 // Catalog returns the catalog of llm.catalog.json as a new value that the caller owns.
 func Catalog() *ecd.Catalog {
 	return &ecd.Catalog{
@@ -70,6 +77,10 @@ func Catalog() *ecd.Catalog {
 			{Kind: KindSes, Residency: ecd.Touched, Budget: 1048576},
 			{Kind: KindCnv, Residency: ecd.All, Budget: 0},
 			{Kind: KindArc, Residency: ecd.All, Budget: 0},
+		},
+		Queries: []ecd.QueryDef{
+			{QID: QIDTurn, Name: "turn", All: []ecd.CID{CIDTurn}},
+			{QID: QIDBilled, Name: "billed", Kinds: []ecd.Kind{KindCnv, KindArc}, All: []ecd.CID{CIDTurn, CIDUsage}, None: []ecd.CID{CIDPinned}},
 		},
 	}
 }
@@ -468,6 +479,17 @@ func (turnHandle) Unset(b *rt.Buffer, r rt.Ref) { b.Unset(r, CIDTurn) }
 // CID returns CIDTurn.
 func (turnHandle) CID() ecd.CID { return CIDTurn }
 
+// Iter runs the query of the handle turn, every entity of an All kind that holds the turn, and returns its answer as
+// a sequence of each entity and a copy of its turn, in the order of the engine's answer. The query runs before Iter
+// returns, so an error of e, ecd.ErrCold and ecd.ErrQuery among them, comes before any yield. A loop body that moves
+// e panics with an *IterError at the next step.
+func (turnHandle) Iter(e ecd.Engine) (iter.Seq2[eid.ID, TurnValue], error) {
+	return iterValues[TurnValue](e, QIDTurn, CIDTurn)
+}
+
+// QID returns QIDTurn.
+func (turnHandle) QID() ecd.QID { return QIDTurn }
+
 // Usage is the handle of the component usage: the usage and cost of a turn.
 var Usage usageHandle
 
@@ -594,6 +616,33 @@ func (pinnedHandle) Remove(b *rt.Buffer, r rt.Ref) { b.Unset(r, CIDPinned) }
 // CID returns CIDPinned.
 func (pinnedHandle) CID() ecd.CID { return CIDPinned }
 
+// Billed is the declared query billed: turns with their usage, not pinned.
+var Billed billedQuery
+
+// billedQuery runs the query billed; its row is BilledRow.
+type billedQuery struct{}
+
+// BilledRow is a row of the query billed: a copy of each component of its "all" that holds a value.
+type BilledRow struct {
+	Turn  TurnValue
+	Usage UsageValue
+}
+
+// Iter runs the query billed and returns its answer as a sequence of each entity and its row, in the order of the
+// engine's answer. The query runs before Iter returns, so an error of e, ecd.ErrCold and ecd.ErrQuery among them,
+// comes before any yield. A loop body that moves e panics with an *IterError at the next step.
+func (billedQuery) Iter(e ecd.Engine) (iter.Seq2[eid.ID, BilledRow], error) {
+	return iterRows(e, QIDBilled, func(id eid.ID, r *BilledRow) error {
+		if err := readValue(e, id, CIDTurn, &r.Turn); err != nil {
+			return err
+		}
+		return readValue(e, id, CIDUsage, &r.Usage)
+	})
+}
+
+// QID returns QIDBilled.
+func (billedQuery) QID() ecd.QID { return QIDBilled }
+
 // decoder is the pointer type of a generated value type: Decode sets the value from its codec bytes.
 type decoder[T any] interface {
 	*T
@@ -627,4 +676,63 @@ func has(e ecd.Engine, id eid.ID, c ecd.CID) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+// IterError is the panic value of a sequence of Iter whose engine moved or failed during the loop. At is the engine's
+// At() when the query ran and Now its At() at the failing step; Err is the error of the step's read, or nil when the
+// engine moved.
+type IterError struct {
+	QID ecd.QID
+	At  uint64
+	Now uint64
+	Err error
+}
+
+// Error describes the failed step.
+func (e *IterError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("llm: iteration of query %d at seq %d: %v", e.QID, e.At, e.Err)
+	}
+	return fmt.Sprintf("llm: iteration of query %d at seq %d: the engine moved to seq %d", e.QID, e.At, e.Now)
+}
+
+// Unwrap returns Err.
+func (e *IterError) Unwrap() error { return e.Err }
+
+// iterRows runs query q on e and returns a sequence of each entity of its answer and the row that read fills. The
+// query runs before iterRows returns; each step panics with an *IterError when e has moved or read fails.
+func iterRows[R any](e ecd.Engine, q ecd.QID, read func(id eid.ID, r *R) error) (iter.Seq2[eid.ID, R], error) {
+	at := e.At()
+	var a ecd.Answer
+	if err := e.Query(q, nil, &a); err != nil {
+		return nil, err
+	}
+	return func(yield func(eid.ID, R) bool) {
+		for _, id := range a.IDs {
+			if now := e.At(); now != at {
+				panic(&IterError{QID: q, At: at, Now: now})
+			}
+			var r R
+			if err := read(id, &r); err != nil {
+				panic(&IterError{QID: q, At: at, Now: at, Err: err})
+			}
+			if !yield(id, r) {
+				return
+			}
+		}
+	}, nil
+}
+
+// iterValues runs query q on e and returns a sequence of each entity of its answer and a copy of its component c.
+func iterValues[T any, P decoder[T]](e ecd.Engine, q ecd.QID, c ecd.CID) (iter.Seq2[eid.ID, T], error) {
+	return iterRows(e, q, func(id eid.ID, v *T) error { return readValue[T, P](e, id, c, v) })
+}
+
+// readValue reads component c of id from e into v. Every error of e, ecd.ErrAbsent among them, is returned.
+func readValue[T any, P decoder[T]](e ecd.Engine, id eid.ID, c ecd.CID, v *T) error {
+	b, err := e.Get(id, c, nil)
+	if err != nil {
+		return err
+	}
+	return P(v).Decode(b)
 }
