@@ -148,6 +148,7 @@ func TestAliases(t *testing.T) {
 			{"Answer", reflect.TypeFor[ecr.Answer](), reflect.TypeFor[ecd.Answer]()},
 			{"Row", reflect.TypeFor[ecr.Row](), reflect.TypeFor[ecd.Row]()},
 			{"RowSource", reflect.TypeFor[ecr.RowSource](), reflect.TypeFor[ecd.RowSource]()},
+			{"Scanner", reflect.TypeFor[ecr.Scanner](), reflect.TypeFor[ecd.Scanner]()},
 			{"Stats", reflect.TypeFor[ecr.Stats](), reflect.TypeFor[ecd.Stats]()},
 			{"KindStats", reflect.TypeFor[ecr.KindStats](), reflect.TypeFor[ecd.KindStats]()},
 			{"Runtime", reflect.TypeFor[ecr.Runtime](), reflect.TypeFor[rt.Runtime]()},
