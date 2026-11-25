@@ -9,7 +9,7 @@
   ],
   "components": [
     {"cid": 1, "name": "session", "form": "component", "type": "text[32]", "doc": "the model that serves the session"},
-    {"cid": 2, "name": "turn", "form": "component", "doc": "one turn of a conversation", "fields": [
+    {"cid": 2, "name": "turn", "form": "component", "query": true, "doc": "one turn of a conversation", "fields": [
       {"name": "seq", "type": "u32"},
       {"name": "role", "type": "u8"},
       {"name": "tokens", "type": "u16"},
@@ -29,5 +29,8 @@
     {"cid": 5, "name": "digest", "form": "component", "type": "bytes[32]", "doc": "a digest of the content"},
     {"cid": 6, "name": "score", "form": "component", "type": "f32", "doc": "a relevance score"},
     {"cid": 7, "name": "pinned", "form": "tag", "doc": "pinned by the user"}
+  ],
+  "queries": [
+    {"name": "billed", "kinds": ["cnv", "arc"], "all": ["turn", "usage"], "none": ["pinned"], "doc": "turns with their usage, not pinned"}
   ]
 }
