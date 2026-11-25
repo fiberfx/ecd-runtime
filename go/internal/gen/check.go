@@ -65,8 +65,11 @@ func check(c *Catalog) []Refusal {
 		}
 	}
 	rs = append(rs, checkKinds(c.Kinds)...)
-	rs = append(rs, checkComponents(c)...)
-	return rs
+	crs, named, texts := checkComponents(c)
+	qrs, qnamed := checkQueries(c)
+	rs = append(rs, crs...)
+	rs = append(rs, qrs...)
+	return append(rs, collisions(c, named, qnamed, &texts)...)
 }
 
 // packageReason returns the refusal of a package name, or "" when it is fine.
@@ -150,9 +153,10 @@ func checkKinds(kinds []Kind) []Refusal {
 	return rs
 }
 
-// checkComponents checks $.components, each component and tag in file order, and then the generated identifiers.
-func checkComponents(c *Catalog) []Refusal {
-	var rs []Refusal
+// checkComponents checks $.components, each component and tag in file order. It returns the refusals, the components
+// whose name passed the grammar, the length and the declared-before check, and the N of every text[N] in the catalog;
+// the generated identifiers are checked by collisions, once the queries are known.
+func checkComponents(c *Catalog) (rs []Refusal, named []int, texts [MaxTextN + 1]bool) {
 	switch n := len(c.Components); {
 	case n == 0:
 		rs = append(rs, Refusal{"$.components", "want at least one component or tag"})
@@ -161,8 +165,6 @@ func checkComponents(c *Catalog) []Refusal {
 	}
 	cids := make(map[int64]int, len(c.Components))
 	names := make(map[string]int, len(c.Components))
-	var named []int // the components whose name passed the grammar, the length and the declared-before check
-	var texts [MaxTextN + 1]bool
 	for i := range c.Components {
 		comp := &c.Components[i]
 		p := fmt.Sprintf("$.components[%d]", i)
@@ -191,6 +193,9 @@ func checkComponents(c *Catalog) []Refusal {
 
 		size := 0 // the codec bytes of the types that parsed
 		if isTag {
+			if comp.Query {
+				rs = append(rs, Refusal{p + ".query", "a tag holds no value to iterate: declare a query in \"queries\""})
+			}
 			if comp.Type != "" {
 				rs = append(rs, Refusal{p + ".type", "a tag holds no value"})
 			}
@@ -229,7 +234,95 @@ func checkComponents(c *Catalog) []Refusal {
 			rs = append(rs, Refusal{p + ".doc", reason})
 		}
 	}
-	return append(rs, collisions(c, named, &texts)...)
+	return rs, named, texts
+}
+
+// checkQueries checks $.queries and each query in file order. It returns the refusals and the indexes of the queries
+// whose name passed the grammar, the length and the declared-before check, in file order.
+func checkQueries(c *Catalog) ([]Refusal, []int) {
+	var rs []Refusal
+	marks := 0
+	for _, comp := range c.Components {
+		if comp.Query {
+			marks++
+		}
+	}
+	if n := len(c.Queries) + marks; n > MaxQueries {
+		rs = append(rs, Refusal{"$.queries", fmt.Sprintf("%d queries and query marks, at most %d", n, MaxQueries)})
+	}
+	kinds := make(map[string]Kind, len(c.Kinds)) // each code of $.kinds to its first Kind
+	for _, k := range c.Kinds {
+		if _, ok := kinds[k.Code]; !ok {
+			kinds[k.Code] = k
+		}
+	}
+	comps := make(map[string]bool, len(c.Components)) // the name of every component and tag
+	for _, comp := range c.Components {
+		comps[comp.Name] = true
+	}
+	declared := make(map[string]int, len(c.Queries))
+	var qnamed []int // the queries whose name passed the grammar, the length and the declared-before check
+	for i := range c.Queries {
+		q := &c.Queries[i]
+		p := fmt.Sprintf("$.queries[%d]", i)
+
+		if reason := nameReason(q.Name); reason != "" {
+			rs = append(rs, Refusal{p + ".name", reason})
+		} else if j, dup := declared[q.Name]; dup {
+			rs = append(rs, Refusal{p + ".name", fmt.Sprintf("name %q is declared at $.queries[%d]", q.Name, j)})
+		} else {
+			declared[q.Name] = i
+			qnamed = append(qnamed, i)
+		}
+
+		seenKind := make(map[string]int, len(q.Kinds))
+		for j, code := range q.Kinds {
+			jp := fmt.Sprintf("%s.kinds[%d]", p, j)
+			kind, kindDeclared := kinds[code]
+			switch {
+			case !kindDeclared:
+				rs = append(rs, Refusal{jp, fmt.Sprintf("kind %q is not declared", code)})
+			case kind.Residency == "touched":
+				rs = append(rs, Refusal{jp, fmt.Sprintf("kind %q is a Touched kind: an engine refuses a query on it (E8)", code)})
+			default:
+				if k, dup := seenKind[code]; dup {
+					rs = append(rs, Refusal{jp, fmt.Sprintf("kind %q is named at %s.kinds[%d]", code, p, k)})
+				} else {
+					seenKind[code] = j
+				}
+			}
+		}
+
+		type place struct {
+			key string
+			j   int
+		}
+		seenComp := make(map[string]place)
+		for _, group := range []struct {
+			key   string
+			names []string
+		}{{"all", q.All}, {"none", q.None}, {"any", q.Any}} {
+			for j, name := range group.names {
+				jp := fmt.Sprintf("%s.%s[%d]", p, group.key, j)
+				_, compDeclared := comps[name]
+				switch {
+				case !compDeclared:
+					rs = append(rs, Refusal{jp, fmt.Sprintf("component %q is not declared", name)})
+				default:
+					if at, dup := seenComp[name]; dup {
+						rs = append(rs, Refusal{jp, fmt.Sprintf("component %q is named at %s.%s[%d]", name, p, at.key, at.j)})
+					} else {
+						seenComp[name] = place{group.key, j}
+					}
+				}
+			}
+		}
+
+		if reason := docReason(q.Doc); reason != "" {
+			rs = append(rs, Refusal{p + ".doc", reason})
+		}
+	}
+	return rs, qnamed
 }
 
 // checkFields checks $.components[I].fields and each field; p is the path of the component. It returns the refusals
@@ -270,9 +363,10 @@ func checkFields(p string, fields []Field, texts *[MaxTextN + 1]bool) ([]Refusal
 }
 
 // collisions registers the identifiers that the generated file declares at package level, in the order of the design,
-// the first holder winning, and refuses the name of each component whose identifier is already held. named lists the
-// components with a name that passed the earlier checks; texts marks the N of every text[N] in the catalog.
-func collisions(c *Catalog, named []int, texts *[MaxTextN + 1]bool) []Refusal {
+// the first holder winning, and refuses the name of each component and query whose identifier is already held. named
+// and qnamed list the components and queries with a name that passed the earlier checks; texts marks the N of every
+// text[N] in the catalog.
+func collisions(c *Catalog, named, qnamed []int, texts *[MaxTextN + 1]bool) []Refusal {
 	held := make(map[string]bool)
 	hold := func(id string) bool { // reports whether id was free
 		if held[id] {
@@ -282,6 +376,9 @@ func collisions(c *Catalog, named []int, texts *[MaxTextN + 1]bool) []Refusal {
 		return true
 	}
 	hold("Catalog")
+	if len(c.Queries) > 0 || slices.ContainsFunc(c.Components, func(x Component) bool { return x.Query }) {
+		hold("IterError")
+	}
 	if c.System != "" {
 		hold("System")
 	}
@@ -304,6 +401,7 @@ func collisions(c *Catalog, named []int, texts *[MaxTextN + 1]bool) []Refusal {
 		return cmp.Compare(c.Components[a].CID, c.Components[b].CID)
 	})
 	var rs []Refusal
+	refused := make(map[int]bool) // the components whose name is refused: one refusal for a value
 	for _, i := range order {
 		comp := &c.Components[i]
 		g := GoName(comp.Name)
@@ -318,8 +416,32 @@ func collisions(c *Catalog, named []int, texts *[MaxTextN + 1]bool) []Refusal {
 			}
 		}
 		if clash != "" {
+			refused[i] = true
 			rs = append(rs, Refusal{fmt.Sprintf("$.components[%d].name", i),
 				fmt.Sprintf("name %q makes the identifier %s, which another declaration of the file holds", comp.Name, clash)})
+		}
+	}
+	for _, i := range order {
+		if comp := &c.Components[i]; comp.Query && comp.Form == "component" {
+			id := "QID" + GoName(comp.Name)
+			if !hold(id) && !refused[i] {
+				rs = append(rs, Refusal{fmt.Sprintf("$.components[%d].name", i),
+					fmt.Sprintf("name %q makes the identifier %s, which another declaration of the file holds", comp.Name, id)})
+			}
+		}
+	}
+	for _, i := range qnamed {
+		q := &c.Queries[i]
+		g := GoName(q.Name)
+		clash := ""
+		for _, id := range []string{"QID" + g, g, g + "Row"} {
+			if !hold(id) && clash == "" {
+				clash = id
+			}
+		}
+		if clash != "" {
+			rs = append(rs, Refusal{fmt.Sprintf("$.queries[%d].name", i),
+				fmt.Sprintf("name %q makes the identifier %s, which another declaration of the file holds", q.Name, clash)})
 		}
 	}
 	return rs
