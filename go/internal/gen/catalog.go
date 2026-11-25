@@ -17,6 +17,7 @@ type Catalog struct {
 	Detached   bool        `json:"detached"` // the system is chosen at run time
 	Kinds      []Kind      `json:"kinds"`
 	Components []Component `json:"components"`
+	Queries    []Query     `json:"queries"`
 }
 
 // Kind is one kind of a catalog.
@@ -34,7 +35,19 @@ type Component struct {
 	Form   string  `json:"form"` // "component" or "tag"
 	Type   string  `json:"type"`
 	Fields []Field `json:"fields"`
+	Query  bool    `json:"query"` // the handle is also a query of every All kind
 	Doc    string  `json:"doc"`
+}
+
+// Query is one declared query of a catalog: its kinds by code (empty: every All kind) and its components by name.
+type Query struct {
+	Name  string   `json:"name"`
+	Kinds []string `json:"kinds"`
+	All   []string `json:"all"`
+	None  []string `json:"none"`
+	Any   []string `json:"any"`
+	Exact bool     `json:"exact"`
+	Doc   string   `json:"doc"`
 }
 
 // Field is one field of a component value, in declared order.
@@ -73,6 +86,7 @@ const (
 	MaxFields     = 64   // fields of one component
 	MaxSize       = 4096 // codec bytes of one value; also the bound of N in bytes[N]
 	MaxTextN      = 255  // N of text[N]: one length byte
+	MaxQueries    = 256  // declared queries and query marks of one catalog; ecd.QID holds 65,536
 )
 
 // FieldType is a parsed field type: its base and, for bytes and text, its N.
