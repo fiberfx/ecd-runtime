@@ -3,9 +3,9 @@
   "package": "llm",
   "system": "llm",
   "kinds": [
-    {"code": "ses", "residency": "touched", "budget": 1048576, "doc": "a chat session, resident while it is in use"},
-    {"code": "cnv", "residency": "all", "budget": 0, "doc": "a conversation"},
-    {"code": "arc", "residency": "all", "budget": 0, "doc": "an archived conversation"}
+    {"code": "ses", "residency": "touched", "budget": 1048576, "doc": "a chat session, resident while it is in use", "components": [{"name": "session"}]},
+    {"code": "cnv", "residency": "all", "budget": 0, "doc": "a conversation", "components": [{"name": "turn"}, {"name": "usage"}, {"name": "parent", "optional": true}]},
+    {"code": "arc", "residency": "all", "budget": 0, "doc": "an archived conversation", "components": [{"name": "turn"}, {"name": "digest", "optional": true}, {"name": "score", "optional": true}]}
   ],
   "components": [
     {"cid": 1, "name": "session", "form": "component", "type": "text[32]", "doc": "the model that serves the session"},

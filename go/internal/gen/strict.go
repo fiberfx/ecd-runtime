@@ -46,6 +46,11 @@ var (
 		{"residency", wantName, true, nil},
 		{"budget", wantInt, true, nil},
 		{"doc", wantString, false, nil},
+		{"components", wantArray, false, &memberShape},
+	}
+	memberShape = shape{
+		{"name", wantName, true, nil},
+		{"optional", wantFlag, false, nil},
 	}
 	componentShape = shape{
 		{"cid", wantInt, true, nil},

@@ -26,6 +26,16 @@ type Kind struct {
 	Residency string `json:"residency"` // "touched" or "all"
 	Budget    int64  `json:"budget"`
 	Doc       string `json:"doc"`
+	// Components are the components the kind's spawn sets and its read returns, in order; empty: no spawn and no
+	// read are generated for the kind.
+	Components []Member `json:"components"`
+}
+
+// Member is one component that a kind lists, by name. An optional member may be absent from a live entity of the
+// kind: the generated entity type holds a Has field for it.
+type Member struct {
+	Name     string `json:"name"`
+	Optional bool   `json:"optional"`
 }
 
 // Component is one component or tag of a catalog. A component has exactly one of Type and Fields; a tag neither.
