@@ -56,6 +56,7 @@ type (
 	Answer       = ecd.Answer
 	Row          = ecd.Row
 	RowSource    = ecd.RowSource
+	Scanner      = ecd.Scanner // a store that scans one component of one kind; *Store implements it
 	Stats        = ecd.Stats
 	KindStats    = ecd.KindStats
 )
