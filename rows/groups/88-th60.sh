@@ -98,7 +98,7 @@ th60_plant TH-01r "TestCatalog/system fails on the plant" ./internal/gen/ TestCa
 
 go_row TH-02 th60 "TestGolden and TestRun rc=0" /w/go test -run '^(TestGolden|TestRun)$' ./internal/gen/ ./cmd/gen/
 th60_plant TH-02p "TestRun/refused fails on the plant" ./cmd/gen/ TestRun refused cmd/gen/main.go \
-  's/gen\.Generate(src, filepath\.Base(\*in), mode)$/gen.Generate(src, filepath.Base(*in), mode); _ = write(*out, got)/'
+  's/gen\.GenerateWith(src, filepath\.Base(\*in), mode, reg)$/gen.GenerateWith(src, filepath.Base(*in), mode, reg); _ = write(*out, got)/'
 th60_plant TH-02q "TestGolden/core fails on the plant" ./internal/gen/ TestGolden core internal/gen/emit.go \
   's/return "dst = binary\.BigEndian\.AppendUint32(dst, " + x + ")"/return "dst = binary.LittleEndian.AppendUint32(dst, " + x + ")"/'
 th60_plant TH-02r "TestGolden/ecr fails on the plant" ./internal/gen/ TestGolden ecr internal/gen/gen.go \
