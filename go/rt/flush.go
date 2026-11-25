@@ -12,6 +12,8 @@ type Result struct {
 	Seq      uint64    // the seq of the committed transaction; 0 when no deed was committed
 	Deeds    []eid.ID  // the eid of each deed, in ord order
 	Outcomes []Outcome // the outcome of each deed, in ord order
+
+	spawns []spawnSet // the spawns of each deed, in ord order, which Spawned reads
 }
 
 // Flush turns the buffers that hold a record into deeds, commits them in one store transaction and applies the
@@ -56,6 +58,7 @@ func (r *Runtime) Flush() (Result, error) {
 
 	// Mint in flush order, and build one deed per buffer.
 	deeds := make([]ecd.Deed, len(bufs))
+	sets := make([]spawnSet, len(bufs))
 	for ord, b := range bufs {
 		deedID, err := r.minter.Mint(r.deedKind)
 		if err != nil {
@@ -85,6 +88,7 @@ func (r *Runtime) Flush() (Result, error) {
 			ops[i] = ecd.Op{Code: rec.code, Entity: e, CID: rec.cid, Value: rec.val}
 		}
 		deeds[ord] = ecd.Deed{ID: deedID, Ord: uint32(ord), TraceID: b.trace, SpanID: b.span, Ops: ops}
+		sets[ord] = spawnSet{buf: b, epoch: b.epoch, ord: ord, ids: spawned}
 	}
 
 	if err := r.index.check(deeds); err != nil {
@@ -97,7 +101,7 @@ func (r *Runtime) Flush() (Result, error) {
 		return Result{}, dropped(bufs, fmt.Errorf("rt: commit: %w", err))
 	}
 
-	res := Result{Seq: seq, Deeds: make([]eid.ID, len(deeds)), Outcomes: out}
+	res := Result{Seq: seq, Deeds: make([]eid.ID, len(deeds)), Outcomes: out, spawns: sets}
 	committed := make([]ecd.Deed, 0, len(deeds))
 	for i := range deeds {
 		res.Deeds[i] = deeds[i].ID
