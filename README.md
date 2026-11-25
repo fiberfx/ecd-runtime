@@ -11,12 +11,12 @@ the contract it implements is the KAN home's `specs/ecd_runtime/ecd_runtime.spec
 ## Install
 
 ```sh
-go get github.com/fiberfx/ecd-runtime/go/ecr@v0.7.0
+go get github.com/fiberfx/ecd-runtime/go/ecr@v0.8.0
 ```
 
 Go 1.27.4 or later. A host imports one package, `github.com/fiberfx/ecd-runtime/go/ecr`, and requires one module:
 
-    require github.com/fiberfx/ecd-runtime/go/ecr v0.7.0
+    require github.com/fiberfx/ecd-runtime/go/ecr v0.8.0
 
 The facade brings in the main module, the SQLite store and the id package at the versions it was released with.
 
@@ -412,6 +412,23 @@ if err != nil {
 `h.Store` is an `ecr.Scanner`, the interface that package ecd declares and that a test can implement. These blocks are
 excerpts: `example_test.go` does not run them; `TestScanHost` of `go/ecr/internal/llm` runs a scan on a host.
 
+A kind may list its components in the catalog file, each required unless it carries `"optional": true`:
+
+```json
+{"code": "cnv", "residency": "all", "budget": 0, "components": [{"name": "turn"}, {"name": "usage"}, {"name": "parent", "optional": true}]}
+```
+
+The generator then writes `CnvEntity`, with a field per listed component and a `HasParent` field per optional one;
+`SpawnCnv(b, v)`, which records the spawn and a set of each required component and of each optional one whose `Has`
+field is true; and `GetCnv(e, id)`, which reads the whole entity: false and nil when a required component is absent, an
+absent optional one as its zero value with its `Has` field false, and an error that matches `ErrKind` for an eid of
+another kind. `Get<K>` reads the engine, so over an All kind such as `cnv` it answers `ErrCold` on a host today, as
+`Iter` does; read such a kind with `Scan`. A kind with no required component answers false and nil when it holds none
+of them. With `-registry DIR`, which holds `systems.tsv` and `kinds.tsv` of the ecd-id registry, the generator
+refuses a catalog whose system is not a live system of the registry or whose kinds are not live entity kinds of that
+system, and a detached catalog, with exit 1 and nothing written. The module `github.com/fiberfx/ecd-id/go` ships no
+registry file, so `DIR` is the `registry/` folder of a checkout of `github.com/fiberfx/ecd-id`.
+
 ## Modules and versions
 
 | Module | Directory | What it is | Require it when |
@@ -420,8 +437,8 @@ excerpts: `example_test.go` does not run them; `TestScanHost` of `go/ecr/interna
 | `github.com/fiberfx/ecd-runtime/go` | `go/` | The seam package `ecd`, the runtime `rt` and the engine Jacquard. No SQLite driver. | You build a Runtime over your own `Committer`, or an engine, without the store. |
 | `github.com/fiberfx/ecd-runtime/go/sqlite` | `go/sqlite/` | The owner store in one SQLite file (pure-Go driver `modernc.org/sqlite`). | You wire `rt` and the store yourself. |
 
-The current release is v0.7.0 of all three (tags `go/v0.7.0`, `go/sqlite/v0.7.0`, `go/ecr/v0.7.0`). If you do not use
-`ecr`, upgrade `go` and `go/sqlite` together: `go/sqlite` v0.7.0 requires `go` v0.7.0.
+The current release is v0.8.0 of all three (tags `go/v0.8.0`, `go/sqlite/v0.8.0`, `go/ecr/v0.8.0`). If you do not use
+`ecr`, upgrade `go` and `go/sqlite` together: `go/sqlite` v0.8.0 requires `go` v0.8.0.
 
 ## Reference
 
@@ -546,7 +563,7 @@ func tick(cfg rt.Config, mover ecd.Kind, pos ecd.CID, known eid.ID) (rt.Result, 
 The module `github.com/fiberfx/ecd-runtime/go/sqlite`, in `go/sqlite/`, package `sqlite`, is an owner store in one
 SQLite file. A host passes it to the Runtime as `rt.Config.Committer`, and after a restart it brings a fresh engine to
 the seq of the committed history. The module has its own tags, `go/sqlite/vX.Y.Z`; `go/sqlite/v0.4.0` is the first. It
-requires `github.com/fiberfx/ecd-runtime/go` v0.7.0, `github.com/fiberfx/ecd-id/go` v0.11.0 and the pure-Go driver
+requires `github.com/fiberfx/ecd-runtime/go` v0.8.0, `github.com/fiberfx/ecd-id/go` v0.11.0 and the pure-Go driver
 `modernc.org/sqlite` v1.37.0. Inside this repository a `replace` directive points the requirement on the main module at
 the parent directory. The main module `go/` does not require the driver.
 
@@ -576,6 +593,8 @@ the parent directory. The main module `go/` does not require the driver.
   may repeat; an eid of another kind is an error before `f` is called. An entity that is not alive, or alive with no
   component value, yields no row. The source is valid only until `f` returns, and an error of `f` is returned
   unchanged.
+- `Store.Scan(k, c, after, f)` calls `f` once, inside one read transaction, with the seq of the store and the stored
+  values of component `c` of the entities of kind `k` above `after`, in eid order; `*Store` is an `ecd.Scanner`.
 - `Store.Log(after, f)` calls `f` with each committed deed of a seq above `after`, in seq order and then ord order. An
   error of `f` stops the walk and is returned unchanged. A body that does not decode matches `ErrSchema`.
 - `Store.Close` closes both connections, and a second `Close` returns nil.
@@ -665,7 +684,8 @@ deed whose transaction failed. Only a deed answered `Committed` reaches the engi
   nothing to a lake. `wal_autocheckpoint` keeps the default of SQLite.
 - The state of a kind of residency `Touched` is written, and `Hydrate` loads none of it: it skips every Touched kind,
   and when the catalog has no All kind and the seq is above 0 it calls the engine's `Start`, which loads no kind.
-  Only `Rows` reads that state back, for the entities a host names; the store keeps no residency.
+  `Rows` reads that state back for the entities a host names, and `Scan` for every entity of a kind that holds a
+  component; the store keeps no residency.
 - An entity with no component value is alive in the store, and `Hydrate` cannot load it, since a `Row` of the hydration
   cannot name it. It is absent after a hydration.
 - One `state` table holds opaque values for every kind. The store has no typed tables, routes no query and keeps no
@@ -742,10 +762,10 @@ func run(path string, create bool, cat *ecr.Catalog, m ecr.Minter, deedKind ecr.
 
 A host requires the one module:
 
-    require github.com/fiberfx/ecd-runtime/go/ecr v0.7.0
+    require github.com/fiberfx/ecd-runtime/go/ecr v0.8.0
 
-The module requires `github.com/fiberfx/ecd-id/go` v0.11.0, `github.com/fiberfx/ecd-runtime/go` v0.7.0 and
-`github.com/fiberfx/ecd-runtime/go/sqlite` v0.7.0, and its build graph is that of `go/sqlite`. Inside this repository
+The module requires `github.com/fiberfx/ecd-id/go` v0.11.0, `github.com/fiberfx/ecd-runtime/go` v0.8.0 and
+`github.com/fiberfx/ecd-runtime/go/sqlite` v0.8.0, and its build graph is that of `go/sqlite`. Inside this repository
 `replace` directives point the requirements on the main module and on `go/sqlite` at their directories. The refusals
 of package `eid` and its lease and minting types are not in `ecr`, which gives the parse and build functions of an eid
 (`Parse`, `ParseString`, `FromBytes`, `FromParts`, `ParseCode` and `MustCode`), and a `Minter` is passed in.

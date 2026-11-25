@@ -4,7 +4,7 @@ go 1.27.4
 
 require (
 	github.com/fiberfx/ecd-id/go v0.11.0
-	github.com/fiberfx/ecd-runtime/go v0.7.0
+	github.com/fiberfx/ecd-runtime/go v0.8.0
 	modernc.org/sqlite v1.37.0
 )
 
