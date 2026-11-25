@@ -17,7 +17,7 @@ import (
 	"github.com/fiberfx/ecd-runtime/go/ecd"
 )
 
-// The vectors of ecd-id v0.8.0 are copied byte for byte into testdata/eid; SHA256SUMS pins them. These tests run
+// The vectors of ecd-id v0.11.0 are copied byte for byte into testdata/eid; SHA256SUMS pins them. These tests run
 // them through the encodings of the eid that the module requires: MarshalText, UnmarshalText, Value and Scan.
 
 const vecDir = "testdata/eid"

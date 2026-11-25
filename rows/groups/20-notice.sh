@@ -14,7 +14,7 @@
 #   NT3   every file that go/NOTICE.txt lists exists, carries the attribution line and names its Ark source files;
 #         go/NOTICE.txt holds the Ark copyright line and the MIT permission sentence
 #   NT3p  plant: go/NOTICE.txt lists engine/jacquard/absent.go; NT3 must turn red
-#   NT4   go/go.mod has the line "go 1.27.4", no toolchain line, and requires exactly github.com/fiberfx/ecd-id/go v0.8.0
+#   NT4   go/go.mod has the line "go 1.27.4", no toolchain line, and requires exactly github.com/fiberfx/ecd-id/go v0.11.0
 #   NT4p  plant: a toolchain line appended to a copy of go/go.mod; NT4 must turn red
 #   NT4q  plant: the go line of a copy of go/go.mod is "go 1.27"; NT4 must turn red
 #   NT5   go mod tidy in a copy of go/, offline, leaves go.mod and go.sum byte-equal
@@ -125,8 +125,8 @@ nt4_check() {
   nt_req=$(awk '/^require \(/ {b = 1; next} b && /^\)/ {b = 0; next} b {print $1 " " $2; next} /^require / {print $2 " " $3}' "$nt_m" | tr '\n' ';')
   if [ "$nt_golines" -ne 1 ] || ! grep -Fxq 'go 1.27.4' "$nt_m"; then echo "the go line is not exactly go 1.27.4"; return 1; fi
   if [ "$nt_tc" -ne 0 ]; then echo "a toolchain line is present"; return 1; fi
-  if [ "$nt_req" != "github.com/fiberfx/ecd-id/go v0.8.0;" ]; then echo "requirements: $nt_req"; return 1; fi
-  echo "go 1.27.4, no toolchain line, requires only github.com/fiberfx/ecd-id/go v0.8.0"
+  if [ "$nt_req" != "github.com/fiberfx/ecd-id/go v0.11.0;" ]; then echo "requirements: $nt_req"; return 1; fi
+  echo "go 1.27.4, no toolchain line, requires only github.com/fiberfx/ecd-id/go v0.11.0"
 }
 
 # nt6_check ROOT: LICENSE and go/LICENSE are present and byte-equal, and begin with the MIT License title and the
@@ -249,7 +249,7 @@ fi
 # NT4
 if sel NT4 notice; then
   nt_o=$(nt4_check /w); nt_r=$?
-  say NT4 "go.mod has go 1.27.4, no toolchain line and the one requirement ecd-id v0.8.0" "$nt_o" "$([ $nt_r -eq 0 ] && echo PASS || { [ $nt_r -eq 1 ] && echo FAIL || echo CNM; })"
+  say NT4 "go.mod has go 1.27.4, no toolchain line and the one requirement ecd-id v0.11.0" "$nt_o" "$([ $nt_r -eq 0 ] && echo PASS || { [ $nt_r -eq 1 ] && echo FAIL || echo CNM; })"
 fi
 if sel NT4p notice; then
   if nt_mk; then

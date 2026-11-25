@@ -546,7 +546,7 @@ func tick(cfg rt.Config, mover ecd.Kind, pos ecd.CID, known eid.ID) (rt.Result, 
 The module `github.com/fiberfx/ecd-runtime/go/sqlite`, in `go/sqlite/`, package `sqlite`, is an owner store in one
 SQLite file. A host passes it to the Runtime as `rt.Config.Committer`, and after a restart it brings a fresh engine to
 the seq of the committed history. The module has its own tags, `go/sqlite/vX.Y.Z`; `go/sqlite/v0.4.0` is the first. It
-requires `github.com/fiberfx/ecd-runtime/go` v0.7.0, `github.com/fiberfx/ecd-id/go` v0.8.0 and the pure-Go driver
+requires `github.com/fiberfx/ecd-runtime/go` v0.7.0, `github.com/fiberfx/ecd-id/go` v0.11.0 and the pure-Go driver
 `modernc.org/sqlite` v1.37.0. Inside this repository a `replace` directive points the requirement on the main module at
 the parent directory. The main module `go/` does not require the driver.
 
@@ -744,7 +744,7 @@ A host requires the one module:
 
     require github.com/fiberfx/ecd-runtime/go/ecr v0.7.0
 
-The module requires `github.com/fiberfx/ecd-id/go` v0.8.0, `github.com/fiberfx/ecd-runtime/go` v0.7.0 and
+The module requires `github.com/fiberfx/ecd-id/go` v0.11.0, `github.com/fiberfx/ecd-runtime/go` v0.7.0 and
 `github.com/fiberfx/ecd-runtime/go/sqlite` v0.7.0, and its build graph is that of `go/sqlite`. Inside this repository
 `replace` directives point the requirements on the main module and on `go/sqlite` at their directories. The refusals
 of package `eid` and its lease and minting types are not in `ecr`, which gives the parse and build functions of an eid

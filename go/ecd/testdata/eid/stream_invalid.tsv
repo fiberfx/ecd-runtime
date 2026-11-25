@@ -17,3 +17,5 @@ syntax-leading-zero	evt	01-2	stream-syntax
 syntax-star	evt	*	stream-syntax
 syntax-u64-overflow	evt	18446744073709551616-1	stream-syntax
 syntax-space	evt	1 -2	stream-syntax
+syntax-negative-ms	evt	-1-3050625797590089728	stream-syntax
+syntax-negative-seq	evt	1795357800000--1	stream-syntax
