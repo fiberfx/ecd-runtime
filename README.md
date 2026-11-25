@@ -346,6 +346,56 @@ It prints:
     refused: true seq 0
     no entity: true
 
+### Generating typed handles and queries
+
+A host that does not want to write codes, sizes and byte offsets by hand declares its system in a catalog file and
+generates a Go package from it: the kinds, a value type with a codec for each component, a handle for each component
+and tag, and the `Catalog()` that `Open` takes. In a Go file of the host, write the `go:generate` line and run
+`go generate`:
+
+```go
+//go:generate go run github.com/fiberfx/ecd-runtime/go/cmd/gen -import ecr -in X.catalog.json -out X_gen.go
+```
+
+`-import ecr` writes the package against package ecr alone, as a host imports it. The repository's own example is
+`go/ecr/internal/llm`. A catalog may mark a component `"query": true` and may declare queries over kinds and
+components. The generator refuses a query that an engine would refuse or that would not compile, with its path and
+reason, and writes the same bytes on every run:
+
+```json
+{"cid": 2, "name": "turn", "form": "component", "query": true, "doc": "one turn of a conversation", "fields": [
+  {"name": "seq", "type": "u32"}, {"name": "tokens", "type": "u16"}
+]},
+```
+
+```json
+"queries": [
+  {"name": "billed", "kinds": ["cnv", "arc"], "all": ["turn", "usage"], "none": ["pinned"], "doc": "turns with their usage, not pinned"}
+]
+```
+
+The marked handle gets `Turn.Iter(e)`, and each declared query a variable (`Billed`) with `Iter(e)` and a row type
+(`BilledRow`) whose fields are copies of the components of `all` that hold a value. `Iter` runs the query before it
+returns, so an error of the engine, `ErrCold` and `ErrQuery` among them, comes before any step. It returns an
+`iter.Seq2` of each entity and its value or row, in the order of the engine's answer:
+
+```go
+seq, err := llm.Billed.Iter(h.Engine)
+if err != nil {
+	log.Fatal(err)
+}
+for id, v := range seq {
+	fmt.Println(id, v.Turn.Seq, v.Usage.Cost)
+}
+```
+
+A loop body must not write to the host: if the engine moves while the loop runs, or a read fails, the next step panics
+with an `*IterError` that names the query and the seq at which the engine answered. Run the query again after a flush.
+
+The limit is decision 27: through `ecr.Open`, an All kind is Cold until an engine is admitted to serve All kinds, so
+`Iter` over an All kind answers `ErrCold` on a host today. `Iter` runs on an engine that a test hydrates, such as
+`ecrtest.NewModel` (see "Testing a host"). These blocks are excerpts: `example_test.go` does not run them.
+
 ## Modules and versions
 
 | Module | Directory | What it is | Require it when |
