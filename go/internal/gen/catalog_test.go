@@ -113,8 +113,8 @@ func TestCatalog(t *testing.T) {
 	})
 
 	t.Run("queries", func(t *testing.T) {
-		wantRefused(t, minimal[:len(minimal)-1]+", \"queries\": []}",
-			`$.queries: unknown key`)
+		wantRefused(t, minimal[:len(minimal)-1]+", \"queries\": {}}",
+			`$.queries: want an array`)
 	})
 
 	t.Run("system", func(t *testing.T) {
