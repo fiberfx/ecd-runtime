@@ -36,7 +36,7 @@ type ComponentDef struct {
 	CID      CID
 	Name     string
 	Form     Form
-	Size     int  // bytes of the Go value; 0 for a tag
+	Size     int  // bytes of the value in the Ecd Runtime codec; 0 for a tag
 	Pointers bool // the value holds a pointer word: pointer, unsafe.Pointer, string, slice, map, chan, func
 	// or interface, found through struct fields and array elements
 }

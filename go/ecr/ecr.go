@@ -115,6 +115,7 @@ var (
 	ErrBudget  = ecd.ErrBudget
 	ErrQuery   = ecd.ErrQuery
 	ErrOwner   = ecd.ErrOwner
+	ErrValue   = ecd.ErrValue
 
 	ErrConfig = rt.ErrConfig // also every refusal of Options by Open
 	ErrRef    = rt.ErrRef
