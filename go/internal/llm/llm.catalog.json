@@ -1,0 +1,33 @@
+{
+  "format": 1,
+  "package": "llm",
+  "system": "llm",
+  "kinds": [
+    {"code": "ses", "residency": "touched", "budget": 1048576, "doc": "a chat session, resident while it is in use"},
+    {"code": "cnv", "residency": "all", "budget": 0, "doc": "a conversation"},
+    {"code": "arc", "residency": "all", "budget": 0, "doc": "an archived conversation"}
+  ],
+  "components": [
+    {"cid": 1, "name": "session", "form": "component", "type": "text[32]", "doc": "the model that serves the session"},
+    {"cid": 2, "name": "turn", "form": "component", "doc": "one turn of a conversation", "fields": [
+      {"name": "seq", "type": "u32"},
+      {"name": "role", "type": "u8"},
+      {"name": "tokens", "type": "u16"},
+      {"name": "started", "type": "i64"},
+      {"name": "open", "type": "bool"}
+    ]},
+    {"cid": 3, "name": "usage", "form": "component", "doc": "the usage and cost of a turn", "fields": [
+      {"name": "input", "type": "u64"},
+      {"name": "output", "type": "u64"},
+      {"name": "cost", "type": "f64"},
+      {"name": "latency_ms", "type": "i32"},
+      {"name": "drift", "type": "i16"},
+      {"name": "sign", "type": "i8"},
+      {"name": "label", "type": "text[16]"}
+    ]},
+    {"cid": 4, "name": "parent", "form": "component", "type": "eid", "doc": "the entity this one follows"},
+    {"cid": 5, "name": "digest", "form": "component", "type": "bytes[32]", "doc": "a digest of the content"},
+    {"cid": 6, "name": "score", "form": "component", "type": "f32", "doc": "a relevance score"},
+    {"cid": 7, "name": "pinned", "form": "tag", "doc": "pinned by the user"}
+  ]
+}
