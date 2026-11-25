@@ -116,6 +116,7 @@ func (p *printer) iterHandle(k *comp) {
 		"}\n\n")
 	p.cm("QID returns " + qid + ".")
 	p.w("func (", h, ") QID() ", p.q("ecd", "QID"), " { return ", qid, " }\n")
+	p.scanHandle(k)
 }
 
 // rowFields returns the components of the "all" of d that hold a value, in the order of "all".
@@ -252,6 +253,7 @@ func (p *printer) iterHelpers() {
 		p.w("func iterValues[T any, P decoder[T]](e ", eng, ", q ", qid, ", c ", cid, ") (iter.Seq2[", id, ", T], error) {\n",
 			"\treturn iterRows(e, q, func(id ", id, ", v *T) error { return readValue[T, P](e, id, c, v) })\n",
 			"}\n")
+		p.scanHelper()
 	}
 	if read {
 		p.w("\n")
