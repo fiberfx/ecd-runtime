@@ -76,12 +76,8 @@ func Example() {
 	}
 	fmt.Println("seq", res.Seq, "committed", res.Outcomes[0] == ecr.Committed)
 
-	// The eid of the new entity is in the committed deed. Read its value back from the engine.
-	var id ecr.ID
-	err = h.Store.Log(res.Seq-1, func(seq uint64, d ecr.Deed) error {
-		id = d.Ops[0].Entity // the spawn comes first
-		return nil
-	})
+	// The flush answers the eid that it minted for the spawn of u. Read its value back from the engine.
+	id, err := res.Spawned(u)
 	if err != nil {
 		log.Fatal(err)
 	}

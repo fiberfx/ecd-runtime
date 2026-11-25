@@ -101,12 +101,8 @@ func main() {
 	}
 	fmt.Println("seq", res.Seq, "committed", res.Outcomes[0] == ecr.Committed)
 
-	// The eid of the new entity is in the committed deed. Read its value back from the engine.
-	var id ecr.ID
-	err = h.Store.Log(res.Seq-1, func(seq uint64, d ecr.Deed) error {
-		id = d.Ops[0].Entity // the spawn comes first
-		return nil
-	})
+	// The flush answers the eid that it minted for the spawn of u. Read its value back from the engine.
+	id, err := res.Spawned(u)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -276,7 +272,7 @@ Every sentinel of ecr holds the error of the package that defines it, so `errors
 | `ErrConfig` | `Open` with no `Path`, `Catalog` or `Minter`, a `DeedKind` that is not a kind, or an `Engine` func that returns no engine; `Register` with an empty or repeated name. Nothing is made. |
 | `ErrExist` | `Open` with `Create` at a path where anything exists. |
 | `ErrSchema` | `Open` of a file that is not an owner store of the current schema (a v0.5.x store needs `Migrate`). |
-| `ErrRef` | `Flush` of a record that names no entity of its buffer. Every collected buffer's records are dropped. |
+| `ErrRef` | `Flush` of a record that names no entity of its buffer. Every collected buffer's records are dropped. Also `Result.Spawned` of a `Ref` that is not the placeholder of a spawn that the flush committed. |
 | `ErrKind` | `Flush` of an op on an entity whose kind the catalog does not declare, or a spawn eid of another kind than the spawn's. Nothing is committed, and every collected buffer's records are dropped. |
 | `ErrOp` | `Flush` of an op the catalog does not allow: an unknown op code, an undeclared CID, a value of the wrong length (a component's value is exactly its `Size`, a tag's is empty), or ops out of order (an op before the spawn, after the destroy, or a spawn and destroy of one eid in one flush). Nothing is committed, and every collected buffer's records are dropped. The engine's `Hydrate` answers it for such a stored row. |
 | `ErrMiss` | `Engine.Get` of an entity of a Touched kind that is not resident, as after a restart. Read it from the store (see "Reading after a restart"). |
@@ -394,7 +390,27 @@ with an `*IterError` that names the query and the seq at which the engine answer
 
 The limit is decision 27: through `ecr.Open`, an All kind is Cold until an engine is admitted to serve All kinds, so
 `Iter` over an All kind answers `ErrCold` on a host today. `Iter` runs on an engine that a test hydrates, such as
-`ecrtest.NewModel` (see "Testing a host"). These blocks are excerpts: `example_test.go` does not run them.
+`ecrtest.NewModel` (see "Testing a host").
+
+A host loops over the entities of a kind from the owner store with `Scan` of a marked handle. It reads the store and
+no engine, so it works while the kind is Cold. It calls `f` with each entity of the kind that holds the component and a
+copy of its value, in eid order, from one read transaction; `after` resumes a scan after an eid of the kind, and the
+zero `ecr.ID{}` starts at the first. A stored value that does not decode (`ErrValue`), an error of the store and an
+error of `f` stop the scan and are returned. `f` runs inside the store's read transaction, so it must not call the
+store (a read waits forever; a commit lands, and the scan still yields the values at its seq):
+
+```go
+err := llm.Turn.Scan(h.Store, llm.KindCnv, ecr.ID{}, func(id ecr.ID, v llm.TurnValue) error {
+	fmt.Println(id, v.Seq)
+	return nil
+})
+if err != nil {
+	log.Fatal(err)
+}
+```
+
+`h.Store` is an `ecr.Scanner`, the interface that package ecd declares and that a test can implement. These blocks are
+excerpts: `example_test.go` does not run them; `TestScanHost` of `go/ecr/internal/llm` runs a scan on a host.
 
 ## Modules and versions
 
@@ -457,11 +473,13 @@ imports the standard library, `github.com/fiberfx/ecd-id/go` and `github.com/fib
   placeholder `Ref`, valid in the buffer that issued it until the next flush of that buffer.
 - `Runtime.Flush` runs the flush and returns a `Result`: `Seq`, the seq of the committed transaction, or 0 when no deed
   was committed; `Deeds`, the eid of each deed in ord order; and `Outcomes`, the `Outcome` of each deed in ord order.
+  `Result.Spawned(ref)` answers the eid that the flush minted for the spawn whose placeholder is `ref`, when its deed
+  was answered `Committed`, and an error that matches `ErrRef` for every other `Ref`.
 - `Committer` is the owner store as the flush sees it. `Commit(deeds, out)` commits the deeds of one flush in one store
   transaction, writes one `Outcome` per deed into `out` and returns the seq of the transaction. The outcomes are
   `Committed`, `Conflict`, `Refused` and `Unknown`; only a deed answered `Committed` reaches the engine.
 - `ErrConfig` is matched by every error of `New` and `Register`. `ErrRef` is matched by a flush refused because a
-  record names no entity of its buffer.
+  record names no entity of its buffer, and by `Result.Spawned` of a `Ref` that it does not answer.
 
 #### The order of a flush
 
