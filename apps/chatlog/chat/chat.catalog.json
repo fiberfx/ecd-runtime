@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "package": "chat",
+  "detached": true,
+  "kinds": [
+    {"code": "rom", "residency": "touched", "budget": 1048576, "doc": "a room, resident once read", "components": [{"name": "name"}, {"name": "total"}]},
+    {"code": "msg", "residency": "all", "budget": 0, "doc": "a message said in a room", "components": [{"name": "line"}, {"name": "room"}]}
+  ],
+  "components": [
+    {"cid": 1, "name": "name", "form": "component", "type": "text[32]", "doc": "the name of a room"},
+    {"cid": 2, "name": "total", "form": "component", "type": "u32", "doc": "the number of messages said in a room"},
+    {"cid": 3, "name": "line", "form": "component", "query": true, "doc": "what a message says, and its number in its room", "fields": [
+      {"name": "n", "type": "u32"},
+      {"name": "text", "type": "text[64]"}
+    ]},
+    {"cid": 4, "name": "room", "form": "component", "type": "eid", "doc": "the room a message was said in"},
+    {"cid": 5, "name": "pinned", "form": "tag", "doc": "pinned by the user"}
+  ]
+}
