@@ -490,6 +490,14 @@ func (turnHandle) Iter(e ecd.Engine) (iter.Seq2[eid.ID, TurnValue], error) {
 // QID returns QIDTurn.
 func (turnHandle) QID() ecd.QID { return QIDTurn }
 
+// Scan calls f with each entity of kind k in s whose eid is above after and that holds the turn, and a copy of its
+// turn, in eid order, from one read transaction of the store; the zero after starts at the first entity of k. It
+// reads the store and no engine, so it answers a kind that an engine holds Cold. A stored value that does not decode
+// (ecd.ErrValue), an error of s and an error of f stop the scan and are returned; f must not call s.
+func (turnHandle) Scan(s ecd.Scanner, k ecd.Kind, after eid.ID, f func(id eid.ID, v TurnValue) error) error {
+	return scanValues[TurnValue](s, k, CIDTurn, after, f)
+}
+
 // Usage is the handle of the component usage: the usage and cost of a turn.
 var Usage usageHandle
 
@@ -726,6 +734,28 @@ func iterRows[R any](e ecd.Engine, q ecd.QID, read func(id eid.ID, r *R) error) 
 // iterValues runs query q on e and returns a sequence of each entity of its answer and a copy of its component c.
 func iterValues[T any, P decoder[T]](e ecd.Engine, q ecd.QID, c ecd.CID) (iter.Seq2[eid.ID, T], error) {
 	return iterRows(e, q, func(id eid.ID, v *T) error { return readValue[T, P](e, id, c, v) })
+}
+
+// scanValues calls f with each entity of kind k above after in s that holds component c, and a copy of its c, in
+// eid order. A value that does not decode stops the scan with an error that names the entity; an error of s or of
+// f is returned unchanged.
+func scanValues[T any, P decoder[T]](s ecd.Scanner, k ecd.Kind, c ecd.CID, after eid.ID, f func(id eid.ID, v T) error) error {
+	return s.Scan(k, c, after, func(_ uint64, src ecd.RowSource) error {
+		var r ecd.Row
+		for {
+			ok, err := src.Next(&r)
+			if err != nil || !ok {
+				return err
+			}
+			var v T
+			if err := P(&v).Decode(r.Value); err != nil {
+				return fmt.Errorf("llm: scan of %v: %w", r.Entity, err)
+			}
+			if err := f(r.Entity, v); err != nil {
+				return err
+			}
+		}
+	})
 }
 
 // readValue reads component c of id from e into v. Every error of e, ecd.ErrAbsent among them, is returned.
