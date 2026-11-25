@@ -47,9 +47,9 @@ ap70_plant() {
     ap70_rc=$?
     if offline "$ap70_log"; then say "$ap70_id" "$ap70_ex" "module not found" CNM
     elif grep -q '^panic:' "$ap70_log"; then
-      say "$ap70_id" "$ap70_ex" "rc=$ap70_rc, $ap70_test panicked: $(why_of "$ap70_log")" CNM
+      say "$ap70_id" "$ap70_ex" "rc=$ap70_rc, $ap70_test panicked: $(why_of "$ap70_log" | tr -d '\\')" CNM
     elif grep -q -E "^ *--- FAIL: $ap70_name " "$ap70_log"; then
-      say "$ap70_id" "$ap70_ex" "rc=$ap70_rc, $ap70_name FAIL: $(why_of "$ap70_log")" KILLED
+      say "$ap70_id" "$ap70_ex" "rc=$ap70_rc, $ap70_name FAIL: $(why_of "$ap70_log" | tr -d '\\')" KILLED
     elif grep -q "^--- FAIL: $ap70_test " "$ap70_log"; then
       say "$ap70_id" "$ap70_ex" "rc=$ap70_rc, $ap70_test FAIL, but not in $ap70_name" SURVIVED
     elif [ $ap70_rc -eq 0 ] && grep -q "^--- PASS: $ap70_test " "$ap70_log"; then
@@ -104,6 +104,13 @@ ap70_boundrow() {
   rm -rf "$ap70_pd" /tmp/rows/AP-04.gen
 }
 
+# ap70_go id expect test: go_row of one test of chatlog; a run whose paths leave out apps measures nothing (CNM).
+ap70_go() {
+  sel "$1" ap70 || return 0
+  if [ ! -d /w/apps ]; then say "$1" "$2" "/w/apps is absent: the run's paths leave out apps" CNM; return 0; fi
+  go_row "$1" ap70 "$2" /w/apps test -run "^$3\$" ./chatlog/
+}
+
 # ap70_run: AP-05, the binary run end to end on a new store.
 ap70_run() {
   sel AP-05 ap70 || return 0
@@ -137,17 +144,17 @@ ap70_run() {
   rm -rf "$ap70_d"
 }
 
-go_row AP-01 ap70 "TestChatlog rc=0" /w/apps test -run '^TestChatlog$' ./chatlog/
+ap70_go AP-01 "TestChatlog rc=0" TestChatlog
 ap70_plant AP-01p "TestChatlog fails on the plant" TestChatlog "" chatlog/main.go \
   's/^\tchat\.Total\.Set(b, ecr\.Of(rid), total)$/\t_ = total/'
 ap70_plant AP-01q "TestChatlog fails on the plant" TestChatlog "" chatlog/main.go \
   's/^\t\t\treturn a\.h\.Engine\.Hydrate(k, at, src)$/\t\t\treturn nil/'
-go_row AP-02 ap70 "TestRefusals rc=0" /w/apps test -run '^TestRefusals$' ./chatlog/
+ap70_go AP-02 "TestRefusals rc=0" TestRefusals
 ap70_plant AP-02p "TestRefusals/replay fails on the plant" TestRefusals replay chatlog/main.go \
   's/^\t\tif v\.Total != counts\[id\] {$/\t\tif false {/'
 ap70_plant AP-02q "TestRefusals/system fails on the plant" TestRefusals system chatlog/main.go \
   's/^\tcase !ok || sys\.Class() != eid\.Detached:$/\tcase !ok:/'
-go_row AP-03 ap70 "TestIter rc=0" /w/apps test -run '^TestIter$' ./chatlog/
+ap70_go AP-03 "TestIter rc=0" TestIter
 ap70_plant AP-03p "TestIter fails on the plant" TestIter "" chatlog/main.go \
   's/chat\.Line\.Scan(a\.h\.Store, chat\.KindMsg(a\.sys),/chat.Line.Scan(a.h.Store, chat.KindRom(a.sys),/'
 ap70_boundrow AP-04 "imports bounded; chat_gen.go is go generate's output" "" ""

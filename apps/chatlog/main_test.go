@@ -103,6 +103,7 @@ func TestChatlog(t *testing.T) {
 func TestRefusals(t *testing.T) {
 	c := newTool(t)
 	room, msgs := world(c)
+	empty := c.ok("open", "empty")[1]
 	other, err := ecr.FromParts(sys, chat.CodeRom, 1795271400000, 9, 1)
 	if err != nil {
 		t.Fatal(err)
@@ -149,6 +150,8 @@ func TestRefusals(t *testing.T) {
 			t.Fatal(err)
 		}
 		chat.Total.Set(b, ecr.Of(rid), 9) // a total that no message gives
+		eid0, _ := ecr.ParseString(empty)
+		chat.Total.Set(b, ecr.Of(eid0), 5) // a room with no message
 		if _, err := h.Flush(); err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +159,7 @@ func TestRefusals(t *testing.T) {
 			t.Fatal(err)
 		}
 		code, out, errs := c.run("replay")
-		if code != 1 || !strings.Contains(out, "total 9 replayed 2") || !strings.Contains(errs, "total 9, replayed 2") {
+		if code != 1 || !strings.Contains(out, "total 9 replayed 2") || !strings.Contains(errs, "total 9, replayed 2") || !strings.Contains(errs, "total 5, replayed 0") {
 			t.Fatalf("replay: exit %d stdout %q stderr %q", code, out, errs)
 		}
 	})

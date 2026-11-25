@@ -249,6 +249,9 @@ func (a *app) replay() error {
 	err := a.h.Store.Log(0, func(s uint64, d ecr.Deed) error {
 		seq, deeds = s, deeds+1
 		for _, op := range d.Ops {
+			if op.Code == ecr.OpSpawn && op.Entity.Kind() == chat.CodeRom {
+				counts[op.Entity] += 0 // a room with no message recounts to 0
+			}
 			if op.Code == ecr.OpSet && op.CID == chat.CIDRoom && op.Entity.Kind() == chat.CodeMsg {
 				var room chat.RoomValue
 				if err := room.Decode(op.Value); err != nil {
