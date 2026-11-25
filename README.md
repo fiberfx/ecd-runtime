@@ -11,12 +11,12 @@ the contract it implements is the KAN home's `specs/ecd_runtime/ecd_runtime.spec
 ## Install
 
 ```sh
-go get github.com/fiberfx/ecd-runtime/go/ecr@v0.6.0
+go get github.com/fiberfx/ecd-runtime/go/ecr@v0.7.0
 ```
 
 Go 1.27.4 or later. A host imports one package, `github.com/fiberfx/ecd-runtime/go/ecr`, and requires one module:
 
-    require github.com/fiberfx/ecd-runtime/go/ecr v0.6.0
+    require github.com/fiberfx/ecd-runtime/go/ecr v0.7.0
 
 The facade brings in the main module, the SQLite store and the id package at the versions it was released with.
 
@@ -404,8 +404,8 @@ The limit is decision 27: through `ecr.Open`, an All kind is Cold until an engin
 | `github.com/fiberfx/ecd-runtime/go` | `go/` | The seam package `ecd`, the runtime `rt` and the engine Jacquard. No SQLite driver. | You build a Runtime over your own `Committer`, or an engine, without the store. |
 | `github.com/fiberfx/ecd-runtime/go/sqlite` | `go/sqlite/` | The owner store in one SQLite file (pure-Go driver `modernc.org/sqlite`). | You wire `rt` and the store yourself. |
 
-The current release is v0.6.0 of all three (tags `go/v0.6.0`, `go/sqlite/v0.6.0`, `go/ecr/v0.6.0`). If you do not use
-`ecr`, upgrade `go` and `go/sqlite` together: `go/sqlite` v0.6.0 requires `go` v0.6.0.
+The current release is v0.7.0 of all three (tags `go/v0.7.0`, `go/sqlite/v0.7.0`, `go/ecr/v0.7.0`). If you do not use
+`ecr`, upgrade `go` and `go/sqlite` together: `go/sqlite` v0.7.0 requires `go` v0.7.0.
 
 ## Reference
 
@@ -457,11 +457,13 @@ imports the standard library, `github.com/fiberfx/ecd-id/go` and `github.com/fib
   placeholder `Ref`, valid in the buffer that issued it until the next flush of that buffer.
 - `Runtime.Flush` runs the flush and returns a `Result`: `Seq`, the seq of the committed transaction, or 0 when no deed
   was committed; `Deeds`, the eid of each deed in ord order; and `Outcomes`, the `Outcome` of each deed in ord order.
+  `Result.Spawned(ref)` answers the eid that the flush minted for the spawn whose placeholder is `ref`, when its deed
+  was answered `Committed`, and an error that matches `ErrRef` for every other `Ref`.
 - `Committer` is the owner store as the flush sees it. `Commit(deeds, out)` commits the deeds of one flush in one store
   transaction, writes one `Outcome` per deed into `out` and returns the seq of the transaction. The outcomes are
   `Committed`, `Conflict`, `Refused` and `Unknown`; only a deed answered `Committed` reaches the engine.
 - `ErrConfig` is matched by every error of `New` and `Register`. `ErrRef` is matched by a flush refused because a
-  record names no entity of its buffer.
+  record names no entity of its buffer, and by `Result.Spawned` of a `Ref` that it does not answer.
 
 #### The order of a flush
 
@@ -517,8 +519,8 @@ func tick(cfg rt.Config, mover ecd.Kind, pos ecd.CID, known eid.ID) (rt.Result, 
   `Committer`, and the tests of package `rt` use a fake.
 - A record names an entity by its eid or by a placeholder of its own buffer. No hot handle for an entity exists.
 - The package runs no scheduler, no parallel stage and no observer. The host calls `Flush` at its sync points.
-- The eid of a spawned entity is not handed back to the system after the flush. It is found in the deeds that the
-  `Committer` receives.
+- After the flush, `Result.Spawned(ref)` returns the eid minted for the spawn whose placeholder is `ref` when its deed
+  was answered `Committed`, and refuses any other `Ref` with `ErrRef`.
 - The package does not rebuild a stale engine: `Flush` returns the engine's error.
 - A deed answered `Conflict`, `Refused` or `Unknown` returns no error, and its records are not listed by stage;
   `Result.Outcomes` names the deed by its ord.
@@ -528,7 +530,7 @@ func tick(cfg rt.Config, mover ecd.Kind, pos ecd.CID, known eid.ID) (rt.Result, 
 The module `github.com/fiberfx/ecd-runtime/go/sqlite`, in `go/sqlite/`, package `sqlite`, is an owner store in one
 SQLite file. A host passes it to the Runtime as `rt.Config.Committer`, and after a restart it brings a fresh engine to
 the seq of the committed history. The module has its own tags, `go/sqlite/vX.Y.Z`; `go/sqlite/v0.4.0` is the first. It
-requires `github.com/fiberfx/ecd-runtime/go` v0.6.0, `github.com/fiberfx/ecd-id/go` v0.8.0 and the pure-Go driver
+requires `github.com/fiberfx/ecd-runtime/go` v0.7.0, `github.com/fiberfx/ecd-id/go` v0.8.0 and the pure-Go driver
 `modernc.org/sqlite` v1.37.0. Inside this repository a `replace` directive points the requirement on the main module at
 the parent directory. The main module `go/` does not require the driver.
 
@@ -724,10 +726,10 @@ func run(path string, create bool, cat *ecr.Catalog, m ecr.Minter, deedKind ecr.
 
 A host requires the one module:
 
-    require github.com/fiberfx/ecd-runtime/go/ecr v0.6.0
+    require github.com/fiberfx/ecd-runtime/go/ecr v0.7.0
 
-The module requires `github.com/fiberfx/ecd-id/go` v0.8.0, `github.com/fiberfx/ecd-runtime/go` v0.6.0 and
-`github.com/fiberfx/ecd-runtime/go/sqlite` v0.6.0, and its build graph is that of `go/sqlite`. Inside this repository
+The module requires `github.com/fiberfx/ecd-id/go` v0.8.0, `github.com/fiberfx/ecd-runtime/go` v0.7.0 and
+`github.com/fiberfx/ecd-runtime/go/sqlite` v0.7.0, and its build graph is that of `go/sqlite`. Inside this repository
 `replace` directives point the requirements on the main module and on `go/sqlite` at their directories. The refusals
 of package `eid` and its lease and minting types are not in `ecr`, which gives the parse and build functions of an eid
 (`Parse`, `ParseString`, `FromBytes`, `FromParts`, `ParseCode` and `MustCode`), and a `Minter` is passed in.

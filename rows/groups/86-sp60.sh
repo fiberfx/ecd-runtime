@@ -3,7 +3,7 @@
 # them on the buffer's next deed and the flush that empties the buffer resets them; that the owner store keeps them
 # in deed.trace_id and deed.span_id, NULL for the zero values, and Log returns them; that Open refuses any user
 # version but 2; that Migrate brings a store of user version 1 to 2; and that the nested module go/sqlite requires
-# the main module at v0.6.0 and replaces it by its parent directory.
+# the main module at v0.7.0 and replaces it by its parent directory.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #
@@ -35,7 +35,7 @@
 #   SP-05q   plant: Migrate alters a store of user version 2 (sqlite/migrate.go; TestMigrate, case current)
 #   SP-05r   plant: Migrate skips the journal mode check (sqlite/migrate.go; TestMigrate, case refused)
 #   SP-05s   plant: Migrate adds trace_id without its length check (sqlite/migrate.go; TestMigrate, case checks)
-#   SP-06    go/sqlite/go.mod requires github.com/fiberfx/ecd-runtime/go v0.6.0 and replaces it by ../
+#   SP-06    go/sqlite/go.mod requires github.com/fiberfx/ecd-runtime/go v0.7.0 and replaces it by ../
 #
 # Rows SP-03, SP-04 and SP-05 and their plants load the driver and its modules from the module inputs, as the rows of
 # group sq40 do. The replace in go/sqlite/go.mod makes every build of go/sqlite here compile against the main module
@@ -169,9 +169,9 @@ sp60_plant SP-05s "TestMigrate/checks fails on the plant" sqlite . TestMigrate c
   's/ADD COLUMN trace_id BLOB CHECK (trace_id IS NULL OR length(trace_id) = 16);$/ADD COLUMN trace_id BLOB;/'
 
 if sel SP-06 sp60; then
-  sp60_req=$(grep -cE '^[[:space:]]+github\.com/fiberfx/ecd-runtime/go v0\.6\.0$' /w/go/sqlite/go.mod)
+  sp60_req=$(grep -cE '^[[:space:]]+github\.com/fiberfx/ecd-runtime/go v0\.7\.0$' /w/go/sqlite/go.mod)
   sp60_rep=$(grep -cxF 'replace github.com/fiberfx/ecd-runtime/go => ../' /w/go/sqlite/go.mod)
   if [ "$sp60_req" -eq 1 ] && [ "$sp60_rep" -eq 1 ]; then
-    say SP-06 "go/sqlite requires go v0.6.0 and replaces it by ../" "require 1, replace 1" PASS
-  else say SP-06 "go/sqlite requires go v0.6.0 and replaces it by ../" "require $sp60_req, replace $sp60_rep" FAIL; fi
+    say SP-06 "go/sqlite requires go v0.7.0 and replaces it by ../" "require 1, replace 1" PASS
+  else say SP-06 "go/sqlite requires go v0.7.0 and replaces it by ../" "require $sp60_req, replace $sp60_rep" FAIL; fi
 fi
