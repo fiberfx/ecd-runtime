@@ -624,6 +624,128 @@ func (pinnedHandle) Remove(b *rt.Buffer, r rt.Ref) { b.Unset(r, CIDPinned) }
 // CID returns CIDPinned.
 func (pinnedHandle) CID() ecd.CID { return CIDPinned }
 
+// SesEntity is a whole entity of the kind ses: the value of each component the kind lists, in its order, and for
+// each optional one a Has field, true when the entity holds it; an absent optional component reads as its zero value.
+type SesEntity struct {
+	Session SessionValue
+}
+
+// SpawnSes records in b a spawn of an entity of the kind ses and then a set of each component of v, in the kind's
+// order, an optional one only when its Has field is true, and returns the entity's placeholder.
+func SpawnSes(b *rt.Buffer, v SesEntity) rt.Ref {
+	r := b.Spawn(KindSes)
+	Session.Set(b, r, v.Session)
+	return r
+}
+
+// GetSes reads the whole entity id of the kind ses from e. An id of another kind answers an error that matches
+// ecd.ErrKind; an entity that lacks a required component answers false and nil; every other error of e is returned with false.
+func GetSes(e ecd.Engine, id eid.ID) (SesEntity, bool, error) {
+	var v SesEntity
+	if id.System() != System || id.Kind() != CodeSes {
+		return v, false, fmt.Errorf("llm: GetSes: %v is not of the kind ses: %w", id, ecd.ErrKind)
+	}
+	var (
+		ok  bool
+		err error
+	)
+	if v.Session, ok, err = Session.Get(e, id); !ok || err != nil {
+		return SesEntity{}, false, err
+	}
+	return v, true, nil
+}
+
+// CnvEntity is a whole entity of the kind cnv: the value of each component the kind lists, in its order, and for
+// each optional one a Has field, true when the entity holds it; an absent optional component reads as its zero value.
+type CnvEntity struct {
+	Turn      TurnValue
+	Usage     UsageValue
+	Parent    ParentValue
+	HasParent bool
+}
+
+// SpawnCnv records in b a spawn of an entity of the kind cnv and then a set of each component of v, in the kind's
+// order, an optional one only when its Has field is true, and returns the entity's placeholder.
+func SpawnCnv(b *rt.Buffer, v CnvEntity) rt.Ref {
+	r := b.Spawn(KindCnv)
+	Turn.Set(b, r, v.Turn)
+	Usage.Set(b, r, v.Usage)
+	if v.HasParent {
+		Parent.Set(b, r, v.Parent)
+	}
+	return r
+}
+
+// GetCnv reads the whole entity id of the kind cnv from e. An id of another kind answers an error that matches
+// ecd.ErrKind; an entity that lacks a required component answers false and nil; every other error of e is returned with false.
+func GetCnv(e ecd.Engine, id eid.ID) (CnvEntity, bool, error) {
+	var v CnvEntity
+	if id.System() != System || id.Kind() != CodeCnv {
+		return v, false, fmt.Errorf("llm: GetCnv: %v is not of the kind cnv: %w", id, ecd.ErrKind)
+	}
+	var (
+		ok  bool
+		err error
+	)
+	if v.Turn, ok, err = Turn.Get(e, id); !ok || err != nil {
+		return CnvEntity{}, false, err
+	}
+	if v.Usage, ok, err = Usage.Get(e, id); !ok || err != nil {
+		return CnvEntity{}, false, err
+	}
+	if v.Parent, v.HasParent, err = Parent.Get(e, id); err != nil {
+		return CnvEntity{}, false, err
+	}
+	return v, true, nil
+}
+
+// ArcEntity is a whole entity of the kind arc: the value of each component the kind lists, in its order, and for
+// each optional one a Has field, true when the entity holds it; an absent optional component reads as its zero value.
+type ArcEntity struct {
+	Turn      TurnValue
+	Digest    DigestValue
+	HasDigest bool
+	Score     ScoreValue
+	HasScore  bool
+}
+
+// SpawnArc records in b a spawn of an entity of the kind arc and then a set of each component of v, in the kind's
+// order, an optional one only when its Has field is true, and returns the entity's placeholder.
+func SpawnArc(b *rt.Buffer, v ArcEntity) rt.Ref {
+	r := b.Spawn(KindArc)
+	Turn.Set(b, r, v.Turn)
+	if v.HasDigest {
+		Digest.Set(b, r, v.Digest)
+	}
+	if v.HasScore {
+		Score.Set(b, r, v.Score)
+	}
+	return r
+}
+
+// GetArc reads the whole entity id of the kind arc from e. An id of another kind answers an error that matches
+// ecd.ErrKind; an entity that lacks a required component answers false and nil; every other error of e is returned with false.
+func GetArc(e ecd.Engine, id eid.ID) (ArcEntity, bool, error) {
+	var v ArcEntity
+	if id.System() != System || id.Kind() != CodeArc {
+		return v, false, fmt.Errorf("llm: GetArc: %v is not of the kind arc: %w", id, ecd.ErrKind)
+	}
+	var (
+		ok  bool
+		err error
+	)
+	if v.Turn, ok, err = Turn.Get(e, id); !ok || err != nil {
+		return ArcEntity{}, false, err
+	}
+	if v.Digest, v.HasDigest, err = Digest.Get(e, id); err != nil {
+		return ArcEntity{}, false, err
+	}
+	if v.Score, v.HasScore, err = Score.Get(e, id); err != nil {
+		return ArcEntity{}, false, err
+	}
+	return v, true, nil
+}
+
 // Billed is the declared query billed: turns with their usage, not pinned.
 var Billed billedQuery
 

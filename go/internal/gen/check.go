@@ -65,6 +65,7 @@ func check(c *Catalog) []Refusal {
 		}
 	}
 	rs = append(rs, checkKinds(c.Kinds)...)
+	rs = append(rs, checkKindComponents(c)...)
 	crs, named, texts := checkComponents(c)
 	qrs, qnamed := checkQueries(c)
 	rs = append(rs, crs...)
@@ -148,6 +149,51 @@ func checkKinds(kinds []Kind) []Refusal {
 		}
 		if reason := docReason(k.Doc); reason != "" {
 			rs = append(rs, Refusal{p + ".doc", reason})
+		}
+	}
+	return rs
+}
+
+// checkKindComponents checks the components that each kind lists: each is declared, holds a value and is listed once,
+// and the fields of the kind's entity type, a value field for each and a Has field for each optional one, are distinct.
+func checkKindComponents(c *Catalog) []Refusal {
+	var rs []Refusal
+	forms := make(map[string]string, len(c.Components)) // the name of each component and tag to its form
+	for _, comp := range c.Components {
+		if _, ok := forms[comp.Name]; !ok {
+			forms[comp.Name] = comp.Form
+		}
+	}
+	for i, k := range c.Kinds {
+		seen := make(map[string]int, len(k.Components))
+		fields := make(map[string]string, 2*len(k.Components)) // each field of the entity type to its component
+		for j, m := range k.Components {
+			name := m.Name
+			p := fmt.Sprintf("$.kinds[%d].components[%d].name", i, j)
+			form, declared := forms[name]
+			switch {
+			case !declared:
+				rs = append(rs, Refusal{p, fmt.Sprintf("component %q is not declared", name)})
+			case form == "tag":
+				rs = append(rs, Refusal{p, fmt.Sprintf("%q is a tag: a kind lists components that hold a value", name)})
+			default:
+				if at, dup := seen[name]; dup {
+					rs = append(rs, Refusal{p, fmt.Sprintf("component %q is listed at $.kinds[%d].components[%d]", name, i, at)})
+					continue
+				}
+				seen[name] = j
+				own := []string{GoName(name)}
+				if m.Optional {
+					own = append(own, "Has"+GoName(name))
+				}
+				for _, f := range own {
+					if other, held := fields[f]; held {
+						rs = append(rs, Refusal{p, fmt.Sprintf("component %q makes the field %s, which component %q makes", name, f, other)})
+					} else {
+						fields[f] = name
+					}
+				}
+			}
 		}
 	}
 	return rs
@@ -442,6 +488,20 @@ func collisions(c *Catalog, named, qnamed []int, texts *[MaxTextN + 1]bool) []Re
 		if clash != "" {
 			rs = append(rs, Refusal{fmt.Sprintf("$.queries[%d].name", i),
 				fmt.Sprintf("name %q makes the identifier %s, which another declaration of the file holds", q.Name, clash)})
+		}
+	}
+	// the identifiers of the whole-entity types come last, so a clash is refused at the kind that lists components
+	for i, k := range c.Kinds {
+		if len(k.Components) == 0 || !validKind(k.Code) {
+			continue
+		}
+		K := upperFirst(k.Code)
+		for _, id := range []string{K + "Entity", "Spawn" + K, "Get" + K} {
+			if !hold(id) {
+				rs = append(rs, Refusal{fmt.Sprintf("$.kinds[%d].components", i),
+					fmt.Sprintf("kind %q makes the identifier %s, which another declaration of the file holds", k.Code, id)})
+				break
+			}
 		}
 	}
 	return rs

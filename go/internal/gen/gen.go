@@ -231,6 +231,7 @@ func (p *printer) emit() {
 	for i := range p.comps {
 		p.handle(&p.comps[i])
 	}
+	p.kindEntities()
 	for i := range p.queries {
 		if p.queries[i].decl != nil {
 			p.query(&p.queries[i])
