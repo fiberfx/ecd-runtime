@@ -8,7 +8,7 @@
 # HAVE_GO.
 #
 #   TH-01    go test -run '^TestCatalog$' ./internal/gen/: the llm catalog and a detached catalog are read; an unknown
-#            key, a repeated key, trailing data, the key queries, a detached or reserved system code, a repeated or
+#            key, a repeated key, trailing data, a key queries that is not an array, a detached or reserved system code, a repeated or
 #            zero cid, a reserved package name, the kind sys, an unknown field type and a name that collides are
 #            refused with their path and reason, sorted
 #   TH-01p   plant: the strict pass records no unknown key (internal/gen/strict.go; TestCatalog, case unknownkey)
@@ -31,6 +31,19 @@
 #   TH-04p   plant: getValue answers absent for every error (internal/llm/llm_gen.go; TestHandles, case model/miss)
 #   TH-04q   plant: Pinned.Add records an unset (internal/llm/llm_gen.go; TestHandles, case model/spawn)
 #   TH-04r   plant: Turn.Set records under CIDUsage (internal/llm/llm_gen.go; TestHandles, case jacquard/spawn)
+#   TH-10    go test -run '^TestQueries$' ./internal/gen/ ./internal/llm/: a catalog with a marked handle and a declared
+#            query generates both with QIDs from 0, and a query on a Touched kind, an undeclared kind or an undeclared
+#            component is refused with its path and reason
+#   TH-10p   plant: a query on a Touched kind is accepted (internal/gen/check.go; TestQueries, case touched)
+#   TH-10q   plant: a query on an undeclared kind is accepted (internal/gen/check.go; TestQueries, case undeclaredkind)
+#   TH-10r   plant: a query of an undeclared component is accepted (internal/gen/check.go; TestQueries, case undeclaredcomponent)
+#   TH-11    go test -run '^TestIter$' ./internal/llm/: Iter of a marked handle and of a declared query yields every
+#            Warm entity once with its value or row, in the engine's order, on model and jacquard; a Cold kind answers
+#            ErrCold and an undeclared query ErrQuery before any yield; a flush in the loop body panics with *IterError
+#   TH-11e   the same test of the facade mode: go test -run '^TestIter$' ./internal/llm/ in go/ecr
+#   TH-11p   plant: Iter ignores the error of the query (internal/llm/llm_gen.go; TestIter, case model/cold)
+#   TH-11q   plant: a step never sees the engine move (internal/llm/llm_gen.go; TestIter, case model/moved)
+#   TH-11r   plant: the sequence runs backwards (internal/llm/llm_gen.go; TestIter, case jacquard/turn)
 #
 # The facade-mode package go/ecr/internal/llm is tested by FC-01 (go test ./... in go/ecr) and its imports by FC-03.
 #
@@ -133,3 +146,20 @@ th60_plant TH-04q "TestHandles/model/spawn fails on the plant" ./internal/llm/ T
   internal/llm/llm_gen.go 's/{ b\.Set(r, CIDPinned, nil) }$/{ b.Unset(r, CIDPinned) }/'
 th60_plant TH-04r "TestHandles/jacquard/spawn fails on the plant" ./internal/llm/ TestHandles jacquard/spawn \
   internal/llm/llm_gen.go 's/b\.Set(r, CIDTurn, v\.Append(a\[:0\]))/b.Set(r, CIDUsage, v.Append(a[:0]))/'
+
+go_row TH-10 th60 "TestQueries rc=0" /w/go test -run '^TestQueries$' ./internal/gen/ ./internal/llm/
+th60_plant TH-10p "TestQueries/touched fails on the plant" ./internal/gen/ TestQueries touched \
+  internal/gen/check.go 's/case kind\.Residency == "touched":/case kind.Residency == "Touched":/'
+th60_plant TH-10q "TestQueries/undeclaredkind fails on the plant" ./internal/gen/ TestQueries undeclaredkind \
+  internal/gen/check.go 's/case !kindDeclared:/case !kindDeclared \&\& false:/'
+th60_plant TH-10r "TestQueries/undeclaredcomponent fails on the plant" ./internal/gen/ TestQueries undeclaredcomponent \
+  internal/gen/check.go 's/case !compDeclared:/case !compDeclared \&\& false:/'
+
+go_row TH-11 th60 "TestIter rc=0" /w/go test -run '^TestIter$' ./internal/llm/
+go_row TH-11e th60 "TestIter of the facade mode rc=0" /w/go/ecr test -run '^TestIter$' ./internal/llm/
+th60_plant TH-11p "TestIter/model/cold fails on the plant" ./internal/llm/ TestIter model/cold \
+  internal/llm/llm_gen.go 's/if err := e\.Query(q, nil, &a); err != nil {/if err := e.Query(q, nil, \&a); false \&\& err != nil {/'
+th60_plant TH-11q "TestIter/model/moved fails on the plant" ./internal/llm/ TestIter model/moved \
+  internal/llm/llm_gen.go 's/if now := e\.At(); now != at {/if now := e.At(); now < at {/'
+th60_plant TH-11r "TestIter/jacquard/turn fails on the plant" ./internal/llm/ TestIter jacquard/turn \
+  internal/llm/llm_gen.go 's/for _, id := range a\.IDs {/for i := range a.IDs { id := a.IDs[len(a.IDs)-1-i]/'
