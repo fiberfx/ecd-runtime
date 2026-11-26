@@ -2,26 +2,34 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"errors"
+	"io"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	eid "github.com/fiberfx/ecd-id/go"
 	"github.com/fiberfx/ecd-runtime/apps/chatlog/chat"
 	"github.com/fiberfx/ecd-runtime/go/ecr"
 	"github.com/fiberfx/ecd-runtime/go/ecr/ecrtest"
+	_ "modernc.org/sqlite" // the database/sql driver "sqlite", to turn a store into one of user version 1
 )
 
 // sys is the detached system of the tests.
 var sys = ecr.MustCode("3cl")
 
-// countMinter mints the eids of sys at one fixed time, writer 1, by a count that one test shares across its runs.
-type countMinter struct{ count uint32 }
+// countMinter mints the eids of its system at one fixed time, writer 1, by a count that one test shares across its
+// runs. run sets sys to the code that chatlog parsed from -sys.
+type countMinter struct {
+	sys   ecr.Code
+	count uint32
+}
 
 func (m *countMinter) Mint(kind ecr.Code) (ecr.ID, error) {
 	m.count++
-	return ecr.FromParts(sys, kind, 1795271400000, 1, m.count)
+	return ecr.FromParts(m.sys, kind, 1795271400000, 1, m.count)
 }
 
 // tool runs chatlog commands on one store with one Minter, as a user runs the binary again and again.
@@ -29,16 +37,21 @@ type tool struct {
 	t    *testing.T
 	path string
 	m    *countMinter
+	args []string // flags put before every command, as -sys CODE
 }
 
 func newTool(t *testing.T) *tool {
-	return &tool{t: t, path: filepath.Join(t.TempDir(), "chat.db"), m: &countMinter{}}
+	return &tool{t: t, path: filepath.Join(t.TempDir(), "chat.db"), m: &countMinter{sys: sys}}
 }
 
 // run runs one command and returns its exit code, stdout and stderr.
 func (c *tool) run(args ...string) (int, string, string) {
 	var out, errw bytes.Buffer
-	code := run(append([]string{"-store", c.path}, args...), &out, &errw, func(ecr.Code) (ecr.Minter, error) { return c.m, nil })
+	flags := append([]string{"-store", c.path}, c.args...)
+	code := run(append(flags, args...), &out, &errw, func(s ecr.Code) (ecr.Minter, error) {
+		c.m.sys = s
+		return c.m, nil
+	})
 	return code, out.String(), errw.String()
 }
 
@@ -224,3 +237,122 @@ func TestIter(t *testing.T) {
 type noRows struct{}
 
 func (noRows) Next(*ecr.Row) (bool, error) { return false, nil }
+
+// userVersion reads the user_version of the SQLite file at path.
+func userVersion(t *testing.T, db *sql.DB) int {
+	t.Helper()
+	var v int
+	if err := db.QueryRow("PRAGMA user_version").Scan(&v); err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+// TestMigrate holds that chatlog migrates a store of user version 1, whose deed table lacks trace_id and span_id,
+// and then works on it with its data intact; Open alone refuses such a store with ErrSchema (row AP-06).
+func TestMigrate(t *testing.T) {
+	c := newTool(t)
+	room, msgs := world(c)
+	_, before, _ := c.run("journal")
+
+	db, err := sql.Open("sqlite", c.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{"ALTER TABLE deed DROP COLUMN trace_id", "ALTER TABLE deed DROP COLUMN span_id", "PRAGMA user_version = 1"} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+	if v := userVersion(t, db); v != 1 {
+		t.Fatalf("user_version %d after the downgrade, want 1", v)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	code, out, errs := c.run("show", room)
+	if code != 0 || out != "room "+room+" lobby total 2\n" {
+		t.Fatalf("show on a store of user_version 1: exit %d stdout %q stderr %q", code, out, errs)
+	}
+	if code, out, errs := c.run("journal"); code != 0 || out != before {
+		t.Fatalf("journal after the migration: exit %d stdout %q, want %q, stderr %q", code, out, before, errs)
+	}
+	if got := c.ok("show", msgs[0]); got[0] != "msg" || got[len(got)-1] != "world" {
+		t.Fatalf("show msg after the migration: %q", got)
+	}
+	db, err = sql.Open("sqlite", c.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if v := userVersion(t, db); v != 2 {
+		t.Fatalf("user_version %d after the migration, want 2", v)
+	}
+}
+
+// TestOtherSystem holds that a detached system code other than 3cl works end to end and that every eid carries it;
+// a code that is not detached is refused (row AP-07).
+//
+// The codes are read from ecd-id go v0.11.0: id.go (Code.Class) classes the first character, with the alphabet
+// "234567abc...", as 2 reserved, 3 to 7 detached, a letter registered; so "7ab" is detached (the last detached
+// first character; detached_test.go keeps "3ab" the same way), "2ab" is reserved and "llm" is registered.
+func TestOtherSystem(t *testing.T) {
+	const other = "7ab"
+	if c, ok := ecr.ParseCode(other); !ok || c.Class() != eid.Detached || c == sys {
+		t.Fatalf("%s: class %v ok %v, want a detached code other than 3cl", other, c.Class(), ok)
+	}
+	c := newTool(t)
+	c.args = []string{"-sys", other}
+	check := func(what, s string, kind ecr.Code) {
+		t.Helper()
+		id, err := ecr.ParseString(s)
+		if err != nil {
+			t.Fatalf("%s %q: %v", what, s, err)
+		}
+		if id.System().String() != other || id.Kind() != kind {
+			t.Fatalf("%s %q: system %s kind %s, want %s %s", what, s, id.System(), id.Kind(), other, kind)
+		}
+	}
+	room := c.ok("open", "lobby")
+	check("open", room[1], chat.CodeRom)
+	msg := c.ok("say", room[1], "hello")
+	check("say msg", msg[1], chat.CodeMsg)
+	check("say room", msg[3], chat.CodeRom)
+	if got := strings.Join(c.ok("show", room[1]), " "); got != "room "+room[1]+" lobby total 1" {
+		t.Fatalf("show room: %q", got)
+	}
+	if got := c.ok("show", msg[1]); got[0] != "msg" || got[1] != msg[1] {
+		t.Fatalf("show msg: %q", got)
+	}
+	for _, bad := range []string{"llm", "2ab", "zz", "7a!"} {
+		t.Run("refuse-"+bad, func(t *testing.T) {
+			var out, errw bytes.Buffer
+			args := []string{"-sys", bad, "-store", c.path, "journal"}
+			if code := run(args, &out, &errw, func(ecr.Code) (ecr.Minter, error) { return c.m, nil }); code != 2 || !strings.Contains(errw.String(), "is not a detached system code") {
+				t.Fatalf("exit %d stderr %q, want 2 and %q", code, errw.String(), "is not a detached system code")
+			}
+		})
+	}
+}
+
+// TestMessageServed holds that message answers from an engine that serves msg: a message the engine does not hold
+// is absent, not found (row AP-08).
+func TestMessageServed(t *testing.T) {
+	e, err := ecrtest.NewModel(chat.Catalog(sys))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+	if err := e.Hydrate(chat.KindMsg(sys), 0, noRows{}); err != nil { // msg is an All kind: Warm once hydrated, so the model serves it
+		t.Fatal(err)
+	}
+	a := &app{h: &ecr.Host{Engine: e}, sys: sys, out: io.Discard}
+	id, err := ecr.FromParts(sys, chat.CodeMsg, 1795271400000, 1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := a.message(id); !errors.Is(err, ecr.ErrAbsent) {
+		t.Fatalf("message of an absent id on the model: %v, want ErrAbsent", err)
+	}
+}
