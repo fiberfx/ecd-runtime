@@ -6,6 +6,8 @@ A host author copies a working shape from here. Each application is a program wr
 not see it. It reaches the runtime through a `replace` of `../go`, `../go/ecr` and `../go/sqlite`, so it builds at
 every commit of the repository; a host of its own writes the plain requirement `github.com/fiberfx/ecd-runtime/go/ecr`
 at a released version instead. Rows AP-01 to AP-05 (`rows/groups/93-ap70.sh`) run it.
+A host outside the repository requires `github.com/fiberfx/ecd-runtime/go/ecr` v0.8.0 or later and needs no `replace`;
+at v0.7.0 chatlog does not build.
 
 ## chatlog
 
