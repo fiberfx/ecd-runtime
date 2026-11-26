@@ -1,12 +1,14 @@
-# Ecd Runtime
+# Entity Component Runtime
 
-Ecd Runtime is an entity store and runtime for one owner process. Your code never changes state directly: each
-system records its writes in a buffer, and a flush turns the buffers into deeds, commits them to an SQLite file and
-then applies the committed ones to an in-memory engine, Jacquard, which answers reads. Each entity has an eid (its
-id, which names its system and kind). After a restart `Open` brings the engine to the store's seq (the number of the
-last committed transaction) but loads no entity, so a read answers `ErrMiss` or `ErrCold` until the host reads the
-store (see "Reading after a restart" below). It is for a Go service, the host, that owns its entities in one process;
-the contract it implements is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`.
+Entity Component Runtime (ECR) is an entity store and runtime for one owner process. Your code never changes state
+directly: each system records its writes in a buffer, and a flush turns the buffers into deeds, commits them to an
+SQLite file and then applies the committed ones to an in-memory engine, Jacquard, which answers reads. Each entity has
+an eid (its id, which names its system and kind). After a restart `Open` brings the engine to the store's seq (the
+number of the last committed transaction) but loads no entity, so a read answers `ErrMiss` or `ErrCold` until the host
+reads the store (see "Reading after a restart" below). It is for a Go service, the host, that owns its entities in one
+process; the contract it implements is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`.
+
+Earlier records and journals call it Ecd Runtime, and before that Ecd Loom; the name changed on 26 Nov 2026.
 
 ## Install
 
@@ -444,10 +446,10 @@ The current release is v0.8.0 of all three (tags `go/v0.8.0`, `go/sqlite/v0.8.0`
 
 The sections below are the detailed rules of each package, as before this README was reorganised.
 
-Ecd Runtime is the entity store and runtime of an owner process. Callers change state only through deeds, which are
-committed through the `Committer` interface of package `rt`, and engines answer reads from memory. The owner store is
-the nested module `go/sqlite`, an SQLite file that a host passes in through `rt.Config.Committer`. Jacquard is the
-archetype engine.
+Entity Component Runtime is the entity store and runtime of an owner process. Callers change state only through deeds,
+which are committed through the `Committer` interface of package `rt`, and engines answer reads from memory. The owner
+store is the nested module `go/sqlite`, an SQLite file that a host passes in through `rt.Config.Committer`. Jacquard is
+the archetype engine.
 
 The contract is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`. This repository holds the implementation.
 
@@ -461,7 +463,7 @@ The contract is the KAN home's `specs/ecd_runtime/ecd_runtime.specs.md`. This re
 | `go/sqlite/` | The nested Go module `github.com/fiberfx/ecd-runtime/go/sqlite`: the owner store in one SQLite file, an implementation of `rt.Committer` that also hydrates an engine. |
 | `go/ecr/` | The nested Go module `github.com/fiberfx/ecd-runtime/go/ecr`: the facade package `ecr`, one import and one requirement for a host. |
 | `go/enginecmp/gj/` | Benchmarks of Jacquard against Ark in module `go/enginecmp`; `rows/gj.bench.rows.sh` runs them. |
-| `go/NOTICE.txt` | Every part taken from another project: the project, its source, commit, licence and copyright line, what is taken and the files that hold it, with the licence text that the project's licence requires, and the projects whose design Ecd Runtime follows. |
+| `go/NOTICE.txt` | Every part taken from another project: the project, its source, commit, licence and copyright line, what is taken and the files that hold it, with the licence text that the project's licence requires, and the projects whose design Entity Component Runtime follows. |
 | `rows/loom.rows.sh` | The rows script. |
 
 `git diff --no-index` between a ported file in `go/engine/jacquard/` and its source file in a checkout of Ark at commit 723f2ac records the adaptation.
@@ -705,13 +707,13 @@ the module. They load the driver and its modules from the offline module inputs.
 
 ### One import for a host
 
-The module `github.com/fiberfx/ecd-runtime/go/ecr`, in `go/ecr/`, package `ecr`, is the facade of Ecd Runtime. A host
-imports this one package and requires this one module. Every type of `ecr` is an alias of the type of the package that
-defines it: the ids of `github.com/fiberfx/ecd-id/go`, the seam types of package `ecd`, the `Runtime`, `Buffer`,
-`Ref`, `Result`, `Outcome`, `Committer` and `Config` of package `rt`, and the `Store` of `go/sqlite`. The constants
-have the values of the constants they name, every sentinel holds the error of its package, so `errors.Is` matches an
-error of either name, and each function calls the function of the same name. No package of Ecd Runtime imports
-`ecr`.
+The module `github.com/fiberfx/ecd-runtime/go/ecr`, in `go/ecr/`, package `ecr`, is the facade of Entity Component
+Runtime. A host imports this one package and requires this one module. Every type of `ecr` is an alias of the type of
+the package that defines it: the ids of `github.com/fiberfx/ecd-id/go`, the seam types of package `ecd`, the `Runtime`,
+`Buffer`, `Ref`, `Result`, `Outcome`, `Committer` and `Config` of package `rt`, and the `Store` of `go/sqlite`. The
+constants have the values of the constants they name, every sentinel holds the error of its package, so `errors.Is`
+matches an error of either name, and each function calls the function of the same name. No package of Entity Component
+Runtime imports `ecr`.
 
 - `Open(Options)` returns a `Host`. `Options` holds `Path`, `Create`, `Catalog`, `Minter`, `DeedKind` and `Engine`,
   a func that builds the engine from the catalog; a nil `Engine` builds Jacquard. `Path` is required, with or without
@@ -792,5 +794,5 @@ it.
 
 ### Attribution
 
-Ecd Runtime's own code is under the MIT License, in `LICENSE` and `go/LICENSE`. Code taken from other projects is
-listed in `go/NOTICE.txt` with each project's licence text.
+Entity Component Runtime's own code is under the MIT License, in `LICENSE` and `go/LICENSE`. Code taken from other
+projects is listed in `go/NOTICE.txt` with each project's licence text.

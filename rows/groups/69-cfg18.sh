@@ -1,6 +1,7 @@
-# Group cfg18 of Ecd Runtime: the refusals of the catalog constructor of package jacquard for a Budget below 0, for an
-# Exact query whose All repeats a CID and for a query whose Kinds repeat a kind. The row J5S-02 of group j5s holds the
-# fault cases of the two query refusals and of the Budget; the plants of the query refusals are in this group.
+# Group cfg18 of Entity Component Runtime: the refusals of the catalog constructor of package jacquard for a Budget
+# below 0, for an Exact query whose All repeats a CID and for a query whose Kinds repeat a kind. The row J5S-02 of group
+# j5s holds the fault cases of the two query refusals and of the Budget; the plants of the query refusals are in this
+# group.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

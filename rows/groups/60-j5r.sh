@@ -1,4 +1,5 @@
-# Group j5r of Ecd Runtime: the residency answers of the Engine of package jacquard, checked against the reference model.
+# Group j5r of Entity Component Runtime: the residency answers of the Engine of package jacquard, checked against the
+# reference model.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

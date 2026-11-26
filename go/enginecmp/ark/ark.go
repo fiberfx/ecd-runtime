@@ -1,6 +1,6 @@
 // Package ark implements ecd.Engine over the Ark entity component system (github.com/mlange-42/ark, commit
-// 723f2ac), for catalogs of All kinds. It is an engine of the comparison module only: the engines of Ecd Runtime
-// are compared with it, and no other module imports Ark. No code is taken.
+// 723f2ac), for catalogs of All kinds. It is an engine of the comparison module only: the engines of Entity Component
+// Runtime are compared with it, and no other module imports Ark. No code is taken.
 //
 // The adapter holds one Ark world per declared kind. Each declared CID maps to one Ark component per world, whose Go
 // type is made with reflect.StructOf and holds one field named after the CID, so two CIDs never share a type. A

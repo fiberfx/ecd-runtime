@@ -1,4 +1,4 @@
-# Group seamc of Ecd Runtime: the decided text of the comments in the seam, go/ecd/engine.go.
+# Group seamc of Entity Component Runtime: the decided text of the comments in the seam, go/ecd/engine.go.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, go_row and HAVE_GO.
 #
 # TestSeamDecidedText reads engine.go and requires the words of the KindDef Budget comment, of the Op comment on

@@ -1,4 +1,4 @@
-# Group repo of Ecd Runtime: RP1 and RP2.
+# Group repo of Entity Component Runtime: RP1 and RP2.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 go_row RP1 repo "go vet ./... rc=0" /w/go vet ./...

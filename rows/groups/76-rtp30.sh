@@ -1,6 +1,6 @@
-# Group rtp30 of Ecd Runtime: package rt (go/rt) with the store as the record of the flush: the transactions that the
-# store committed, replayed in seq order into a new engine of the same catalog, give the state of the engine that the
-# flushes applied.
+# Group rtp30 of Entity Component Runtime: package rt (go/rt) with the store as the record of the flush: the
+# transactions that the store committed, replayed in seq order into a new engine of the same catalog, give the state of
+# the engine that the flushes applied.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

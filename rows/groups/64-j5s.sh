@@ -1,4 +1,4 @@
-# Group j5s of Ecd Runtime: the seam methods and the catalog constructor of the Engine of package jacquard.
+# Group j5s of Entity Component Runtime: the seam methods and the catalog constructor of the Engine of package jacquard.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

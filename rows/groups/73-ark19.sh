@@ -1,6 +1,6 @@
-# Group ark19 of Ecd Runtime: the adapter of package ark in go/enginecmp, an ecd.Engine over Ark for catalogs of All
-# kinds, and its refusals. The module go/enginecmp holds the adapter and the comparison tests; its go.mod requires Ark,
-# which the inputs tree provides.
+# Group ark19 of Entity Component Runtime: the adapter of package ark in go/enginecmp, an ecd.Engine over Ark for
+# catalogs of All kinds, and its refusals. The module go/enginecmp holds the adapter and the comparison tests; its
+# go.mod requires Ark, which the inputs tree provides.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

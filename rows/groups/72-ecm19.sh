@@ -1,6 +1,6 @@
-# Group ecm19 of Ecd Runtime: the module go/enginecmp, which requires Ark at commit 723f2ac from the offline GOPROXY
-# tree and replaces the main module by path. The rows show that the module graph of go/ never names Ark, that the Ark
-# zip of the inputs matches go.sum, and that go mod tidy leaves the files of go/enginecmp unchanged.
+# Group ecm19 of Entity Component Runtime: the module go/enginecmp, which requires Ark at commit 723f2ac from the
+# offline GOPROXY tree and replaces the main module by path. The rows show that the module graph of go/ never names Ark,
+# that the Ark zip of the inputs matches go.sum, and that go mod tidy leaves the files of go/enginecmp unchanged.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

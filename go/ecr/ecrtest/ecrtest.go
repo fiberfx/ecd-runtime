@@ -1,5 +1,5 @@
-// Package ecrtest gives the tests of a host the reference engine of Ecd Runtime, from the module of the facade package
-// ecr, as package httptest gives the tests of an HTTP server a recorder.
+// Package ecrtest gives the tests of a host the reference engine of Entity Component Runtime, from the module of the
+// facade package ecr, as package httptest gives the tests of an HTTP server a recorder.
 //
 // The model is the reference engine of tests: a map-based implementation of the Engine seam that states its behaviour
 // in its plainest form, against which every other engine is compared. A host never runs it: Open of package ecr

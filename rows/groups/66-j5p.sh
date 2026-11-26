@@ -1,6 +1,6 @@
-# Group j5p of Ecd Runtime: the residency policy of jacquard.New, which keeps a Touched kind within its byte budget by
-# CLOCK eviction, refuses the hydration of an All kind that exceeds its budget, and sets the mark of a read outside the
-# record.
+# Group j5p of Entity Component Runtime: the residency policy of jacquard.New, which keeps a Touched kind within its
+# byte budget by CLOCK eviction, refuses the hydration of an All kind that exceeds its budget, and sets the mark of a
+# read outside the record.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, go_row and HAVE_GO.
 #
 #   J11         four seeds of 2,000 transactions through New and a store, with two All kinds and one Touched kind that

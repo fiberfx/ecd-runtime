@@ -1,9 +1,9 @@
-# Group sp60 of Ecd Runtime: a deed carries the W3C trace id and span id of the span that made it. The rows show that
-# ecd.Deed holds them as ecd.TraceID and ecd.SpanID and that no engine reads them; that a buffer's Span call puts
-# them on the buffer's next deed and the flush that empties the buffer resets them; that the owner store keeps them
-# in deed.trace_id and deed.span_id, NULL for the zero values, and Log returns them; that Open refuses any user
-# version but 2; that Migrate brings a store of user version 1 to 2; and that the nested module go/sqlite requires
-# the main module at v0.8.0 and replaces it by its parent directory.
+# Group sp60 of Entity Component Runtime: a deed carries the W3C trace id and span id of the span that made it. The rows
+# show that ecd.Deed holds them as ecd.TraceID and ecd.SpanID and that no engine reads them; that a buffer's Span call
+# puts them on the buffer's next deed and the flush that empties the buffer resets them; that the owner store keeps them
+# in deed.trace_id and deed.span_id, NULL for the zero values, and Log returns them; that Open refuses any user version
+# but 2; that Migrate brings a store of user version 1 to 2; and that the nested module go/sqlite requires the main
+# module at v0.8.0 and replaces it by its parent directory.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

@@ -1,8 +1,8 @@
-# Group fs60 of Ecd Runtime: story 23, the eids of the spawns of a flush. Result.Spawned answers, by its placeholder,
-# the eid that the flush minted for a spawn of a deed answered Committed, equal to the spawn in the committed deed and
-# in record order; it refuses with ErrRef a Ref that is not a placeholder, a placeholder of another buffer or of
-# another flush, and the spawn of a deed answered Conflict, Refused or Unknown. The number 89 is above every group
-# file present.
+# Group fs60 of Entity Component Runtime: story 23, the eids of the spawns of a flush. Result.Spawned answers, by its
+# placeholder, the eid that the flush minted for a spawn of a deed answered Committed, equal to the spawn in the
+# committed deed and in record order; it refuses with ErrRef a Ref that is not a placeholder, a placeholder of another
+# buffer or of another flush, and the spawn of a deed answered Conflict, Refused or Unknown. The number 89 is above
+# every group file present.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

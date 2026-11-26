@@ -1,4 +1,4 @@
-# Group i2b of Ecd Runtime: I2B-01 to I2B-04 and their plants (the rows ending in p).
+# Group i2b of Entity Component Runtime: I2B-01 to I2B-04 and their plants (the rows ending in p).
 # Package ecd (go/ecd): the seam's hardening. Apply is all or nothing, in a check pass and a commit pass; QueryDef holds
 # an Any term; ErrOp is the tenth sentinel; the host's one Minter is the only minter; the catalog names are ecd_*.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and

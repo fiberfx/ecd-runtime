@@ -1,9 +1,10 @@
-# Group sq40 of Ecd Runtime: the module go/sqlite, an owner store in one SQLite file that a host passes to the Runtime
-# as its Committer and that hydrates a fresh engine after a restart. The rows show that the module vets, that its
-# requirements, the driver included, resolve and verify from the offline GOPROXY tree and that go mod tidy leaves its
-# go.mod and go.sum unchanged, that Create and Open keep the settings and the schema of the store, that a committed
-# history survives a close and hydrates a fresh engine equal to the live one, that the log replays to the same state,
-# that a refused or retried deed leaves nothing in the file, and that the writer and the reader carry their pragmas.
+# Group sq40 of Entity Component Runtime: the module go/sqlite, an owner store in one SQLite file that a host passes to
+# the Runtime as its Committer and that hydrates a fresh engine after a restart. The rows show that the module vets,
+# that its requirements, the driver included, resolve and verify from the offline GOPROXY tree and that go mod tidy
+# leaves its go.mod and go.sum unchanged, that Create and Open keep the settings and the schema of the store, that a
+# committed history survives a close and hydrates a fresh engine equal to the live one, that the log replays to the same
+# state, that a refused or retried deed leaves nothing in the file, and that the writer and the reader carry their
+# pragmas.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

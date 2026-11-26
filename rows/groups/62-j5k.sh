@@ -1,4 +1,4 @@
-# Group j5k of Ecd Runtime: the referenced bitset of package jacquard that orders the eviction of entities.
+# Group j5k of Entity Component Runtime: the referenced bitset of package jacquard that orders the eviction of entities.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rows of Ecd Runtime: the checks of the repository, run offline from the root of the unpacked tree (/w).
+# Rows of Entity Component Runtime: the checks of the repository, run offline from the root of the unpacked tree (/w).
 # The script needs the Go toolchain and git. Rows sit in groups, and ROWS selects them.
 #
 # Run command (flow:row-container, image mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2, whose /usr/local/go is

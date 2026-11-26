@@ -1,8 +1,8 @@
 #!/bin/sh
-# Comparison benchmarks of Ecd Runtime: Jacquard against Ark on the gates GJ1, GJ3 and GJ4, with GJ2, G4 and G6
-# recorded. The script runs the benchmarks of package gj in go/enginecmp in 6 rounds, prints the raw output whole,
-# takes the median of the samples of each metric per engine and prints one line per gate. It measures: a gate that is
-# NOT-MET changes no exit code, and a gate that was not measured is CNM.
+# Comparison benchmarks of Entity Component Runtime: Jacquard against Ark on the gates GJ1, GJ3 and GJ4, with GJ2, G4
+# and G6 recorded. The script runs the benchmarks of package gj in go/enginecmp in 6 rounds, prints the raw output
+# whole, takes the median of the samples of each metric per engine and prints one line per gate. It measures: a gate
+# that is NOT-MET changes no exit code, and a gate that was not measured is CNM.
 #
 # Run command (flow:row-container, image mx-trafikist-toolchain:go1.27.4-rust1.100.0-r2, whose /usr/local/go is
 # go1.27.4), on a box that runs no other container, since a second load changes the timings:

@@ -1,4 +1,4 @@
-# Group jcmp of Ecd Runtime: the comparison of the Engine of package jacquard with the reference model.
+# Group jcmp of Entity Component Runtime: the comparison of the Engine of package jacquard with the reference model.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

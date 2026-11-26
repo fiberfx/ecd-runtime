@@ -1,4 +1,4 @@
-# Group j3 of Ecd Runtime: the Engine of package jacquard, its two-pass apply and its moves.
+# Group j3 of Entity Component Runtime: the Engine of package jacquard, its two-pass apply and its moves.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

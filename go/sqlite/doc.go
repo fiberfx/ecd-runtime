@@ -1,7 +1,7 @@
-// Package sqlite is an owner store of Ecd Runtime in one SQLite file. A host passes a *Store to the Runtime as
-// its rt.Committer, so that committed deeds outlive the process. After a restart, Hydrate brings a fresh engine to
-// the store's seq with every All kind as it was committed, Log yields the committed deeds for replay, and Rows reads
-// given entities of one kind at the store's seq.
+// Package sqlite is an owner store of Entity Component Runtime in one SQLite file. A host passes a *Store to the
+// Runtime as its rt.Committer, so that committed deeds outlive the process. After a restart, Hydrate brings a fresh
+// engine to the store's seq with every All kind as it was committed, Log yields the committed deeds for replay, and
+// Rows reads given entities of one kind at the store's seq.
 //
 // # Tables
 //

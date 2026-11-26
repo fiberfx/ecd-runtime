@@ -1,7 +1,7 @@
-# Group rt30 of Ecd Runtime: package rt (go/rt), which records the writes of systems in buffers and commits them as one
-# flush: a Runtime that needs a Minter, the order and the deeds of a flush, the refusal of a record before anything is
-# minted, committed or applied, the pre-commit check of the deeds, and the direction of the dependency between the
-# engine and the runtime.
+# Group rt30 of Entity Component Runtime: package rt (go/rt), which records the writes of systems in buffers and commits
+# them as one flush: a Runtime that needs a Minter, the order and the deeds of a flush, the refusal of a record before
+# anything is minted, committed or applied, the pre-commit check of the deeds, and the direction of the dependency
+# between the engine and the runtime.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

@@ -1,9 +1,9 @@
-# Group notice of Ecd Runtime: NT1 to NT6 and their plants.
+# Group notice of Entity Component Runtime: NT1 to NT6 and their plants.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, go_row and HAVE_GO.
 #
 # The checks keep the attribution of code taken from other projects in one file, go/NOTICE.txt, keep the module's
-# go line and requirements as they are declared, and keep the licence text of Ecd Runtime's own code in LICENSE and
-# go/LICENSE.
+# go line and requirements as they are declared, and keep the licence text of Entity Component Runtime's own code in
+# LICENSE and go/LICENSE.
 #
 #   NT1   no path, Go file or README names the directory of a vendored copy
 #   NT1p  plant: a copy of go/ with a file added below a directory of that name; NT1 must turn red
@@ -130,8 +130,8 @@ nt4_check() {
 }
 
 # nt6_check ROOT: LICENSE and go/LICENSE are present and byte-equal, and begin with the MIT License title and the
-# copyright line of Ecd Runtime. A tree without go/LICENSE is red; a tree without LICENSE could not be measured, as the
-# run's archive holds LICENSE only when its paths name it.
+# copyright line of Entity Component Runtime. A tree without go/LICENSE is red; a tree without LICENSE could not be
+# measured, as the run's archive holds LICENSE only when its paths name it.
 nt6_check() {
   if [ ! -f "$1/go/LICENSE" ]; then echo "go/LICENSE is absent"; return 1; fi
   if [ ! -f "$1/LICENSE" ]; then echo "LICENSE is not in the tree under test"; return 2; fi

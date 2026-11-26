@@ -1,5 +1,6 @@
-# Group acmp19 of Ecd Runtime: the comparison of the ark adapter with the reference model on random histories, and the
-# comparison of the sentinels of package ecd that the errors of package jacquard and of the reference model match.
+# Group acmp19 of Entity Component Runtime: the comparison of the ark adapter with the reference model on random
+# histories, and the comparison of the sentinels of package ecd that the errors of package jacquard and of the reference
+# model match.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

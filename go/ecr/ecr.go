@@ -1,5 +1,5 @@
-// Package ecr is the facade of Ecd Runtime for a host: one import for the ids, the seam types, the Runtime, the owner
-// store and the default engine.
+// Package ecr is the facade of Entity Component Runtime for a host: one import for the ids, the seam types, the
+// Runtime, the owner store and the default engine.
 //
 // Every type of ecr is an alias of the type of the package that defines it: the ids of package eid
 // (github.com/fiberfx/ecd-id/go), the seam package ecd, the Runtime of package rt and the Store of the module
@@ -12,8 +12,8 @@
 // version 1 to the user version 2 that Open accepts.
 //
 // The package imports the standard library, package eid and the packages ecd, rt, engine/jacquard and sqlite of
-// Ecd Runtime. No package of Ecd Runtime imports ecr. The reference engine of tests is in package ecrtest of this
-// module, which ecr does not import.
+// Entity Component Runtime. No package of Entity Component Runtime imports ecr. The reference engine of tests is in
+// package ecrtest of this module, which ecr does not import.
 package ecr
 
 import (

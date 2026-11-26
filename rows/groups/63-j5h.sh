@@ -1,4 +1,5 @@
-# Group j5h of Ecd Runtime: the hydration and the eviction of the Engine of package jacquard, checked against the reference model.
+# Group j5h of Entity Component Runtime: the hydration and the eviction of the Engine of package jacquard, checked
+# against the reference model.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

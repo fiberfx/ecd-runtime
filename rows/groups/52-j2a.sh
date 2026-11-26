@@ -1,4 +1,4 @@
-# Group j2a of Ecd Runtime: masks, chunk geometry and vocabulary of package jacquard.
+# Group j2a of Entity Component Runtime: masks, chunk geometry and vocabulary of package jacquard.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

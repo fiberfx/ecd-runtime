@@ -1,4 +1,4 @@
-# Group mdl18 of Ecd Runtime: the refusals of the reference model, package model of engine/jacquard.
+# Group mdl18 of Entity Component Runtime: the refusals of the reference model, package model of engine/jacquard.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

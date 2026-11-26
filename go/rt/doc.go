@@ -1,5 +1,5 @@
-// Package rt is the Ecd Runtime: one command buffer per registered system, and the flush that turns the buffers
-// into deeds, commits them in the owner store and applies the committed ones to the engine.
+// Package rt is the Entity Component Runtime: one command buffer per registered system, and the flush that turns the
+// buffers into deeds, commits them in the owner store and applies the committed ones to the engine.
 //
 // A system records its writes in its Buffer: Spawn, Set, Unset and Destroy. A record names its entity by a Ref:
 // the eid of an entity that exists (Of), or the placeholder that a Spawn of the same buffer returned since that

@@ -1,4 +1,5 @@
-# Group j0m of Ecd Runtime: the reference model and its op-sequence vectors, package model of engine/jacquard.
+# Group j0m of Entity Component Runtime: the reference model and its op-sequence vectors, package model of
+# engine/jacquard.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

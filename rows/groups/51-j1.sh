@@ -1,4 +1,5 @@
-# Group j1 of Ecd Runtime: the identity core of package jacquard (J1-01 to J1-10 and their plants, the rows ending in p).
+# Group j1 of Entity Component Runtime: the identity core of package jacquard (J1-01 to J1-10 and their plants, the rows
+# ending in p).
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 # Entity (8 B handle), record (16 B), the record pool with its free list, and the index that maps eid <-> Entity.

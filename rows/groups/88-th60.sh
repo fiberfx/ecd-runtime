@@ -1,9 +1,9 @@
-# Group th60 of Ecd Runtime: story 15, the generator of typed values and handles from a catalog file. The generator
-# go/internal/gen reads a strict JSON catalog of format 1 and refuses an unknown or repeated key, trailing data and every
-# fault of the schema, sorted; it emits a gofmt-formatted file of the catalog, value types with a big-endian packed codec
-# and typed handles, in the core mode (go/internal/llm) and the facade mode (go/ecr/internal/llm); the command
-# go/cmd/gen writes the file through a temporary file and writes nothing for a refused catalog. The number 88 is above
-# every group file present.
+# Group th60 of Entity Component Runtime: story 15, the generator of typed values and handles from a catalog file. The
+# generator go/internal/gen reads a strict JSON catalog of format 1 and refuses an unknown or repeated key, trailing
+# data and every fault of the schema, sorted; it emits a gofmt-formatted file of the catalog, value types with a
+# big-endian packed codec and typed handles, in the core mode (go/internal/llm) and the facade mode
+# (go/ecr/internal/llm); the command go/cmd/gen writes the file through a temporary file and writes nothing for a
+# refused catalog. The number 88 is above every group file present.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

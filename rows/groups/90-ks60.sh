@@ -1,6 +1,6 @@
-# Group ks60 of Ecd Runtime: story 24, a typed scan of a kind from the owner store. Store.Scan of go/sqlite answers
-# the stored values of one component of the entities of one kind, in eid order, from one read transaction, after a
-# given eid; the generated Scan of a marked handle decodes them through ecd.Scanner and stops at a value that does not
+# Group ks60 of Entity Component Runtime: story 24, a typed scan of a kind from the owner store. Store.Scan of go/sqlite
+# answers the stored values of one component of the entities of one kind, in eid order, from one read transaction, after
+# a given eid; the generated Scan of a marked handle decodes them through ecd.Scanner and stops at a value that does not
 # decode, with ErrValue, and at an error of its f. The number 90 is above every group file present.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.

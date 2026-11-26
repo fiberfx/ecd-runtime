@@ -1,4 +1,4 @@
-# Group j2c of Ecd Runtime: tables, chunks, typed columns and change stamps of package jacquard.
+# Group j2c of Entity Component Runtime: tables, chunks, typed columns and change stamps of package jacquard.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

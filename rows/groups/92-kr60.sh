@@ -1,6 +1,6 @@
-# Group kr60 of Ecd Runtime: the generator half of story 26. gen -registry DIR refuses a catalog whose system and kinds
-# are not live entity kinds of the ecd-id registry, each fault named; without the flag gen is as it was. The number 92
-# is above every group file present when car g1 lands, after 91-kb60.sh.
+# Group kr60 of Entity Component Runtime: the generator half of story 26. gen -registry DIR refuses a catalog whose
+# system and kinds are not live entity kinds of the ecd-id registry, each fault named; without the flag gen is as it
+# was. The number 92 is above every group file present when car g1 lands, after 91-kb60.sh.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

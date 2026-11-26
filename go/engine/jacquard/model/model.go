@@ -1,5 +1,5 @@
-// Package model is the reference engine of Ecd Runtime: a map-based implementation of ecd.Engine that states
-// the behaviour of the seam in its plainest form. Every other engine is compared against it.
+// Package model is the reference engine of Entity Component Runtime: a map-based implementation of ecd.Engine that
+// states the behaviour of the seam in its plainest form. Every other engine is compared against it.
 //
 // A kind holds its entities in a map from eid to the entity's components, and a component is its CID and a
 // private copy of its value. The model keeps no byte budget and never answers ecd.ErrBudget: an entity of a

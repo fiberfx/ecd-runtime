@@ -1,13 +1,14 @@
-Ecd Runtime: parts taken from other projects
+Entity Component Runtime: parts taken from other projects
 
-This file lists every part of Ecd Runtime that is taken from another project, and the projects whose design Ecd
-Runtime follows without taking code. It has two sections. Parts taken: each entry names the project, its source
-repository and commit, its licence and copyright line, what is taken, and the files that hold it. Each such file
-begins with the entry's attribution line, and the licence text that the project's licence requires follows the entry.
-Foundational references: each entry names a project, its source repository and commit, its licence and copyright
-line, and the design ideas that Ecd Runtime follows from it. No code is taken from these projects.
+This file lists every part of Entity Component Runtime (ECR) that is taken from another project, and the projects whose
+design Entity Component Runtime follows without taking code. It has two sections. Parts taken: each entry names the
+project, its source repository and commit, its licence and copyright line, what is taken, and the files that hold it.
+Each such file begins with the entry's attribution line, and the licence text that the project's licence requires
+follows the entry. Foundational references: each entry names a project, its source repository and commit, its licence
+and copyright line, and the design ideas that Entity Component Runtime follows from it. No code is taken from these
+projects.
 
-Ecd Runtime's own code is under the MIT License; its text is in LICENSE at the module root.
+Entity Component Runtime's own code is under the MIT License; its text is in LICENSE at the module root.
 
 Parts taken
 
@@ -16,8 +17,8 @@ Parts taken
 Project:     Ark
 Source:      https://github.com/mlange-42/ark
 Commit:      723f2ac3186a79f12830c1d9fee773a8151dec89 (v0.8.3-10-g723f2ac)
-Licence:     MIT License or Apache License 2.0, at the licensee's option. Ecd Runtime takes Ark under the MIT
-             License.
+Licence:     MIT License or Apache License 2.0, at the licensee's option. Entity Component Runtime takes Ark under
+             the MIT License.
 Copyright:   Copyright (c) 2025 Martin Lange
 Attribution: Derived from Ark (github.com/mlange-42/ark) at commit 723f2ac. Copyright (c) 2025 Martin Lange. MIT License.
 
@@ -74,10 +75,10 @@ Commit:      aa6f5bd40b3c436309844e83f8e78301cb467acc
 Licence:     MIT License
 Copyright:   Copyright (c) 2024 kjkrol
 
-Ecd Runtime follows GOKe's design for stages under a plan, a command buffer per system with a flush at explicit sync
-points, a scheduler that reaches storage only through an interface, readers on several goroutines that each hold a
-cursor over one matcher, a monotonic structural version per table, one spare chunk kept on shrink, and compaction
-strategies for bulk moves. No code is taken.
+Entity Component Runtime follows GOKe's design for stages under a plan, a command buffer per system with a flush at
+explicit sync points, a scheduler that reaches storage only through an interface, readers on several goroutines that
+each hold a cursor over one matcher, a monotonic structural version per table, one spare chunk kept on shrink, and
+compaction strategies for bulk moves. No code is taken.
 
 3. donburi
 
@@ -89,10 +90,10 @@ Copyright:   Copyright (c) 2022 Yota Hamada
              The project's LICENSE also carries the MIT notices of Copyright (c) 2020 Thomas Gillen,
              Copyright (c) 2021 Artem Sedykh and Copyright (c) 2021 Wojciech Franczyk.
 
-Ecd Runtime follows donburi's API shapes: typed component handles as package-level values, value accessors, a handle
-that doubles as a one-component query, filter terms as composable values (All, None, Any, Exact), range-over-func
-iteration, presence checks for optional components, data-less tags, typed events and lifecycle hooks, and
-per-archetype counts. No code is taken.
+Entity Component Runtime follows donburi's API shapes: typed component handles as package-level values, value accessors,
+a handle that doubles as a one-component query, filter terms as composable values (All, None, Any, Exact),
+range-over-func iteration, presence checks for optional components, data-less tags, typed events and lifecycle hooks,
+and per-archetype counts. No code is taken.
 
 4. Volt
 
@@ -102,6 +103,6 @@ Commit:      d6236fec0f28c664e1a19cd7f0773013958c4532
 Licence:     Apache License 2.0
 Copyright:   Copyright 2024, Agoune Ramine
 
-Ecd Runtime follows Volt's design ideas and test cases: checks before placement, the generation step tested at its
-limit, a dead-handle soak, empty-archetype placement cases, and benchmark scenarios in a nested module. No code is
-taken.
+Entity Component Runtime follows Volt's design ideas and test cases: checks before placement, the generation step tested
+at its limit, a dead-handle soak, empty-archetype placement cases, and benchmark scenarios in a nested module. No code
+is taken.

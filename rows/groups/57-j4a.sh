@@ -1,4 +1,4 @@
-# Group j4a of Ecd Runtime: queries in the Engine of package jacquard.
+# Group j4a of Entity Component Runtime: queries in the Engine of package jacquard.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

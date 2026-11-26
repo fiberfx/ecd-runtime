@@ -1,5 +1,5 @@
-# Group jcd18 of Ecd Runtime: the plants of the random comparison of the Engine of package jacquard with the reference
-# model that concern a hydrated row of the wrong length and the sentinels of an Apply error.
+# Group jcd18 of Entity Component Runtime: the plants of the random comparison of the Engine of package jacquard with
+# the reference model that concern a hydrated row of the wrong length and the sentinels of an Apply error.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

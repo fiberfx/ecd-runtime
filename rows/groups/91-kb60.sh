@@ -1,6 +1,6 @@
-# Group kb60 of Ecd Runtime: story 25, kinds as typed bundles. A kind of the catalog lists its components, each
-# required or optional; the generator writes <K>Entity, Spawn<K> and Get<K> for it. The number 91 is above every group
-# file present.
+# Group kb60 of Entity Component Runtime: story 25, kinds as typed bundles. A kind of the catalog lists its components,
+# each required or optional; the generator writes <K>Entity, Spawn<K> and Get<K> for it. The number 91 is above every
+# group file present.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

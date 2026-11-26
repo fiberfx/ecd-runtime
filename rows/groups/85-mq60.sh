@@ -1,6 +1,6 @@
-# Group mq60 of Ecd Runtime: the SQL twin of the declared queries. The rows show that every declared query of the
-# store's catalog answers on each engine of the repository what its SQL twin over the store's tables answers at the
-# same seq, in eid order, with Count the number of IDs, and that a write into a returned answer changes no later
+# Group mq60 of Entity Component Runtime: the SQL twin of the declared queries. The rows show that every declared query
+# of the store's catalog answers on each engine of the repository what its SQL twin over the store's tables answers at
+# the same seq, in eid order, with Count the number of IDs, and that a write into a returned answer changes no later
 # answer. Row L12-model of group j0m runs the model's case of the same test; its plants are here.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.

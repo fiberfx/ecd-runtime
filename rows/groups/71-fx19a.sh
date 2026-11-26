@@ -1,5 +1,5 @@
-# Group fx19a of Ecd Runtime: the refusal of a catalog with two faults by the catalog constructors, and the comparison
-# of a query whose All repeats a CID without Exact.
+# Group fx19a of Entity Component Runtime: the refusal of a catalog with two faults by the catalog constructors, and the
+# comparison of a query whose All repeats a CID without Exact.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

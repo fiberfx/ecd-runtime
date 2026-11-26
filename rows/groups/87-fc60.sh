@@ -1,12 +1,12 @@
-# Group fc60 of Ecd Runtime: the nested module go/ecr, the facade package ecr, which gives a host one import and one
-# requirement: aliases of the ids, the seam types, the Runtime and the owner store, the constants, sentinels and
-# functions of their packages, among them Migrate, and Open and Close of a Host; and the package ecrtest of the
-# module, which gives the tests of a host the reference engine. The rows show that the tests of the module pass,
-# among them the refusals of Open (an empty Path, an Engine func that returns no engine) and the order of Close, that
-# go mod tidy leaves its go.mod and go.sum unchanged, and that the facade is a leaf: no package outside go/ecr imports
-# ecr or ecrtest, ecr imports only the standard library, package eid and the packages ecd, rt, engine/jacquard and
-# sqlite, and ecrtest alone of the module imports the model. The number 87 is above every group file present once
-# group sp60 moves from 82-sp60.sh to 86-sp60.sh.
+# Group fc60 of Entity Component Runtime: the nested module go/ecr, the facade package ecr, which gives a host one
+# import and one requirement: aliases of the ids, the seam types, the Runtime and the owner store, the constants,
+# sentinels and functions of their packages, among them Migrate, and Open and Close of a Host; and the package ecrtest
+# of the module, which gives the tests of a host the reference engine. The rows show that the tests of the module pass,
+# among them the refusals of Open (an empty Path, an Engine func that returns no engine) and the order of Close, that go
+# mod tidy leaves its go.mod and go.sum unchanged, and that the facade is a leaf: no package outside go/ecr imports ecr
+# or ecrtest, ecr imports only the standard library, package eid and the packages ecd, rt, engine/jacquard and sqlite,
+# and ecrtest alone of the module imports the model. The number 87 is above every group file present once group sp60
+# moves from 82-sp60.sh to 86-sp60.sh.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #
@@ -32,8 +32,8 @@
 #   FC-02    go mod tidy in a copy of go/ leaves go/ecr/go.mod and go.sum byte-equal
 #   FC-03    no Go file under go/ outside go/ecr imports github.com/fiberfx/ecd-runtime/go/ecr or its package
 #            ecrtest; the imports of the packages of go/ecr and of their tests, as go list prints them, are the
-#            standard library, ecd-id, ecr, ecrtest and the packages ecd, rt, engine/jacquard and sqlite of Ecd
-#            Runtime, and the model, engine/jacquard/model, for package ecrtest only
+#            standard library, ecd-id, ecr, ecrtest and the packages ecd, rt, engine/jacquard and sqlite of Entity
+#            Component Runtime, and the model, engine/jacquard/model, for package ecrtest only
 #   FC-03p   plant: go/rt/doc.go imports ecr
 #   FC-03q   plant: go/ecr/ecr.go imports modernc.org/sqlite
 #   FC-03r   plant: go/ecr/ecr.go imports the model

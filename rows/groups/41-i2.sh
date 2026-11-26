@@ -1,4 +1,4 @@
-# Group i2 of Ecd Runtime: L06, I2-01 to I2-06 and their plants (the rows ending in p).
+# Group i2 of Entity Component Runtime: L06, I2-01 to I2-06 and their plants (the rows ending in p).
 # Package ecd (go/ecd): the id types over eid, the trace and span ids, and the engine seam. Rules E1 to E9 bind the
 # engines that implement the seam; this group checks the seam's types, constants and sentinels.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and

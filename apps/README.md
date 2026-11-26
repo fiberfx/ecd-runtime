@@ -1,4 +1,4 @@
-# Reference applications of Ecd Runtime
+# Reference applications of Entity Component Runtime
 
 A host author copies a working shape from here. Each application is a program written against the facade package
 `ecr` and the code that `go/cmd/gen` generates from its catalog file, and nothing else of the repository. The module

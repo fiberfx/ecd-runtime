@@ -36,7 +36,7 @@ type ComponentDef struct {
 	CID      CID
 	Name     string
 	Form     Form
-	Size     int  // bytes of the value in the Ecd Runtime codec; 0 for a tag
+	Size     int  // bytes of the value in the Entity Component Runtime codec; 0 for a tag
 	Pointers bool // the value holds a pointer word: pointer, unsafe.Pointer, string, slice, map, chan, func
 	// or interface, found through struct fields and array elements
 }
@@ -77,7 +77,7 @@ const (
 	OpDestroy
 )
 
-// Op is one change. Value is the component's value in the Ecd Runtime codec, or nil for a tag,
+// Op is one change. Value is the component's value in the Entity Component Runtime codec, or nil for a tag,
 // an unset, a spawn's header op and a destroy. A spawn is one OpSpawn followed by its OpSet ops.
 // Every write, value or structural, reaches an engine only as an op of a committed deed (E1).
 type Op struct {
@@ -170,7 +170,7 @@ type Engine interface {
 	// ErrMiss: not resident (Touched). ErrAbsent: resident, and the entity or component is absent.
 	Get(id eid.ID, c CID, dst []byte) ([]byte, error)
 
-	// Query runs a declared query. arg holds its parameters in the Ecd Runtime codec (empty for none).
+	// Query runs a declared query. arg holds its parameters in the Entity Component Runtime codec (empty for none).
 	// An entity matches a QueryDef when it holds every CID of All, none of None and, when Any is not empty, one
 	// of Any; with Exact, its components equal All.
 	// An unknown QID, a non-empty arg for a query that takes none, and a query that names a Touched or an

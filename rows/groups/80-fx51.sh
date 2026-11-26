@@ -1,7 +1,7 @@
-# Group fx51 of Ecd Runtime: Start on a closed engine, a deed with no op, and the wrap of Hydrate's start error. The
-# rows show that every engine of the repository is Stale once closed and answers Start with ErrStale, on an engine
-# that was new and on one at the seq of the call; that the store commits a deed with no op, whose body is of length
-# 0 and not NULL, and Log yields it with no op; and that Hydrate wraps an error of e.Start with the prefix
+# Group fx51 of Entity Component Runtime: Start on a closed engine, a deed with no op, and the wrap of Hydrate's start
+# error. The rows show that every engine of the repository is Stale once closed and answers Start with ErrStale, on an
+# engine that was new and on one at the seq of the call; that the store commits a deed with no op, whose body is of
+# length 0 and not NULL, and Log yields it with no op; and that Hydrate wraps an error of e.Start with the prefix
 # "sqlite: hydrate: start: ".
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.

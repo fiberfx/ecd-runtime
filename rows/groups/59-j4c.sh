@@ -1,4 +1,4 @@
-# Group j4c of Ecd Runtime: the node list of a declared query in the Engine of package jacquard.
+# Group j4c of Entity Component Runtime: the node list of a declared query in the Engine of package jacquard.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

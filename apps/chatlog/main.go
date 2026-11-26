@@ -1,5 +1,5 @@
-// Command chatlog is the reference application of Ecd Runtime: a chat log of rooms and messages on a detached
-// system, written against the facade package ecr, its generated package chat and the Minter of ecd-id alone.
+// Command chatlog is the reference application of Entity Component Runtime: a chat log of rooms and messages on a
+// detached system, written against the facade package ecr, its generated package chat and the Minter of ecd-id alone.
 //
 // Usage:
 //

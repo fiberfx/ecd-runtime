@@ -1,8 +1,8 @@
-# Group sq50 of Ecd Runtime: the engine's Start and the store's Rows. The rows show that every engine of the repository
-# brings a new engine to a seq without loading a kind and refuses another seq on an engine that is not new, that Rows
-# yields the stored values of given entities of one kind at the store's seq, in eid order and then CID order, that a
-# host serves a miss on a Touched kind through Rows and the engine's Hydrate, and that Hydrate with a catalog without
-# All kinds brings a new engine to the store's seq through Start.
+# Group sq50 of Entity Component Runtime: the engine's Start and the store's Rows. The rows show that every engine of
+# the repository brings a new engine to a seq without loading a kind and refuses another seq on an engine that is not
+# new, that Rows yields the stored values of given entities of one kind at the store's seq, in eid order and then CID
+# order, that a host serves a miss on a Touched kind through Rows and the engine's Hydrate, and that Hydrate with a
+# catalog without All kinds brings a new engine to the store's seq through Start.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

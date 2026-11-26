@@ -1,5 +1,5 @@
-# Group ap70 of Ecd Runtime: story 27, the reference application chatlog in the module apps, outside go/. The number
-# 93 is above every group file present.
+# Group ap70 of Entity Component Runtime: story 27, the reference application chatlog in the module apps, outside go/.
+# The number 93 is above every group file present.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO. The module apps reaches the runtime through a replace of ../go, ../go/ecr and ../go/sqlite.
 #

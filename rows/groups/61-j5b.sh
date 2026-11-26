@@ -1,4 +1,4 @@
-# Group j5b of Ecd Runtime: the per-kind statistics of the Engine of package jacquard.
+# Group j5b of Entity Component Runtime: the per-kind statistics of the Engine of package jacquard.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #

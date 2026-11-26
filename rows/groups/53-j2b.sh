@@ -1,4 +1,4 @@
-# Group j2b of Ecd Runtime: archetypes and the graph of package jacquard.
+# Group j2b of Entity Component Runtime: archetypes and the graph of package jacquard.
 # Sourced by the rows harness from /w; the harness supplies say, sel, offline, head_of, count, why_of, go_row and
 # HAVE_GO.
 #
