@@ -5,6 +5,7 @@ go 1.27.4
 require (
 	github.com/fiberfx/ecd-id/go v0.11.0
 	github.com/fiberfx/ecd-runtime/go/ecr v0.8.0
+	modernc.org/sqlite v1.37.0
 )
 
 require (
@@ -20,7 +21,6 @@ require (
 	modernc.org/libc v1.62.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.9.1 // indirect
-	modernc.org/sqlite v1.37.0 // indirect
 )
 
 replace (

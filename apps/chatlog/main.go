@@ -335,14 +335,17 @@ func (a *app) room(id ecr.ID) (chat.RomEntity, error) {
 }
 
 // message reads the message id and whether it is pinned. The kind msg is an All kind, Cold in the host's engine
-// (decision 27), so the engine answers ErrCold and the message is read from the store and decoded here.
+// (decision 27), so the engine answers ErrCold and the message is read from the store and decoded here; an engine
+// that serves msg answers from itself, and an absent message stays absent.
 func (a *app) message(id ecr.ID) (v chat.MsgEntity, pinned bool, err error) {
 	v, ok, err := chat.GetMsg(a.h.Engine, id)
-	if err == nil && ok {
+	switch {
+	case err == nil && ok:
 		pinned, err = chat.Pinned.Has(a.h.Engine, id)
 		return v, pinned, err
-	}
-	if !errors.Is(err, ecr.ErrCold) {
+	case err == nil:
+		return v, false, fmt.Errorf("no message %v: %w", id, ecr.ErrAbsent) // an engine that serves msg says absent
+	case !errors.Is(err, ecr.ErrCold):
 		return v, false, err
 	}
 	var line, room bool

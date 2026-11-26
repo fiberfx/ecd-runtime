@@ -20,6 +20,15 @@
 #   AP-04q   plant: main.go imports go/sqlite beside ecr
 #   AP-05    the binary, built and vetted, runs open, say, say, show, pin, journal and replay on a new store, each
 #            exit 0, replay last with "total 2 replayed 2"; pin of a room exits 1
+#   AP-06    TestMigrate (apps/chatlog): a store of user_version 1 (deed without trace_id and span_id) is migrated and
+#            then read with its data intact; user_version reads 2 afterwards
+#   AP-06p   plant: the Migrate call is dropped (apps/chatlog/main.go; TestMigrate)
+#   AP-07    TestOtherSystem (apps/chatlog): -sys 7ab works end to end and every eid carries it; llm, 2ab and the
+#            malformed codes are refused with exit 2
+#   AP-07p   plant: run ignores -sys and uses 3cl (apps/chatlog/main.go; TestOtherSystem)
+#   AP-08    TestMessageServed (apps/chatlog): on an engine that serves msg, a message the engine does not hold is
+#            absent (ecr.ErrAbsent), not found
+#   AP-08p   plant: message returns no error for it (apps/chatlog/main.go; TestMessageServed)
 #
 ap70_plant() {
   ap70_id=$1 ap70_ex=$2 ap70_test=$3 ap70_case=$4 ap70_file=$5 ap70_sed=$6
@@ -163,3 +172,12 @@ ap70_boundrow AP-04p "the hand edit is found" chatlog/chat/chat_gen.go \
 ap70_boundrow AP-04q "the import of go/sqlite is found" chatlog/main.go \
   's#^\t"github.com/fiberfx/ecd-runtime/go/ecr"$#\t"github.com/fiberfx/ecd-runtime/go/ecr"; _ "github.com/fiberfx/ecd-runtime/go/sqlite"#'
 ap70_run
+ap70_go AP-06 "TestMigrate rc=0" TestMigrate
+ap70_plant AP-06p "TestMigrate fails on the plant" TestMigrate "" chatlog/main.go \
+  's/^\t\tif err := ecr\.Migrate(path); err != nil {$/\t\tif err := error(nil); err != nil {/'
+ap70_go AP-07 "TestOtherSystem rc=0" TestOtherSystem
+ap70_plant AP-07p "TestOtherSystem fails on the plant" TestOtherSystem "" chatlog/main.go \
+  's/sys, ok := ecr\.ParseCode(\*code)/sys, ok := ecr.ParseCode("3cl")/'
+ap70_go AP-08 "TestMessageServed rc=0" TestMessageServed
+ap70_plant AP-08p "TestMessageServed fails on the plant" TestMessageServed "" chatlog/main.go \
+  's#^\t\treturn v, false, fmt\.Errorf("no message %v: %w", id, ecr\.ErrAbsent) // an engine that serves msg says absent$#\t\treturn v, false, nil#'
