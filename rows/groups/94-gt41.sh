@@ -1,4 +1,4 @@
-# Group gt41 of Entity Component Runtime: the rows of the gates G1, G2, G3 and G5 of the contract
+# Group gt41 of Entity Component Runtime: the rows of the gates G1, G2, G3, G5 and G6 of the contract
 # (specs/ecd_runtime/ecd_runtime.specs.md#gates), which bind every engine, measured on Jacquard (story 41). Each row
 # runs one test that measures its gate's target; its plant puts one fault in the measured path. The timed values of
 # the gates are rows/gj.bench.rows.sh, which this group does not run.
@@ -22,6 +22,10 @@
 #            bytes to /gc/scan/heap:bytes (TestG5Scan in go/enginecmp/gj)
 #   G5-01p   plant: a column's array in a chunk's block is typed as pointers of the component's type, of the same
 #            size, so the collector scans the block (engine/jacquard/table.go)
+#   G6-01    a hydration of 100,000 entities of one All kind peaks at most 2 times the final resident bytes
+#            (TestG6Peak in go/engine/jacquard, collector off; G6 of the contract, added by rung 23)
+#   G6-01p   plant: the hydration stages each value in a new buffer of its own instead of the reused one,
+#            one allocation per row (engine/jacquard/hydrate.go)
 #
 # Every test of this group logs its measured value as "GATEVAL <gate> <value>" (G2 once per query). A row is PASS
 # when its test passes and FAIL when the target is not met.
@@ -94,4 +98,7 @@ gt41_plant G3-01p "KILLED" enginecmp ./gj/ TestG3Allocs engine/jacquard/engine.g
 go_row G5-01 gt41 "TestG5Scan rc=0" /w/go/enginecmp test -run '^TestG5Scan$' ./gj/
 gt41_plant G5-01p "KILLED" enginecmp ./gj/ TestG5Scan engine/jacquard/table.go \
   's/Type: reflect\.ArrayOf(n, d\.typ)}/Type: reflect.ArrayOf(n, reflect.PointerTo(d.typ))}/'
+go_row G6-01 gt41 "TestG6Peak rc=0" /w/go test -run '^TestG6Peak$' ./engine/jacquard/
+gt41_plant G6-01p "KILLED" . ./engine/jacquard/ TestG6Peak engine/jacquard/hydrate.go \
+  's/cur\.vals\[c\] = append(cur\.vals\[c\]\[:0\], r\.Value\.\.\.)/cur.vals[c] = append(make([]byte, 0, 64), r.Value...)/'
 unset ECDRT_GATES
