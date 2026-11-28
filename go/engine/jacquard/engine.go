@@ -50,6 +50,7 @@ type compDef struct {
 //	res     the residency of each kind by kind index; nil: every kind is All and Warm
 //	allKinds the indexes of the All kinds, in kind order
 //	hydrated a hydration or a Start has succeeded; the seq rule of hydrate reads it
+//	scr     the memory that apply reuses from one call to the next; empty between calls
 //
 // Mutation happens on one goroutine; get writes nothing.
 type Engine struct {
@@ -66,6 +67,7 @@ type Engine struct {
 	res      []kindRes          // the residency of each kind by kind index; nil: every kind is All and Warm
 	allKinds []uint16           // the indexes of the All kinds, in kind order
 	hydrated bool               // a hydration or a Start has succeeded; the seq rule of hydrate reads it
+	scr      scratch            // the memory that apply reuses from one call to the next; empty between calls
 }
 
 // newEngine returns an empty engine over the declared kinds and components. It answers errCatalog, wrapped,
@@ -129,7 +131,8 @@ func (en *Engine) fail(cause error) error {
 // apply applies the transaction seq, which holds deeds, all or nothing as far as a check can tell. A stale
 // engine answers ecd.ErrStale. The check pass runs first and changes nothing: its refusal leaves the engine
 // and appliedAt as they were. The commit pass then applies the deeds in Ord order, and in list order within
-// equal Ord; an error or a panic from there on makes the engine stale. On success appliedAt is seq.
+// equal Ord; an error or a panic from there on makes the engine stale. On success appliedAt is seq. Both passes
+// work in the engine's scratch, which apply empties before it returns, whatever it returns.
 func (en *Engine) apply(seq uint64, deeds []ecd.Deed) (err error) {
 	if en.stale {
 		return ecd.ErrStale
@@ -138,6 +141,7 @@ func (en *Engine) apply(seq uint64, deeds []ecd.Deed) (err error) {
 		if r := recover(); r != nil {
 			err = en.fail(fmt.Errorf("jacquard: panic while applying %d: %v", seq, r))
 		}
+		en.scr.reset()
 	}()
 	if err := en.check(seq, deeds); err != nil {
 		return err
@@ -172,36 +176,39 @@ func inOrder(deeds []ecd.Deed) []ecd.Deed {
 	return out
 }
 
-// opSeen is what the check pass has seen of one eid in a transaction.
+// opSeen is what the check pass has seen of one eid in a transaction. The commit pass adds the state of the eid in
+// the deed it reduces: deed is the number of that deed, from 1, and state the position of the state; deed 0 means
+// that no deed has reduced the eid yet.
 type opSeen struct {
-	ops       int
+	ops       int32
 	spawned   bool
 	destroyed bool
+	deed      uint32
+	state     int32
 }
 
 // check is the check pass: it refuses a transaction before any change. It answers ecd.ErrGap when seq is not
 // appliedAt()+1; ecd.ErrKind for an op on an entity of an undeclared kind; and errOp for a Set or Unset of an
 // undeclared CID, a Set of a pointer-holding component, a Set whose value is not exactly the component's size
 // (a tag's value is empty), a Spawn that is not the first op of its eid in the transaction, an op after the
-// Destroy of its eid, and a Destroy and a Spawn of one eid. It changes no state and creates no graph node.
+// Destroy of its eid, and a Destroy and a Spawn of one eid. It changes no state and creates no graph node. What it
+// has seen of each eid is kept in the scratch. The kind of an eid is checked at its first op only: a later op of
+// the same eid has the same kind.
 func (en *Engine) check(seq uint64, deeds []ecd.Deed) error {
 	if seq != en.applied+1 {
 		return fmt.Errorf("%w: seq %d, applied %d", ecd.ErrGap, seq, en.applied)
 	}
-	seen := make(map[eid.ID]*opSeen)
 	for _, d := range inOrder(deeds) {
 		for i := range d.Ops {
 			op := &d.Ops[i]
-			if _, err := en.idx.kindIndex(ecd.KindOf(op.Entity)); err != nil {
-				return err
+			st, known := en.scr.see(op.Entity)
+			if !known {
+				if _, err := en.idx.kindIndex(ecd.KindOf(op.Entity)); err != nil {
+					return err
+				}
 			}
 			if err := en.checkValue(op); err != nil {
 				return err
-			}
-			st := seen[op.Entity]
-			if st == nil {
-				st = new(opSeen)
-				seen[op.Entity] = st
 			}
 			if (op.Code == ecd.OpSpawn && st.destroyed) || (op.Code == ecd.OpDestroy && st.spawned) {
 				return fmt.Errorf("%w: destroy and spawn of %s in one transaction", errOp, op.Entity)
@@ -251,7 +258,8 @@ func (en *Engine) checkValue(op *ecd.Op) error {
 
 // opState is one entity's ops of one deed reduced in list order. A skipped state holds an entity whose ops change
 // nothing: the kind is Cold, or the entity is a Touched entity that is not resident and its first op in the deed
-// is not a Spawn. Its later ops in the deed are ignored and applyDeed applies nothing for it.
+// is not a Spawn. Its later ops in the deed are ignored and applyDeed applies nothing for it. The vals of a state
+// that reduce made are filled from the scratch just before the state applies.
 type opState struct {
 	id        eid.ID
 	spawned   bool
@@ -278,6 +286,7 @@ func (en *Engine) applyDeed(d *ecd.Deed) error {
 		if states[i].skipped {
 			continue
 		}
+		states[i].vals = en.scr.values(d, i)
 		if err := en.applyState(&states[i]); err != nil {
 			return en.fail(err)
 		}
@@ -285,26 +294,31 @@ func (en *Engine) applyDeed(d *ecd.Deed) error {
 	return nil
 }
 
-// reduce reduces the ops of d to one state per entity, in order of first appearance. It reads the entities'
-// current component sets and changes nothing.
+// reduce reduces the ops of d to one state per entity, in order of first appearance, in the scratch, which drops
+// the states of the deed before. It finds the state of an op's eid through what the check pass saw of the eid. A
+// state's values stay in the ops of d, which the scratch chains per state, until values reads them. It reads the
+// entities' current component sets and changes nothing.
 func (en *Engine) reduce(d *ecd.Deed) ([]opState, error) {
-	var states []opState
-	at := make(map[eid.ID]int)
+	s := &en.scr
+	at := s.startDeed(len(d.Ops))
 	for i := range d.Ops {
 		op := &d.Ops[i]
-		n, ok := at[op.Entity]
-		if !ok {
+		a := &at[i]
+		seen := s.seenOf(a, op.Entity)
+		n := int(seen.state)
+		if seen.deed != s.deed {
 			st, err := en.begin(op)
 			if err != nil {
 				return nil, err
 			}
-			n = len(states)
-			at[op.Entity] = n
-			states = append(states, st)
+			n = s.push(st, i)
+			seen.deed, seen.state = s.deed, int32(n)
 		} else if op.Code == ecd.OpSpawn {
 			return nil, fmt.Errorf("%w: spawn of %s is not its first op", errOp, op.Entity)
+		} else {
+			s.link(n, i)
 		}
-		st := &states[n]
+		st := &s.states[n]
 		if st.skipped {
 			continue
 		}
@@ -316,10 +330,7 @@ func (en *Engine) reduce(d *ecd.Deed) ([]opState, error) {
 			}
 			st.mask.set(c)
 			if !en.comps[c].tag {
-				if st.vals == nil {
-					st.vals = make(map[compID][]byte)
-				}
-				st.vals[c] = op.Value
+				a.c, a.act = c, actSet
 			}
 		case ecd.OpUnset:
 			c, ok := en.byCID[op.CID]
@@ -327,7 +338,7 @@ func (en *Engine) reduce(d *ecd.Deed) ([]opState, error) {
 				return nil, fmt.Errorf("%w: CID %d is not declared", errOp, op.CID)
 			}
 			st.mask.clear(c)
-			delete(st.vals, c)
+			a.c, a.act = c, actUnset
 		case ecd.OpDestroy:
 			st.destroyed = true
 		case ecd.OpSpawn:
@@ -335,7 +346,7 @@ func (en *Engine) reduce(d *ecd.Deed) ([]opState, error) {
 			return nil, fmt.Errorf("%w: op code %d", errOp, op.Code)
 		}
 	}
-	return states, nil
+	return s.states, nil
 }
 
 // begin returns the state of the entity of op before its ops apply: a new entity for a Spawn, with an empty
