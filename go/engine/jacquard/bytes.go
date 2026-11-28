@@ -8,10 +8,18 @@ import (
 )
 
 // indexEntityBytes is the fixed cost that every resident entity adds to Bytes for the index. It sums what the
-// index holds for one entity: its record (16 bytes), its slot in the eid array (16), and its entry in the map from
-// eid to Entity (a 16-byte key and an 8-byte value). The map's own bucket overhead is not counted, so the cost
-// does not vary with the map's load.
-const indexEntityBytes = int64(unsafe.Sizeof(record{}) + unsafe.Sizeof(eid.ID{}) + unsafe.Sizeof(eid.ID{}) + unsafe.Sizeof(Entity{}))
+// index holds for one entity, each part at its mean over the growth of the array or map that holds it, so the cost
+// does not vary with the map's load or the arrays' spare capacity:
+//
+//	record    16 bytes in the record array, and 1/8 more: append grows a large array by 1/4, so its spare
+//	          capacity runs from none to 1/4 of its length
+//	eid slot  16 bytes in the eid array, and 1/8 more, for the same reason
+//	map entry a slot of the map from eid to Entity, 25 bytes (a 16-byte key, an 8-byte value and a control byte),
+//	          7/4 times: the map holds between 8/7 and 16/7 slots per entry, since its load falls from 7/8 to
+//	          7/16 each time it grows, and 7/4 is the mean that runtime/metrics shows from 10,000 to 1,000,000
+//	          entries, with the map's tables and directory
+const indexEntityBytes = int64((unsafe.Sizeof(record{})+unsafe.Sizeof(eid.ID{}))*9/8 +
+	(unsafe.Sizeof(eid.ID{})+unsafe.Sizeof(Entity{})+1)*7/4)
 
 // kindStats returns the resident numbers of the kind at index ki. It reads the archetype graph, the tables and
 // the index, and writes nothing. State and Evictions are left zero for the caller to fill; an index that names no
@@ -19,8 +27,9 @@ const indexEntityBytes = int64(unsafe.Sizeof(record{}) + unsafe.Sizeof(eid.ID{})
 //
 //	Entities      the rows of every table of the kind
 //	Bytes         the allocated capacity of every table of the kind, in rows of the whole chunks it holds times
-//	              the bytes of a row (the eid, the record index and every column), plus indexEntityBytes for
-//	              each entity; a chunk counts whole whether its rows are in use or not
+//	              the bytes of a row (the eid, the record index and every column), and the chunkB bytes that each
+//	              chunk holds beside its rows, plus indexEntityBytes for each entity; a chunk counts whole whether
+//	              its rows are in use or not
 //	PointerBytes  the allocated capacity of the columns whose element type holds a pointer word; a part of Bytes
 //	Archetypes    the nodes of the kind whose table holds at least one row; a table emptied by destroys does not
 //	              count
@@ -48,10 +57,10 @@ func (en *Engine) kindStats(ki uint16) ecd.KindStats {
 		if t.len() > 0 {
 			st.Archetypes++
 		}
-		st.Bytes += chunkedBytes(len(t.chunks), t.shift, t.rowB)
+		st.Bytes += chunkedBytes(len(t.chunks), t.shift, t.rowB, t.chunkB())
 		for col, d := range t.defs {
 			if d.pointers {
-				st.PointerBytes += chunkedBytes(len(t.chunks), t.shift, t.sizes[col])
+				st.PointerBytes += chunkedBytes(len(t.chunks), t.shift, t.sizes[col], 0)
 			}
 		}
 	}
@@ -60,10 +69,10 @@ func (en *Engine) kindStats(ki uint16) ecd.KindStats {
 }
 
 // chunkedBytes returns the bytes that a table of the given number of chunks adds to the Bytes of its kind: the
-// rows of the whole chunks, 1<<shift rows to a chunk, times rowB bytes to a row. kindStats measures each table by
-// it, and so does hydratedBytes.
-func chunkedBytes(chunks int, shift uint8, rowB int) int64 {
-	return (int64(chunks) << shift) * int64(rowB)
+// rows of the whole chunks, 1<<shift rows to a chunk, times rowB bytes to a row, and chunkB bytes to a chunk.
+// kindStats measures each table by it, and so does hydratedBytes.
+func chunkedBytes(chunks int, shift uint8, rowB, chunkB int) int64 {
+	return (int64(chunks)<<shift)*int64(rowB) + int64(chunks)*int64(chunkB)
 }
 
 // chunksFor returns the number of chunks, of 1<<shift rows each, that n rows fill.
@@ -95,12 +104,12 @@ func (en *Engine) hydratedBytes(ki uint16, rows []hydEntity) int64 {
 		}
 		m := en.gr.arch(uint32(node)).mask
 		kept := min(len(t.chunks), 1) // unload empties the table and shrink keeps one spare chunk
-		sum += chunkedBytes(max(kept, chunksFor(count[m], t.shift)), t.shift, t.rowB)
+		sum += chunkedBytes(max(kept, chunksFor(count[m], t.shift)), t.shift, t.rowB, t.chunkB())
 		delete(count, m)
 	}
 	for m, n := range count {
 		t := en.emptyTable(ki, &m)
-		sum += chunkedBytes(chunksFor(n, t.shift), t.shift, t.rowB)
+		sum += chunkedBytes(chunksFor(n, t.shift), t.shift, t.rowB, t.chunkB())
 	}
 	return sum
 }

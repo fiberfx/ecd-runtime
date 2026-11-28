@@ -9,9 +9,13 @@ import (
 	"github.com/fiberfx/ecd-runtime/go/ecd"
 )
 
-// j5bIndexCost is the index cost of one entity, written out: a 16-byte record, a 16-byte eid slot, and a map entry of
-// a 16-byte key and an 8-byte value.
-const j5bIndexCost = 16 + 16 + 16 + 8
+// j5bIndexCost is the index cost of one entity, written out: a 16-byte record and a 16-byte eid slot, each with 1/8
+// more for spare capacity, and 7/4 slots of the map, each of a 16-byte key, an 8-byte value and a control byte.
+const j5bIndexCost = (16+16)*9/8 + (16+8+1)*7/4
+
+// j5bChunkCost returns the bytes that a chunk of a table of cols columns holds beside its rows, written out: its
+// entry in the table, two 8-byte pointers, and its stamps, one 8-byte rowsAt and one 8-byte colAt per column.
+func j5bChunkCost(cols int) int64 { return 16 + 8*int64(1+cols) }
 
 // j5bRowBase is the size of the two columns that every row holds: a 16-byte eid and a 4-byte record index.
 const j5bRowBase = 16 + 4
@@ -57,7 +61,7 @@ func j5bRecount(t *testing.T, en *Engine, ki uint16) ecd.KindStats {
 		if rows < int64(tb.len()) {
 			t.Fatalf("kind index %d: node %d holds %d rows in a capacity of %d", ki, node, tb.len(), rows)
 		}
-		want.Bytes += rows * int64(rowB)
+		want.Bytes += rows*int64(rowB) + int64(len(tb.chunks))*j5bChunkCost(len(en.gr.arch(node).cols))
 		for _, c := range en.gr.arch(node).cols {
 			if en.comps[c].def.pointers {
 				want.PointerBytes += rows * int64(en.comps[c].size)
@@ -103,8 +107,8 @@ func j5bSpawn(t *testing.T, en *Engine, k ecd.Kind, n uint64, count int, cids ..
 // TestJ5BStats (J5B-01): after random histories of spawns, sets, unsets and destroys over three kinds, the
 // Entities, Archetypes and Nodes of every kind equal a recount from the records and the graph's keys, and Bytes and
 // PointerBytes equal the formula over the chunks that the tables hold. Fixed cases state the formula's numbers:
-// one entity with one 8-byte component holds one chunk of 512 rows of 28 bytes and 56 bytes of index; a column that
-// holds a pointer word counts as PointerBytes.
+// one entity with one 8-byte component holds one chunk of 512 rows of 28 bytes, the chunk's entry and stamps, and
+// j5bIndexCost bytes of index; a column that holds a pointer word counts as PointerBytes.
 func TestJ5BStats(t *testing.T) {
 	check := func(en *Engine, ref map[eid.ID]map[ecd.CID][]byte, step int) {
 		t.Helper()
@@ -154,7 +158,7 @@ func TestJ5BStats(t *testing.T) {
 		}
 		j5bSpawn(t, en, kinds[0], 1, 1, j3U64)
 		j5bSame(t, "one entity of the first kind", en.kindStats(0), ecd.KindStats{
-			Entities: 1, Archetypes: 1, Nodes: 1, Bytes: 512*28 + 56,
+			Entities: 1, Archetypes: 1, Nodes: 1, Bytes: 512*28 + j5bChunkCost(1) + j5bIndexCost,
 		})
 		for i := 1; i < len(kinds); i++ {
 			j5bSame(t, "kind of no entity", en.kindStats(uint16(i)), ecd.KindStats{})
@@ -172,7 +176,7 @@ func TestJ5BStats(t *testing.T) {
 		tb.push(j1ID(t, j1Kinds()[0], 1), 1)
 		// a row of 16+4+16 = 36 bytes: 16384/36 = 455 rows fit a chunk, which rounds down to 256.
 		j5bSame(t, "one row with a string column", en.kindStats(0), ecd.KindStats{
-			Entities: 1, Archetypes: 1, Nodes: 1, PointerBytes: 256 * 16, Bytes: 256*36 + 56,
+			Entities: 1, Archetypes: 1, Nodes: 1, PointerBytes: 256 * 16, Bytes: 256*36 + j5bChunkCost(1) + j5bIndexCost,
 		})
 	})
 }
@@ -185,7 +189,8 @@ func TestJ5BStatsKinds(t *testing.T) {
 		en := j3Engine(t)
 		k := j1Kinds()[0]
 		ids := j5bSpawn(t, en, k, 1, 5, j3U64)
-		j5bSame(t, "five entities", en.kindStats(0), ecd.KindStats{Entities: 5, Archetypes: 1, Nodes: 1, Bytes: 512*28 + 5*56})
+		j5bSame(t, "five entities", en.kindStats(0), ecd.KindStats{Entities: 5, Archetypes: 1, Nodes: 1,
+			Bytes: 512*28 + j5bChunkCost(1) + 5*j5bIndexCost})
 
 		var ops []ecd.Op
 		for _, id := range ids {
@@ -195,16 +200,18 @@ func TestJ5BStatsKinds(t *testing.T) {
 		if en.tables[1] == nil || en.tables[1].len() != 0 || !en.gr.arch(1).active {
 			t.Fatal("precondition: the table of node 1 should exist, be empty, and keep its active flag")
 		}
-		j5bSame(t, "after the destroys", en.kindStats(0), ecd.KindStats{Entities: 0, Archetypes: 0, Nodes: 1, Bytes: 512 * 28})
+		j5bSame(t, "after the destroys", en.kindStats(0), ecd.KindStats{Entities: 0, Archetypes: 0, Nodes: 1,
+			Bytes: 512*28 + j5bChunkCost(1)})
 
 		j5bSpawn(t, en, k, 10, 1, j3U64)
-		j5bSame(t, "after one more spawn", en.kindStats(0), ecd.KindStats{Entities: 1, Archetypes: 1, Nodes: 1, Bytes: 512*28 + 56})
+		j5bSame(t, "after one more spawn", en.kindStats(0), ecd.KindStats{Entities: 1, Archetypes: 1, Nodes: 1,
+			Bytes: 512*28 + j5bChunkCost(1) + j5bIndexCost})
 
 		// the entity loses its only component: it moves to the empty node and the first table is left empty.
 		id := j1ID(t, k, 10)
 		j3Apply(t, en, en.appliedAt()+1, j3Deed(1, j3Unset(id, j3U64)))
 		j5bSame(t, "after the unset", en.kindStats(0), ecd.KindStats{
-			Entities: 1, Archetypes: 1, Nodes: 2, Bytes: 512*28 + 512*20 + 56,
+			Entities: 1, Archetypes: 1, Nodes: 2, Bytes: 512*28 + 512*20 + j5bChunkCost(1) + j5bChunkCost(0) + j5bIndexCost,
 		})
 	})
 
@@ -215,9 +222,12 @@ func TestJ5BStatsKinds(t *testing.T) {
 		j5bSpawn(t, en, kinds[1], 100, 5, j3U64)
 		j5bSpawn(t, en, kinds[2], 200, 2, j3U64, j3B3)
 		// the first two kinds hold the same component set in two nodes; the third holds another set.
-		j5bSame(t, "first kind", en.kindStats(0), ecd.KindStats{Entities: 3, Archetypes: 1, Nodes: 1, Bytes: 512*28 + 3*56})
-		j5bSame(t, "second kind", en.kindStats(1), ecd.KindStats{Entities: 5, Archetypes: 1, Nodes: 1, Bytes: 512*28 + 5*56})
-		j5bSame(t, "third kind", en.kindStats(2), ecd.KindStats{Entities: 2, Archetypes: 1, Nodes: 1, Bytes: 512*31 + 2*56})
+		j5bSame(t, "first kind", en.kindStats(0), ecd.KindStats{Entities: 3, Archetypes: 1, Nodes: 1,
+			Bytes: 512*28 + j5bChunkCost(1) + 3*j5bIndexCost})
+		j5bSame(t, "second kind", en.kindStats(1), ecd.KindStats{Entities: 5, Archetypes: 1, Nodes: 1,
+			Bytes: 512*28 + j5bChunkCost(1) + 5*j5bIndexCost})
+		j5bSame(t, "third kind", en.kindStats(2), ecd.KindStats{Entities: 2, Archetypes: 1, Nodes: 1,
+			Bytes: 512*31 + j5bChunkCost(2) + 2*j5bIndexCost})
 		if got := en.kindStats(3); got != (ecd.KindStats{}) {
 			t.Fatalf("an index that names no kind answers %+v, want the zero value", got)
 		}
@@ -232,7 +242,7 @@ func TestJ5BStatsKinds(t *testing.T) {
 		var capBytes int64
 		for _, tb := range en.tables {
 			if tb != nil {
-				capBytes += int64(len(tb.chunks)) << tb.shift * int64(tb.rowB)
+				capBytes += int64(len(tb.chunks))<<tb.shift*int64(tb.rowB) + int64(len(tb.chunks))*j5bChunkCost(len(tb.ids))
 			}
 		}
 		if entities != int64(en.idx.len()) || tableBytes != capBytes {

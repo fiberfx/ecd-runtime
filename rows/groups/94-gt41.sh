@@ -20,8 +20,8 @@
 #            pass of every Apply (engine/jacquard/engine.go)
 #   G5-01    1,000,000 resident entities of 8 pointer-free components of 8 bytes add less than 1% of their column
 #            bytes to /gc/scan/heap:bytes (TestG5Scan in go/enginecmp/gj)
-#   G5-01p   plant: a column's backing array is allocated as pointers of the component's type, of the same size,
-#            so the collector scans it (engine/jacquard/column.go)
+#   G5-01p   plant: a column's array in a chunk's block is typed as pointers of the component's type, of the same
+#            size, so the collector scans the block (engine/jacquard/table.go)
 #
 # Every test of this group logs its measured value as "GATEVAL <gate> <value>" (G2 once per query). A row is PASS
 # when its test passes and FAIL when the target is not met.
@@ -92,6 +92,6 @@ go_row G3-01 gt41 "TestG3Allocs rc=0" /w/go/enginecmp test -run '^TestG3Allocs$'
 gt41_plant G3-01p "KILLED" enginecmp ./gj/ TestG3Allocs engine/jacquard/engine.go \
   's/^\(\t\)if slices\.IsSortedFunc(deeds, cmp) {$/\1if false \&\& slices.IsSortedFunc(deeds, cmp) {/'
 go_row G5-01 gt41 "TestG5Scan rc=0" /w/go/enginecmp test -run '^TestG5Scan$' ./gj/
-gt41_plant G5-01p "KILLED" enginecmp ./gj/ TestG5Scan engine/jacquard/column.go \
-  's/reflect\.MakeSlice(reflect\.SliceOf(d\.typ), n, n)/reflect.MakeSlice(reflect.SliceOf(reflect.PointerTo(d.typ)), n, n)/'
+gt41_plant G5-01p "KILLED" enginecmp ./gj/ TestG5Scan engine/jacquard/table.go \
+  's/Type: reflect\.ArrayOf(n, d\.typ)}/Type: reflect.ArrayOf(n, reflect.PointerTo(d.typ))}/'
 unset ECDRT_GATES

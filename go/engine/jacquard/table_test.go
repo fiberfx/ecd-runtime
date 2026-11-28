@@ -36,11 +36,11 @@ func ttNew(at *uint64) *table {
 }
 
 // ttSlotFault names the first column of slot i in a chunk that does not read zero, or returns "".
-func ttSlotFault(tb *table, ch *chunk, i int) string {
-	if ch.eid[i] != (eid.ID{}) {
+func ttSlotFault(tb *table, ch chunk, i int) string {
+	if tb.eids(ch)[i] != (eid.ID{}) {
 		return "eid"
 	}
-	if ch.ix[i] != 0 {
+	if tb.ixs(ch)[i] != 0 {
 		return "ix"
 	}
 	for col := range tb.defs {
@@ -152,16 +152,16 @@ func TestTableChunks(t *testing.T) {
 		t.Fatalf("%d chunks, want 4", len(tb.chunks))
 	}
 	for _, ch := range tb.chunks {
-		if len(ch.eid) != per || len(ch.ix) != per {
-			t.Fatalf("a chunk holds %d eids and %d ix, want %d", len(ch.eid), len(ch.ix), per)
+		if len(tb.eids(ch)) != per || len(tb.ixs(ch)) != per {
+			t.Fatalf("a chunk holds %d eids and %d ix, want %d", len(tb.eids(ch)), len(tb.ixs(ch)), per)
 		}
 	}
 	for n := range total {
 		ch, i := tb.chunks[n/per], n%per
-		if ch.eid[i] != ttID(n) || ch.ix[i] != uint32(n)+1 {
-			t.Fatalf("row %d: chunk %d slot %d holds eid %v and ix %d", n, n/per, i, ch.eid[i], ch.ix[i])
+		if tb.eids(ch)[i] != ttID(n) || tb.ixs(ch)[i] != uint32(n)+1 {
+			t.Fatalf("row %d: chunk %d slot %d holds eid %v and ix %d", n, n/per, i, tb.eids(ch)[i], tb.ixs(ch)[i])
 		}
-		if got := *(*uint64)(unsafe.Add(ch.data[0], i*8)); got != uint64(n)*3+1 {
+		if got := *(*uint64)(unsafe.Add(ch.mem, tb.offs[0]+i*8)); got != uint64(n)*3+1 {
 			t.Fatalf("row %d: column 0 reads %d in its chunk, want %d", n, got, uint64(n)*3+1)
 		}
 		if got := *(*uint32)(tb.ptr(uint32(n), 1)); got != uint32(n)*5+2 {
