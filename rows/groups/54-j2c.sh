@@ -5,7 +5,7 @@
 #   J09      pointer columns survive the collector: a string and a slice in a component stay intact across pushes, copies
 #            and swap-removes with two collections between operations, and an object that only a resident
 #            value references is never freed while resident (TestJ09); a control probe shows that a release is observable
-#   J09p     plant: columns are allocated as []byte arrays; TestJ09 must fail
+#   J09p     plant: the block of a chunk's pointer-holding columns is allocated as a byte array; TestJ09 must fail
 #   J2C-01   eid and ix columns and both value columns equal a reference after random push and swapRemove; swapRemove
 #            returns the moved row's ix; a pushed row and every slot beyond the length read zero (TestTableRows)
 #   J2C-01p  plant: swapRemove returns the removed row's ix
@@ -54,10 +54,10 @@ j2c_plant() {
 }
 
 go_row J09 j2c "TestJ09 rc=0" /w/go test -run '^TestJ09$' ./engine/jacquard/
-j2c_plant J09p "TestJ09 fails on the plant" TestJ09 column.go 's/reflect\.SliceOf(d\.typ), n, n)/reflect.SliceOf(reflect.TypeFor[byte]()), n*int(d.typ.Size()), n*int(d.typ.Size()))/'
+j2c_plant J09p "TestJ09 fails on the plant" TestJ09 table.go 's/ch\.ptr = reflect\.New(t\.ptrType)\.UnsafePointer()/ch.ptr = reflect.New(reflect.ArrayOf(int(t.ptrType.Size()), reflect.TypeFor[byte]())).UnsafePointer()/'
 
 go_row J2C-01 j2c "TestTableRows rc=0" /w/go test -run '^TestTableRows$' ./engine/jacquard/
-j2c_plant J2C-01p "TestTableRows fails on the plant" TestTableRows table.go 's/movedIx = tc\.ix\[ti\]$/movedIx = dc.ix[di]/'
+j2c_plant J2C-01p "TestTableRows fails on the plant" TestTableRows table.go 's/movedIx = t\.ixs(tc)\[ti\]$/movedIx = t.ixs(dc)[di]/'
 
 go_row J2C-02 j2c "TestTableChunks rc=0" /w/go test -run '^TestTableChunks$' ./engine/jacquard/
 j2c_plant J2C-02p "TestTableChunks fails on the plant" TestTableChunks table.go 's/return t\.chunks\[row>>t\.shift\], /return t.chunks[row\/64], /'
@@ -69,7 +69,7 @@ go_row J2C-04 j2c "TestCopyShared rc=0" /w/go test -run '^TestCopyShared$' ./eng
 j2c_plant J2C-04p "TestCopyShared fails on the plant" TestCopyShared table.go 's/j, ok := src\.col(c)/j, ok := i, i < len(src.ids) \&\& c < maskBits/'
 
 go_row J2C-05 j2c "TestStamps rc=0" /w/go test -run '^TestStamps$' ./engine/jacquard/
-j2c_plant J2C-05p "TestStamps fails on the plant" TestStamps table.go 's/{ ch\.colAt\[col\] = \*t\.at }/{ ch.colAt[col] = *t.at - 1 }/'
+j2c_plant J2C-05p "TestStamps fails on the plant" TestStamps table.go 's/{ t\.stamps\[t\.stampAt(row)+1+col\] = \*t\.at }/{ t.stamps[t.stampAt(row)+1+col] = *t.at - 1 }/'
 
 go_row J2C-06 j2c "TestColRank rc=0" /w/go test -run '^TestColRank$' ./engine/jacquard/
 j2c_plant J2C-06p "TestColRank fails on the plant" TestColRank table.go 's/m\[w\] & (1<<(c&63) - 1)/m[w] \& (1<<(c\&63+1) - 1)/'

@@ -5,33 +5,40 @@ package jacquard
 
 import (
 	"math/bits"
+	"reflect"
 	"slices"
+	"strconv"
 	"unsafe"
 
 	eid "github.com/fiberfx/ecd-id/go"
 )
 
-// chunk holds the rows of one table in fixed-size arrays: column 0 is the eid, then the record index, then
-// one typed array per component column. A slot beyond the table's length reads zero in every column.
+// chunk holds the rows of one table in two blocks, each an array of one element per slot for every column it
+// holds, at the offsets that the table keeps. The block mem holds column 0, the eid, then the record index, then
+// every column whose element type holds no pointer; its type holds no pointer either, so the collector does not
+// scan it. The block ptr holds every column whose element type holds a pointer, and its type holds them, so the
+// collector scans it. A slot beyond the table's length reads zero in every column.
 type chunk struct {
-	eid    []eid.ID         // column 0
-	ix     []uint32         // record index per row; 0 names no entity (record 0 is reserved)
-	data   []unsafe.Pointer // one typed backing array per column (reflect.MakeSlice), kept alive by these pointers
-	rowsAt uint64           // stamp of the last push or swapRemove that touched this chunk
-	colAt  []uint64         // by column position: stamp of the column's last write in this chunk
+	mem unsafe.Pointer // eid, record index (0 names no entity: record 0 is reserved) and the pointer-free columns
+	ptr unsafe.Pointer // the pointer-holding columns; nil when the table has none
 }
 
 // table stores the rows of one archetype. Rows are numbered from 0; a row lives in chunk row>>shift at slot
 // row&slotMask. The columns follow ids, which ascend; a column's position is the rank of its compID.
 type table struct {
-	ids      []compID // component columns, ascending; tags have no column
-	cols     mask     // the bits of ids
-	defs     []colDef // by column position
-	sizes    []int    // element size by column position
-	rowB     int      // 16 + 4 + sizes
-	shift    uint8    // log2 of the rows per chunk
-	slotMask uint32   // rows per chunk - 1
-	chunks   []*chunk
+	ids      []compID     // component columns, ascending; tags have no column
+	cols     mask         // the bits of ids
+	defs     []colDef     // by column position
+	sizes    []int        // element size by column position
+	offs     []int        // by column position: offset of the column in its block, ptr when it holds pointers, else mem
+	ixOff    int          // offset of the record index in mem; the eid is at offset 0
+	memType  reflect.Type // the type of a chunk's mem, which holds no pointer
+	ptrType  reflect.Type // the type of a chunk's ptr; nil when no column holds a pointer
+	rowB     int          // 16 + 4 + sizes
+	shift    uint8        // log2 of the rows per chunk
+	slotMask uint32       // rows per chunk - 1
+	chunks   []chunk
+	stamps   []uint64 // by chunk, 1+len(ids) apiece: rowsAt, then colAt by column position (see stampAt)
 	rows     uint32
 	at       *uint64 // the stamp every write records
 }
@@ -55,35 +62,86 @@ func newTable(ids []compID, defs []colDef, at *uint64) *table {
 	t.rowB = rowB
 	t.shift = chunkShift(rowB)
 	t.slotMask = 1<<t.shift - 1
+	t.layout()
 	return t
+}
+
+// layout sets the types of the two blocks of a chunk and the offset of every column in its block. Each column is
+// a struct field, an array of 1<<shift elements named after its position, so that reflect aligns it and gives the
+// block the pointer bits of its columns. Rows per chunk are a power of two of at least 64, so every array is a whole
+// multiple of 64 bytes, no column needs padding, and the two blocks hold rowB bytes per row.
+func (t *table) layout() {
+	n := 1 << t.shift
+	mem := []reflect.StructField{
+		{Name: "E", Type: reflect.ArrayOf(n, reflect.TypeFor[eid.ID]())},
+		{Name: "X", Type: reflect.ArrayOf(n, reflect.TypeFor[uint32]())},
+	}
+	var ptr []reflect.StructField
+	for i, d := range t.defs {
+		f := reflect.StructField{Name: "C" + strconv.Itoa(i), Type: reflect.ArrayOf(n, d.typ)}
+		if d.pointers {
+			ptr = append(ptr, f)
+		} else {
+			mem = append(mem, f)
+		}
+	}
+	t.memType = reflect.StructOf(mem)
+	t.ixOff = int(t.memType.Field(1).Offset)
+	if len(ptr) > 0 {
+		t.ptrType = reflect.StructOf(ptr)
+	}
+	t.offs = make([]int, len(t.defs))
+	for i, d := range t.defs {
+		block := t.memType
+		if d.pointers {
+			block = t.ptrType
+		}
+		f, _ := block.FieldByName("C" + strconv.Itoa(i))
+		t.offs[i] = int(f.Offset)
+	}
 }
 
 // len returns the number of rows.
 func (t *table) len() uint32 { return t.rows }
 
-// newChunk allocates a zeroed chunk.
-func (t *table) newChunk() *chunk {
-	n := 1 << t.shift
-	ch := &chunk{
-		eid:   make([]eid.ID, n),
-		ix:    make([]uint32, n),
-		data:  make([]unsafe.Pointer, len(t.defs)),
-		colAt: make([]uint64, len(t.defs)),
+// addChunk appends a zeroed chunk and its stamps, which read zero. Each block is allocated with its type, so
+// only ptr is scanned by the collector, and the chunk's pointers keep both alive.
+func (t *table) addChunk() {
+	ch := chunk{mem: reflect.New(t.memType).UnsafePointer()}
+	if t.ptrType != nil {
+		ch.ptr = reflect.New(t.ptrType).UnsafePointer()
 	}
-	for i, d := range t.defs {
-		ch.data[i] = newBacking(d, n)
-	}
-	return ch
+	t.chunks = append(t.chunks, ch)
+	t.stamps = append(t.stamps, make([]uint64, 1+len(t.ids))...)
+}
+
+// chunkB returns the bytes that a chunk holds beside its rows: its entry in chunks and its stamps.
+func (t *table) chunkB() int {
+	return int(unsafe.Sizeof(chunk{})) + (1+len(t.ids))*int(unsafe.Sizeof(uint64(0)))
 }
 
 // locate returns the chunk of a row and the row's slot in it.
-func (t *table) locate(row uint32) (*chunk, int) {
+func (t *table) locate(row uint32) (chunk, int) {
 	return t.chunks[row>>t.shift], int(row & t.slotMask)
 }
 
+// eids returns the eid column of a chunk, one element per slot.
+func (t *table) eids(ch chunk) []eid.ID {
+	return unsafe.Slice((*eid.ID)(ch.mem), t.slotMask+1)
+}
+
+// ixs returns the record index column of a chunk, one element per slot.
+func (t *table) ixs(ch chunk) []uint32 {
+	return unsafe.Slice((*uint32)(unsafe.Add(ch.mem, t.ixOff)), t.slotMask+1)
+}
+
 // slot returns the address of column col at slot i of a chunk.
-func (t *table) slot(ch *chunk, i, col int) unsafe.Pointer {
-	return unsafe.Add(ch.data[col], i*t.sizes[col])
+func (t *table) slot(ch chunk, i, col int) unsafe.Pointer {
+	block := ch.mem
+	if t.defs[col].pointers {
+		block = ch.ptr
+	}
+	return unsafe.Add(block, t.offs[col]+i*t.sizes[col])
 }
 
 // push appends a row for id with record index ix and returns its row. Every column of the row reads zero. The
@@ -91,12 +149,12 @@ func (t *table) slot(ch *chunk, i, col int) unsafe.Pointer {
 func (t *table) push(id eid.ID, ix uint32) uint32 {
 	row := t.rows
 	if int(row>>t.shift) == len(t.chunks) {
-		t.chunks = append(t.chunks, t.newChunk())
+		t.addChunk()
 	}
 	ch, i := t.locate(row)
-	ch.eid[i] = id
-	ch.ix[i] = ix
-	ch.rowsAt = *t.at
+	t.eids(ch)[i] = id
+	t.ixs(ch)[i] = ix
+	t.stampRows(row)
 	t.rows++
 	return row
 }
@@ -109,27 +167,27 @@ func (t *table) swapRemove(row uint32) (movedIx uint32, moved bool) {
 	tc, ti := t.locate(last)
 	if row != last {
 		dc, di := t.locate(row)
-		movedIx = tc.ix[ti]
-		dc.eid[di] = tc.eid[ti]
-		dc.ix[di] = movedIx
+		movedIx = t.ixs(tc)[ti]
+		t.eids(dc)[di] = t.eids(tc)[ti]
+		t.ixs(dc)[di] = movedIx
 		for col := range t.defs {
 			copyElem(t.defs[col], t.slot(dc, di, col), t.slot(tc, ti, col))
-			t.stampCol(dc, col)
+			t.stampCol(row, col)
 		}
-		dc.rowsAt = *t.at
+		t.stampRows(row)
 		moved = true
 	}
 	t.clearRow(tc, ti)
-	tc.rowsAt = *t.at
+	t.stampRows(last)
 	t.rows--
 	return movedIx, moved
 }
 
 // clearRow zeroes eid, ix and every column at slot i of a chunk. A pointer-holding column is cleared as a typed
 // value, so the collector no longer finds what the removed value referenced.
-func (t *table) clearRow(ch *chunk, i int) {
-	ch.eid[i] = eid.ID{}
-	ch.ix[i] = 0
+func (t *table) clearRow(ch chunk, i int) {
+	t.eids(ch)[i] = eid.ID{}
+	t.ixs(ch)[i] = 0
 	for col, d := range t.defs {
 		clearElem(d, t.slot(ch, i, col))
 	}
@@ -138,13 +196,13 @@ func (t *table) clearRow(ch *chunk, i int) {
 // eidAt returns the eid of a row.
 func (t *table) eidAt(row uint32) eid.ID {
 	ch, i := t.locate(row)
-	return ch.eid[i]
+	return t.eids(ch)[i]
 }
 
 // ixAt returns the record index of a row.
 func (t *table) ixAt(row uint32) uint32 {
 	ch, i := t.locate(row)
-	return ch.ix[i]
+	return t.ixs(ch)[i]
 }
 
 // col returns the column position of component c, or (0, false) when the table has no column for c.
@@ -178,7 +236,7 @@ func (t *table) ptr(row uint32, col int) unsafe.Pointer {
 func (t *table) set(row uint32, col int, src unsafe.Pointer) {
 	ch, i := t.locate(row)
 	copyElem(t.defs[col], t.slot(ch, i, col), src)
-	t.stampCol(ch, col)
+	t.stampCol(row, col)
 }
 
 // setBytes copies b into column col of a row and stamps the column. It returns false and changes nothing when
@@ -189,7 +247,7 @@ func (t *table) setBytes(row uint32, col int, b []byte) bool {
 	}
 	ch, i := t.locate(row)
 	copy(unsafe.Slice((*byte)(t.slot(ch, i, col)), t.sizes[col]), b)
-	t.stampCol(ch, col)
+	t.stampCol(row, col)
 	return true
 }
 
@@ -203,8 +261,16 @@ func (t *table) appendBytes(row uint32, col int, dst []byte) []byte {
 	return append(dst, unsafe.Slice((*byte)(t.slot(ch, i, col)), t.sizes[col])...)
 }
 
-// stampCol records the table's current stamp as the last write of column col in a chunk.
-func (t *table) stampCol(ch *chunk, col int) { ch.colAt[col] = *t.at }
+// stampAt returns the index in stamps of the rowsAt of the chunk of a row; the colAt of column col follows at
+// 1+col. rowsAt is the stamp of the last push or swapRemove that touched the chunk, and colAt the stamp of the
+// column's last write in the chunk.
+func (t *table) stampAt(row uint32) int { return int(row>>t.shift) * (1 + len(t.ids)) }
+
+// stampRows records the table's current stamp as the rowsAt of the chunk of a row.
+func (t *table) stampRows(row uint32) { t.stamps[t.stampAt(row)] = *t.at }
+
+// stampCol records the table's current stamp as the last write of column col in the chunk of a row.
+func (t *table) stampCol(row uint32, col int) { t.stamps[t.stampAt(row)+1+col] = *t.at }
 
 // copyShared copies the columns of row srow of src into row drow of dst for every component that both tables
 // hold, and stamps them in dst. Columns that src lacks keep their value.
@@ -217,20 +283,20 @@ func copyShared(dst *table, drow uint32, src *table, srow uint32) {
 			continue
 		}
 		copyElem(dst.defs[i], dst.slot(dc, di, i), src.slot(sc, si, j))
-		dst.stampCol(dc, i)
+		dst.stampCol(drow, i)
 	}
 }
 
 // changes reports what changed in a chunk after the stamp since: the compID bits of the columns written
 // above since, and whether rows were pushed or removed above since. Each reader keeps its own since.
 func (t *table) changes(chunk int, since uint64) (cols mask, rows bool) {
-	ch := t.chunks[chunk]
-	for i, at := range ch.colAt {
+	st := t.stamps[chunk*(1+len(t.ids)):][:1+len(t.ids)]
+	for i, at := range st[1:] {
 		if at > since {
 			cols.set(t.ids[i])
 		}
 	}
-	return cols, ch.rowsAt > since
+	return cols, st[0] > since
 }
 
 // shrink releases the chunks beyond those that hold rows, keeping one spare chunk.
@@ -242,4 +308,5 @@ func (t *table) shrink() {
 	}
 	clear(t.chunks[keep:])
 	t.chunks = t.chunks[:keep]
+	t.stamps = t.stamps[:keep*(1+len(t.ids))]
 }

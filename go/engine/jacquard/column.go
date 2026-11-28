@@ -38,12 +38,6 @@ func hasPointers(t reflect.Type) bool {
 	return false
 }
 
-// newBacking allocates a zeroed array of n elements of d and returns a pointer to its first element. The
-// array has the element type, so the collector scans a pointer-holding column; the pointer keeps it alive.
-func newBacking(d colDef, n int) unsafe.Pointer {
-	return reflect.MakeSlice(reflect.SliceOf(d.typ), n, n).UnsafePointer()
-}
-
 // copyElem copies one element of d from src to dst. A pointer-holding element is copied as a typed value
 // through reflect, which respects the write barrier (JI5, J09); other elements are copied as bytes.
 func copyElem(d colDef, dst, src unsafe.Pointer) {
