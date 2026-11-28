@@ -84,7 +84,7 @@ gt41_plant() {
 
 go_row G1-01 gt41 "TestG1TypedGet rc=0" /w/go test -run '^TestG1TypedGet$' ./internal/llm/
 gt41_plant G1-01p "KILLED" . ./internal/llm/ TestG1TypedGet internal/llm/llm_gen.go \
-  '/^func getValue\[/,/^}/s/^\(\t\)b, err := e\.Get(id, c, nil)$/\1b, err := e.Get(id, c, nil); b = append([]byte(nil), b...)/'
+  '/^func getValue(/,/^}/s/^\(\t\)b, err := e\.Get(id, c, a\[:0\])$/\1b, err := e.Get(id, c, a[:0]); b = append([]byte(nil), b...)/'
 go_row G2-01 gt41 "TestG2Query rc=0" /w/go/sqlite test -run '^TestG2Query$' .
 gt41_plant G2-01p "KILLED" sqlite . TestG2Query engine/jacquard/query.go \
   's/^\(\t\)start := len(out\.IDs)$/\1start := len(out.IDs); out.IDs = slices.Clip(out.IDs)/'

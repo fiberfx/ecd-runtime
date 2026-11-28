@@ -117,7 +117,7 @@ type field struct {
 // needs records what the catalog makes the generated file import and declare.
 type needs struct {
 	binary, math bool // the imports encoding/binary and math
-	component    bool // a component with a value: fmt, errLength, decoder and getValue
+	component    bool // a component with a value: fmt, sync, errLength, readBuf, readBufs and getValue
 	query        bool // a marked handle or a declared query: iter, fmt, the QIDs and the helpers of Iter
 	anyText      bool // decodeText
 	text         [MaxTextN + 1]bool
@@ -272,6 +272,9 @@ func (p *printer) imports() {
 	}
 	if p.need.math {
 		p.w("\t\"math\"\n")
+	}
+	if p.need.component {
+		p.w("\t\"sync\"\n")
 	}
 	p.w("\n")
 	switch p.mode {

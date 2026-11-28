@@ -181,8 +181,8 @@ func (p *printer) query(q *query) {
 	p.w("func (", t, ") QID() ", p.q("ecd", "QID"), " { return ", qid, " }\n")
 }
 
-// iterHelpers writes IterError and the helpers of Iter: iterRows always, iterValues when a handle is marked and
-// readValue when a handle is marked or a row has a field.
+// iterHelpers writes IterError and the helpers of Iter: iterRows always, iterValues and scanValues when a handle is
+// marked, and decoder and readValue when a handle is marked or a row has a field.
 func (p *printer) iterHelpers() {
 	if len(p.queries) == 0 {
 		return
@@ -247,6 +247,14 @@ func (p *printer) iterHelpers() {
 		"\t\t}\n",
 		"\t}, nil\n",
 		"}\n")
+	if read {
+		p.w("\n")
+		p.cm("decoder is the pointer type of a generated value type: Decode sets the value from its codec bytes.")
+		p.w("type decoder[T any] interface {\n",
+			"\t*T\n",
+			"\tDecode(b []byte) error\n",
+			"}\n")
+	}
 	if marked {
 		p.w("\n")
 		p.cm("iterValues runs query q on e and returns a sequence of each entity of its answer and a copy of its component c.")
