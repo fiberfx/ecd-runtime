@@ -33,8 +33,12 @@
 // counts every byte that the hydration allocates: it bounds from above the peak of a hydration with the collector
 // on.
 //
-// Not measured here: the typed path; churn, the destruction and spawn of entities between iterations; GJ3 with
-// more than one active archetype, such as 256 archetypes over several kinds; the gates G1, G2, G3 and G5; Touched
-// kinds and byte budgets, which the adapter does not serve. The values are the inputs of rule E9 and do not decide
-// it alone.
+// The file gates_test.go holds, on Jacquard alone, the gates G3 (TestG3Allocs and BenchmarkG3Bulk) and G5
+// (TestG5Scan and BenchmarkG5Scan) and the peak of G6 with the collector on (BenchmarkG6PeakGC); its header says
+// what each measures. G1 is measured in go/internal/llm, through the typed path, and G2 in go/sqlite, beside the
+// SQL twin of L12.
+//
+// Not measured here: churn, the destruction and spawn of entities between iterations; GJ3 with more than one active
+// archetype, such as 256 archetypes over several kinds; Touched kinds and byte budgets, which the adapter does not
+// serve. The values are the inputs of rule E9 and do not decide it alone.
 package gj

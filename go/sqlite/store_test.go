@@ -104,7 +104,7 @@ func (m *countMinter) Mint(kind eid.Code) (eid.ID, error) {
 }
 
 // must mints an eid of kind, which must succeed.
-func (m *countMinter) must(t *testing.T, kind eid.Code) eid.ID {
+func (m *countMinter) must(t testing.TB, kind eid.Code) eid.ID {
 	t.Helper()
 	id, err := m.Mint(kind)
 	if err != nil {
@@ -192,7 +192,7 @@ func destroyOp(e eid.ID) ecd.Op { return ecd.Op{Code: ecd.OpDestroy, Entity: e} 
 func ops(o ...ecd.Op) []ecd.Op { return o }
 
 // deedsOf returns one deed per list of ops, each with a new eid of m and its index as Ord.
-func deedsOf(t *testing.T, m *countMinter, lists ...[]ecd.Op) []ecd.Deed {
+func deedsOf(t testing.TB, m *countMinter, lists ...[]ecd.Op) []ecd.Deed {
 	t.Helper()
 	ds := make([]ecd.Deed, len(lists))
 	for i, l := range lists {
@@ -218,7 +218,7 @@ type emptyRows struct{}
 func (emptyRows) Next(*ecd.Row) (bool, error) { return false, nil }
 
 // openEngine returns a new engine of one case over cat, with no kind hydrated.
-func openEngine(t *testing.T, ec engineCase, cat *ecd.Catalog) ecd.Engine {
+func openEngine(t testing.TB, ec engineCase, cat *ecd.Catalog) ecd.Engine {
 	t.Helper()
 	en, err := ec.open(cat)
 	if err != nil {
@@ -229,7 +229,7 @@ func openEngine(t *testing.T, ec engineCase, cat *ecd.Catalog) ecd.Engine {
 }
 
 // emptyEngine returns a new engine of one case over cat, with every All kind of cat hydrated empty at seq 0.
-func emptyEngine(t *testing.T, ec engineCase, cat *ecd.Catalog) ecd.Engine {
+func emptyEngine(t testing.TB, ec engineCase, cat *ecd.Catalog) ecd.Engine {
 	t.Helper()
 	en := openEngine(t, ec, cat)
 	for _, k := range cat.Kinds {
@@ -245,7 +245,7 @@ func emptyEngine(t *testing.T, ec engineCase, cat *ecd.Catalog) ecd.Engine {
 
 // newStore creates a store file in a new temporary folder and opens it. It returns the path and the store, which is
 // closed at the end of the test.
-func newStore(t *testing.T) (string, *sqlite.Store) {
+func newStore(t testing.TB) (string, *sqlite.Store) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "owner.db")
 	if err := sqlite.Create(path); err != nil {
@@ -255,7 +255,7 @@ func newStore(t *testing.T) (string, *sqlite.Store) {
 }
 
 // openStore opens the store at path, which must succeed. The store is closed at the end of the test.
-func openStore(t *testing.T, path string) *sqlite.Store {
+func openStore(t testing.TB, path string) *sqlite.Store {
 	t.Helper()
 	s, err := sqlite.Open(path)
 	if err != nil {
@@ -275,7 +275,7 @@ func closeStore(t *testing.T, s *sqlite.Store) {
 
 // commitWant commits deeds through s and fails the test unless Commit returns no error, the outcomes want and the
 // seq seq.
-func commitWant(t *testing.T, s *sqlite.Store, what string, deeds []ecd.Deed, want []rt.Outcome, seq uint64) {
+func commitWant(t testing.TB, s *sqlite.Store, what string, deeds []ecd.Deed, want []rt.Outcome, seq uint64) {
 	t.Helper()
 	out := make([]rt.Outcome, len(deeds))
 	got, err := s.Commit(deeds, out)

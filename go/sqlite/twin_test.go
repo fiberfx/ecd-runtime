@@ -81,7 +81,7 @@ func twinSQL(q ecd.QueryDef, kinds []ecd.Kind) (string, []any) {
 // twinRead opens a connection of its own on the store file at path and returns, from one read transaction, the
 // store's seq and the answer of the SQL twin of each query of cat, by QID. A query with no kinds runs on every All
 // kind of cat.
-func twinRead(t *testing.T, path string, cat *ecd.Catalog) (uint64, map[ecd.QID][]eid.ID) {
+func twinRead(t testing.TB, path string, cat *ecd.Catalog) (uint64, map[ecd.QID][]eid.ID) {
 	t.Helper()
 	db, err := sql.Open("sqlite", "file:"+path+"?mode=rw&_pragma=query_only(1)")
 	if err != nil {
