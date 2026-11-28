@@ -81,23 +81,23 @@ func chunksFor(n int, shift uint8) int {
 }
 
 // hydratedBytes returns the Bytes that kindStats reports for the All kind at index ki once hydrate has unloaded the
-// kind and spawned rows into it. It writes nothing: no node, table or entity of the engine is added or changed.
+// kind and adopted the staged tables of rows. It writes nothing: no node, table or entity of the engine is added or
+// changed.
 //
 // After unload every table of the kind is empty and holds at most one chunk, since shrink keeps one spare chunk.
-// Each entity of rows is spawned once, into the node of its whole component set, tags included, and a push adds a
-// chunk only when the row index reaches the chunks held. A table therefore holds the larger of the chunk that
-// unload kept and the chunks that its entities fill. A node without a table gets the table that emptyTable
-// describes. Each entity adds indexEntityBytes.
-func (en *Engine) hydratedBytes(ki uint16, rows []hydEntity) int64 {
+// Each entity of rows is spawned once, into the node of its whole component set, tags included: the staged table of
+// the set takes the place of the node's empty table, trimmed to the chunks that its entities fill, and a node whose
+// set no entity has keeps its table. A table therefore holds the larger of the chunk that unload kept and the chunks
+// that its entities fill. A node without a table gets the table that emptyTable describes. Each entity adds
+// indexEntityBytes.
+func (en *Engine) hydratedBytes(ki uint16, rows *hydStage) int64 {
 	count := make(map[mask]int) // the entities of rows by the mask of the node that spawns them
-	for i := range rows {
-		var m mask
-		for cid := range rows[i].vals {
-			m.set(en.byCID[cid])
+	for _, h := range rows.tabs {
+		if n := int(h.t.len()); n > 0 {
+			count[h.m] = n
 		}
-		count[m]++
 	}
-	sum := int64(len(rows)) * indexEntityBytes
+	sum := int64(rows.n) * indexEntityBytes
 	for node, t := range en.tables {
 		if t == nil || en.gr.arch(uint32(node)).kind != ki {
 			continue
