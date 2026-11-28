@@ -581,3 +581,68 @@ func TestJ5HRehydrate(t *testing.T) {
 		j5hSame(p, "hydrate an All kind twice")
 	})
 }
+
+// TestJ5HStageOrder requires rows out of eid order to load as the same rows in eid order do. The first rows give 600
+// entities of job a u64 only, which fill two chunks of one staged table; the later rows give the last 100 of them a
+// u32, which takes them out of that table, so its rows fit in one chunk. The test fails when stage does not leave
+// that table with more chunks than its rows fill, since the case then proves nothing. The hydration succeeds, every
+// table of the kind holds the chunks that its rows fill, each chunk records the seq of the hydration as the last write
+// of its rows and of every column, Bytes equals what hydratedBytes predicts on the staged rows and what the rows in
+// eid order give on a scratch engine, and every component of every entity reads as there.
+func TestJ5HStageOrder(t *testing.T) {
+	job := j1Kinds()[0]
+	ids := j5pJobIDs(t, 1, 600)
+	all := j5pShapeRows(ids, j5pShapeC, 1)
+	for _, id := range ids[500:] {
+		all = append(all, ecd.Row{Entity: id, CID: j3U32, Value: j5pNum32(1)})
+	}
+	ordered := append(j5pShapeRows(ids[:500], j5pShapeC, 1), j5pShapeRows(ids[500:], j5pShapeA, 1)...)
+
+	p := j5pNew(t, j5pCatalog(0))
+	staged, err := p.stage(job, 1, 0, &jcRowList{rows: all})
+	if err != nil {
+		t.Fatalf("stage: %v", err)
+	}
+	if st := staged.tabs[0].t; st.len() != 500 || len(st.chunks) <= chunksFor(500, st.shift) {
+		t.Fatalf("the first staged table holds %d rows in %d chunks, want 500 rows in more chunks than %d: the case "+
+			"proves nothing", st.len(), len(st.chunks), chunksFor(500, st.shift))
+	}
+	pred := p.hydratedBytes(0, staged)
+	if err := p.Hydrate(job, 1, &jcRowList{rows: all}); err != nil {
+		t.Fatalf("Hydrate: %v", err)
+	}
+	for node, n := range j5pTableChunks(p) {
+		tb := p.tables[node]
+		if want := chunksFor(int(tb.len()), tb.shift); n != want {
+			t.Errorf("node %d holds %d rows in %d chunks, want %d", node, tb.len(), n, want)
+		}
+		for ch := range n {
+			cols, rows := tb.changes(ch, 0)
+			later, rowsLater := tb.changes(ch, 1)
+			if cols != tb.cols || !rows || !later.isZero() || rowsLater {
+				t.Errorf("node %d chunk %d: written after 0: %v rows %v; after 1: %v rows %v; want every column and "+
+					"the rows at the seq 1 of the hydration, and nothing after it", node, ch, cols, rows, later, rowsLater)
+			}
+		}
+	}
+	got, want := p.kindStats(0).Bytes, j5pReference(t, ordered)
+	if got != pred || got != want {
+		t.Errorf("Bytes %d, predicted %d, the rows in eid order give %d; want all three equal", got, pred, want)
+	}
+	ref, err := build(j5pCatalog(0))
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if err := ref.hydrate(job, 1, &jcRowList{rows: ordered}); err != nil {
+		t.Fatalf("hydrate of the rows in eid order: %v", err)
+	}
+	for _, id := range ids {
+		for _, c := range j5pCIDs {
+			v, err := p.get(id, c, nil)
+			w, errW := ref.get(id, c, nil)
+			if !bytes.Equal(v, w) || j5rClass(err) != j5rClass(errW) {
+				t.Fatalf("Get(%s, %d) answers %x %s, the rows in eid order %x %s", id, c, v, j5rClass(err), w, j5rClass(errW))
+			}
+		}
+	}
+}

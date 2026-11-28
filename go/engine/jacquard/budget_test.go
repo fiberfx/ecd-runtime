@@ -233,7 +233,7 @@ func TestJ5PBudgetPredict(t *testing.T) {
 	}
 	var multi, big, shrunk, unused, grown bool
 	for i, rows := range steps {
-		staged, err := p.stage(job, 0, &jcRowList{rows: rows})
+		staged, err := p.stage(job, 1, 0, &jcRowList{rows: rows})
 		if err != nil {
 			t.Fatalf("step %d: stage: %v", i+1, err)
 		}
@@ -332,7 +332,7 @@ func TestJ5PBudgetBound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	staged, err := scratch.stage(job, 0, &jcRowList{rows: first})
+	staged, err := scratch.stage(job, 1, 0, &jcRowList{rows: first})
 	if err != nil {
 		t.Fatalf("stage of the first rows: %v", err)
 	}
