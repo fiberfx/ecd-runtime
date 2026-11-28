@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"sync"
 
 	"github.com/fiberfx/ecd-runtime/go/ecr"
 )
@@ -262,7 +263,15 @@ type nameHandle struct{}
 // Get returns a copy of the name of id. An entity or component that e reports absent answers false and nil;
 // every other error of e, ecr.ErrMiss and ecr.ErrCold among them, is returned with false.
 func (nameHandle) Get(e ecr.Engine, id ecr.ID) (NameValue, bool, error) {
-	return getValue[NameValue](e, id, CIDName)
+	var v NameValue
+	a := readBufs.Get().(*readBuf)
+	b, ok, err := getValue(e, id, CIDName, a)
+	if ok {
+		err = v.Decode(b)
+		ok = err == nil
+	}
+	readBufs.Put(a)
+	return v, ok, err
 }
 
 // Has reports whether id holds the name. Absent answers false and nil; every other error of e is returned.
@@ -289,7 +298,15 @@ type totalHandle struct{}
 // Get returns a copy of the total of id. An entity or component that e reports absent answers false and nil;
 // every other error of e, ecr.ErrMiss and ecr.ErrCold among them, is returned with false.
 func (totalHandle) Get(e ecr.Engine, id ecr.ID) (TotalValue, bool, error) {
-	return getValue[TotalValue](e, id, CIDTotal)
+	var v TotalValue
+	a := readBufs.Get().(*readBuf)
+	b, ok, err := getValue(e, id, CIDTotal, a)
+	if ok {
+		err = v.Decode(b)
+		ok = err == nil
+	}
+	readBufs.Put(a)
+	return v, ok, err
 }
 
 // Has reports whether id holds the total. Absent answers false and nil; every other error of e is returned.
@@ -316,7 +333,15 @@ type lineHandle struct{}
 // Get returns a copy of the line of id. An entity or component that e reports absent answers false and nil;
 // every other error of e, ecr.ErrMiss and ecr.ErrCold among them, is returned with false.
 func (lineHandle) Get(e ecr.Engine, id ecr.ID) (LineValue, bool, error) {
-	return getValue[LineValue](e, id, CIDLine)
+	var v LineValue
+	a := readBufs.Get().(*readBuf)
+	b, ok, err := getValue(e, id, CIDLine, a)
+	if ok {
+		err = v.Decode(b)
+		ok = err == nil
+	}
+	readBufs.Put(a)
+	return v, ok, err
 }
 
 // Has reports whether id holds the line. Absent answers false and nil; every other error of e is returned.
@@ -362,7 +387,15 @@ type roomHandle struct{}
 // Get returns a copy of the room of id. An entity or component that e reports absent answers false and nil;
 // every other error of e, ecr.ErrMiss and ecr.ErrCold among them, is returned with false.
 func (roomHandle) Get(e ecr.Engine, id ecr.ID) (RoomValue, bool, error) {
-	return getValue[RoomValue](e, id, CIDRoom)
+	var v RoomValue
+	a := readBufs.Get().(*readBuf)
+	b, ok, err := getValue(e, id, CIDRoom, a)
+	if ok {
+		err = v.Decode(b)
+		ok = err == nil
+	}
+	readBufs.Put(a)
+	return v, ok, err
 }
 
 // Has reports whether id holds the room. Absent answers false and nil; every other error of e is returned.
@@ -470,27 +503,25 @@ func GetMsg(e ecr.Engine, id ecr.ID) (MsgEntity, bool, error) {
 	return v, true, nil
 }
 
-// decoder is the pointer type of a generated value type: Decode sets the value from its codec bytes.
-type decoder[T any] interface {
-	*T
-	Decode(b []byte) error
-}
+// readBuf holds the largest component value of the catalog, SizeLine bytes. A handle's Get lends one to the
+// engine, which copies the value into it, so that the read allocates no copy of its own.
+type readBuf [SizeLine]byte
 
-// getValue reads component c of id from e and decodes it. An error that matches ecr.ErrAbsent answers the zero T,
-// false and nil; every other error is returned.
-func getValue[T any, P decoder[T]](e ecr.Engine, id ecr.ID, c ecr.CID) (T, bool, error) {
-	var v T
-	b, err := e.Get(id, c, nil)
+// readBufs holds the buffers that the handles' Get lend to the engine. A Get takes one and puts it back once it has
+// decoded the value, so that no byte of the buffer leaves the Get.
+var readBufs = sync.Pool{New: func() any { return new(readBuf) }}
+
+// getValue reads the value of component c of id from e into a and returns its codec bytes. An error that matches
+// ecr.ErrAbsent answers nil, false and nil; every other error is returned with false.
+func getValue(e ecr.Engine, id ecr.ID, c ecr.CID, a *readBuf) ([]byte, bool, error) {
+	b, err := e.Get(id, c, a[:0])
 	if errors.Is(err, ecr.ErrAbsent) {
-		return v, false, nil
+		return nil, false, nil
 	}
 	if err != nil {
-		return v, false, err
+		return nil, false, err
 	}
-	if err := P(&v).Decode(b); err != nil {
-		return v, false, err
-	}
-	return v, true, nil
+	return b, true, nil
 }
 
 // has reports whether id holds component or tag c. An error that matches ecr.ErrAbsent answers false and nil.
@@ -548,6 +579,12 @@ func iterRows[R any](e ecr.Engine, q ecr.QID, read func(id ecr.ID, r *R) error) 
 			}
 		}
 	}, nil
+}
+
+// decoder is the pointer type of a generated value type: Decode sets the value from its codec bytes.
+type decoder[T any] interface {
+	*T
+	Decode(b []byte) error
 }
 
 // iterValues runs query q on e and returns a sequence of each entity of its answer and a copy of its component c.

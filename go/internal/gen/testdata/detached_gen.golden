@@ -5,6 +5,7 @@ package dtc
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	eid "github.com/fiberfx/ecd-id/go"
 	"github.com/fiberfx/ecd-runtime/go/ecd"
@@ -171,7 +172,15 @@ type stateHandle struct{}
 // Get returns a copy of the state of id. An entity or component that e reports absent answers false and nil;
 // every other error of e, ecd.ErrMiss and ecd.ErrCold among them, is returned with false.
 func (stateHandle) Get(e ecd.Engine, id eid.ID) (StateValue, bool, error) {
-	return getValue[StateValue](e, id, CIDState)
+	var v StateValue
+	a := readBufs.Get().(*readBuf)
+	b, ok, err := getValue(e, id, CIDState, a)
+	if ok {
+		err = v.Decode(b)
+		ok = err == nil
+	}
+	readBufs.Put(a)
+	return v, ok, err
 }
 
 // Has reports whether id holds the state. Absent answers false and nil; every other error of e is returned.
@@ -198,7 +207,15 @@ type labelHandle struct{}
 // Get returns a copy of the label of id. An entity or component that e reports absent answers false and nil;
 // every other error of e, ecd.ErrMiss and ecd.ErrCold among them, is returned with false.
 func (labelHandle) Get(e ecd.Engine, id eid.ID) (LabelValue, bool, error) {
-	return getValue[LabelValue](e, id, CIDLabel)
+	var v LabelValue
+	a := readBufs.Get().(*readBuf)
+	b, ok, err := getValue(e, id, CIDLabel, a)
+	if ok {
+		err = v.Decode(b)
+		ok = err == nil
+	}
+	readBufs.Put(a)
+	return v, ok, err
 }
 
 // Has reports whether id holds the label. Absent answers false and nil; every other error of e is returned.
@@ -225,7 +242,15 @@ type refHandle struct{}
 // Get returns a copy of the ref of id. An entity or component that e reports absent answers false and nil;
 // every other error of e, ecd.ErrMiss and ecd.ErrCold among them, is returned with false.
 func (refHandle) Get(e ecd.Engine, id eid.ID) (RefValue, bool, error) {
-	return getValue[RefValue](e, id, CIDRef)
+	var v RefValue
+	a := readBufs.Get().(*readBuf)
+	b, ok, err := getValue(e, id, CIDRef, a)
+	if ok {
+		err = v.Decode(b)
+		ok = err == nil
+	}
+	readBufs.Put(a)
+	return v, ok, err
 }
 
 // Has reports whether id holds the ref. Absent answers false and nil; every other error of e is returned.
@@ -261,27 +286,25 @@ func (doneHandle) Remove(b *rt.Buffer, r rt.Ref) { b.Unset(r, CIDDone) }
 // CID returns CIDDone.
 func (doneHandle) CID() ecd.CID { return CIDDone }
 
-// decoder is the pointer type of a generated value type: Decode sets the value from its codec bytes.
-type decoder[T any] interface {
-	*T
-	Decode(b []byte) error
-}
+// readBuf holds the largest component value of the catalog, SizeLabel bytes. A handle's Get lends one to the
+// engine, which copies the value into it, so that the read allocates no copy of its own.
+type readBuf [SizeLabel]byte
 
-// getValue reads component c of id from e and decodes it. An error that matches ecd.ErrAbsent answers the zero T,
-// false and nil; every other error is returned.
-func getValue[T any, P decoder[T]](e ecd.Engine, id eid.ID, c ecd.CID) (T, bool, error) {
-	var v T
-	b, err := e.Get(id, c, nil)
+// readBufs holds the buffers that the handles' Get lend to the engine. A Get takes one and puts it back once it has
+// decoded the value, so that no byte of the buffer leaves the Get.
+var readBufs = sync.Pool{New: func() any { return new(readBuf) }}
+
+// getValue reads the value of component c of id from e into a and returns its codec bytes. An error that matches
+// ecd.ErrAbsent answers nil, false and nil; every other error is returned with false.
+func getValue(e ecd.Engine, id eid.ID, c ecd.CID, a *readBuf) ([]byte, bool, error) {
+	b, err := e.Get(id, c, a[:0])
 	if errors.Is(err, ecd.ErrAbsent) {
-		return v, false, nil
+		return nil, false, nil
 	}
 	if err != nil {
-		return v, false, err
+		return nil, false, err
 	}
-	if err := P(&v).Decode(b); err != nil {
-		return v, false, err
-	}
-	return v, true, nil
+	return b, true, nil
 }
 
 // has reports whether id holds component or tag c. An error that matches ecd.ErrAbsent answers false and nil.
